@@ -1,0 +1,13 @@
+domain:                            example.fr
+status:                            ACTIVE
+hold:                              NO
+holder-c:                          ANO00-FRNIC
+admin-c:                           EXAMPLE1-FRNIC
+tech-c:                            EXAMPLE2-FRNIC
+registrar:                         EXAMPLE REGISTRAR
+Expiry Date:                       2026-08-13T04:00:00Z
+created:                           1995-08-14T04:00:00Z
+last-update:                       2025-08-14T07:01:31Z
+source:                            FRNIC
+nameservers:                       ns1.example.fr
+nameservers:                       ns2.example.fr

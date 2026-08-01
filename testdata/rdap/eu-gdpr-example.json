@@ -1,0 +1,43 @@
+{
+  "objectClassName": "domain",
+  "handle": "EXAMPLE-EURID",
+  "ldhName": "EXAMPLE.EU",
+  "unicodeName": "example.eu",
+  "status": ["active"],
+  "entities": [
+    {
+      "objectClassName": "entity",
+      "roles": ["registrant"],
+      "remarks": [
+        {
+          "title": "REDACTED FOR PRIVACY",
+          "type": "object redacted due to eligibility",
+          "description": [
+            "Some of the data in this object has been redacted for privacy."
+          ]
+        }
+      ]
+    },
+    {
+      "objectClassName": "entity",
+      "handle": "EXAMPLE-REGISTRAR-EU",
+      "roles": ["registrar"],
+      "vcardArray": [
+        "vcard",
+        [
+          ["version", {}, "text", "4.0"],
+          ["fn", {}, "text", "Example Registrar B.V."]
+        ]
+      ]
+    }
+  ],
+  "events": [
+    { "eventAction": "registration", "eventDate": "2010-06-01T00:00:00Z" },
+    { "eventAction": "expiration", "eventDate": "2026-06-01T00:00:00Z" }
+  ],
+  "nameservers": [
+    { "objectClassName": "nameserver", "ldhName": "NS1.EXAMPLE.EU" },
+    { "objectClassName": "nameserver", "ldhName": "NS2.EXAMPLE.EU" }
+  ],
+  "rdapConformance": ["rdap_level_0"]
+}

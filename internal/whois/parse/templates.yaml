@@ -1,0 +1,14 @@
+de:
+  format: kv
+  synonyms:
+    changed: updated
+jp:
+  format: brackets
+uk:
+  format: indent
+eu:
+  format: kv
+fr:
+  format: kv
+nl:
+  format: kv

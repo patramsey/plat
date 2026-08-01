@@ -1,0 +1,15 @@
+Domain Name: EXAMPLE.ORG
+Registry Domain ID: D12345678-LROR
+Registrar WHOIS Server: whois.example-registrar.example
+Registrar URL: http://www.example-registrar.example
+Updated Date: 2025-11-02T10:15:00Z
+Creation Date: 1998-03-20T00:00:00Z
+Registry Expiry Date: 2026-03-20T00:00:00Z
+Registrar: Example Registrar, Inc.
+Registrar IANA ID: 1234
+Registrant Organization: Example Nonprofit Org
+Registrant Country: US
+Domain Status: clientTransferProhibited https://icann.org/epp#clientTransferProhibited
+Name Server: NS1.EXAMPLE.ORG
+Name Server: NS2.EXAMPLE.ORG
+DNSSEC: signedDelegation

@@ -1,0 +1,2 @@
+No match for "NONEXISTENT-DOMAIN-XYZ.COM".
+>>> Last update of WHOIS database: 2026-07-12T09:15:00Z <<<

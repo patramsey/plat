@@ -1,0 +1,10 @@
+[Domain Name]                  EXAMPLE.JP
+
+[Registrant]                   Example Corp
+
+[Name Server]                  a.dns.jp
+[Name Server]                  b.dns.jp
+[Status]                       Active
+[Created on]                   1995/08/14
+[Expires on]                   2026/08/13
+[Last Updated]                 2025/08/14

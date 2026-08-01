@@ -1,0 +1,26 @@
+Domain name:
+        example.uk
+
+Registrant:
+        Example Organisation Ltd
+
+Registrant type:
+        UK Limited Company (Company number 12345678)
+
+Registrar:
+        Example Registrar Ltd t/a Example Registrar [Tag = EXAMPLE]
+        URL: http://www.example-registrar.co.uk
+
+Relevant dates:
+        Registered on: 14-Aug-1995
+        Expiry date:  13-Aug-2026
+        Last updated:  14-Jan-2025
+
+Registration status:
+        Registered until expiry date.
+
+Name servers:
+        ns1.example.uk
+        ns2.example.uk
+
+WHOIS lookup made on Sun, 12 Jul 2026 at 09:15:00

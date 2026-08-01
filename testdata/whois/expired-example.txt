@@ -1,0 +1,8 @@
+Domain Name: EXPIRED-EXAMPLE.COM
+Registry Domain ID: D111222333-COM
+Registrar: Example Registrar, Inc.
+Creation Date: 2015-01-10T00:00:00Z
+Registry Expiry Date: 2025-01-10T00:00:00Z
+Updated Date: 2025-02-15T00:00:00Z
+Domain Status: pendingDelete
+Domain Status: redemptionPeriod

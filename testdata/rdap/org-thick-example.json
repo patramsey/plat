@@ -1,0 +1,53 @@
+{
+  "objectClassName": "domain",
+  "handle": "D123456789-LROR",
+  "ldhName": "EXAMPLE.ORG",
+  "unicodeName": "example.org",
+  "status": [
+    "client transfer prohibited",
+    "server delete prohibited"
+  ],
+  "entities": [
+    {
+      "objectClassName": "entity",
+      "handle": "EXAMPLE-REGISTRAR",
+      "roles": ["registrar"],
+      "publicIds": [
+        { "type": "IANA Registrar ID", "identifier": "9999" }
+      ],
+      "vcardArray": [
+        "vcard",
+        [
+          ["version", {}, "text", "4.0"],
+          ["fn", {}, "text", "Example Registrar, Inc."]
+        ]
+      ],
+      "entities": [
+        {
+          "objectClassName": "entity",
+          "roles": ["abuse"],
+          "vcardArray": [
+            "vcard",
+            [
+              ["version", {}, "text", "4.0"],
+              ["email", {}, "text", "abuse@example-registrar.example"]
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "events": [
+    { "eventAction": "registration", "eventDate": "2001-03-15T00:00:00Z" },
+    { "eventAction": "last changed", "eventDate": "2025-03-15T12:00:00Z" },
+    { "eventAction": "expiration", "eventDate": "2027-03-15T00:00:00Z" }
+  ],
+  "nameservers": [
+    { "objectClassName": "nameserver", "ldhName": "NS1.EXAMPLE.ORG" },
+    { "objectClassName": "nameserver", "ldhName": "NS2.EXAMPLE.ORG" }
+  ],
+  "secureDNS": {
+    "delegationSigned": true
+  },
+  "rdapConformance": ["rdap_level_0"]
+}

@@ -1,0 +1,13 @@
+Domain name: example.nl
+Status:      active
+
+Registrar:
+   Example Registrar B.V.
+   Amsterdam, Netherlands
+
+DNSSEC:      no
+
+Domain nameservers: ns1.example.nl
+Domain nameservers: ns2.example.nl
+
+Record maintained by: NL Domain Registry

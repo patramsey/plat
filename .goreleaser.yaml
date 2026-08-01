@@ -1,0 +1,84 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    # NOTE: deliberately NOT `dist/docs` as originally drafted. goreleaser's
+    # BuildPipeline runs before.hooks immediately before its own dist.Pipe,
+    # whose sole job is "ensure ./dist exists and is empty" (see
+    # internal/pipeline/pipeline.go and internal/pipe/dist/dist.go in the
+    # goreleaser/goreleaser/v2 module source) -- confirmed by reading the
+    # v2.17.0 source after a real `goreleaser release --snapshot --clean`
+    # run failed with "dist is not empty, remove it before running
+    # goreleaser or use the --clean flag". Any hook that writes into dist/
+    # unconditionally fails that check, in every goreleaser v2 release with
+    # this pipeline shape -- it is not a version-specific quirk. Writing
+    # generated docs to a directory outside dist/ (still gitignored, still
+    # regenerated fresh on every run) sidesteps the conflict entirely while
+    # preserving the hook's purpose.
+    - go run ./cmd/plat gendocs .gendocs
+
+builds:
+  - id: plat
+    main: ./cmd/plat
+    binary: plat
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser
+
+archives:
+  - id: plat
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+      - .gendocs/man/*
+      - .gendocs/completions/*
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^style:"
+
+brews:
+  # `brews` is marked deprecated by goreleaser's own runtime warning, in
+  # favor of a newer `homebrew_casks` mechanism aimed primarily at
+  # GUI/app-bundle distribution. `brews` remains fully functional
+  # (confirmed via a real `goreleaser release --snapshot --clean` run,
+  # which produces a working dist/homebrew/plat.rb formula) and is still
+  # the correct mechanism for a traditional Formula-based "tap" — the
+  # exact deliverable plat-plan.md's M7 line asks for — so it's used here
+  # deliberately. Revisit if goreleaser removes `brews` outright in a
+  # future major version.
+  - name: plat
+    repository:
+      owner: patramsey
+      name: homebrew-tap
+    homepage: "https://github.com/patramsey/plat"
+    description: "Domain lookup via WHOIS and RDAP with per-field source provenance"
+    license: "MIT"
+
+release:
+  footer: >-
+
+    ---
+
+    Released by [GoReleaser](https://github.com/goreleaser/goreleaser).

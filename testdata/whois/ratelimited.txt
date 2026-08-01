@@ -1,0 +1,4 @@
+% This query returned too many results.
+%
+% Your request has exceeded the query rate limit for this WHOIS server.
+% Query rate limit exceeded. Please wait and try again later.

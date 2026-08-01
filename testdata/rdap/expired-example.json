@@ -1,0 +1,17 @@
+{
+  "objectClassName": "domain",
+  "handle": "D111222333-LROR",
+  "ldhName": "EXPIRED-EXAMPLE.COM",
+  "unicodeName": "expired-example.com",
+  "status": [
+    "pending delete",
+    "redemption period"
+  ],
+  "events": [
+    { "eventAction": "registration", "eventDate": "2015-01-10T00:00:00Z" },
+    { "eventAction": "expiration", "eventDate": "2025-01-10T00:00:00Z" },
+    { "eventAction": "last changed", "eventDate": "2025-02-15T00:00:00Z" }
+  ],
+  "nameservers": [],
+  "rdapConformance": ["rdap_level_0"]
+}

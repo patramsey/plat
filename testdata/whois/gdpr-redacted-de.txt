@@ -1,0 +1,6 @@
+Domain: example.de
+Nserver: ns1.example.de
+Nserver: ns2.example.de
+Status: connect
+Changed: 2025-08-14T07:01:31+02:00
+Registrar: REDACTED FOR PRIVACY

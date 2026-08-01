@@ -1,0 +1,61 @@
+{
+  "objectClassName": "domain",
+  "handle": "REG-2336799",
+  "ldhName": "EXAMPLE.COM",
+  "unicodeName": "example.com",
+  "status": ["clientTransferProhibited"],
+  "events": [
+    {"eventAction": "registration", "eventDate": "1995-08-14T04:00:00Z"},
+    {"eventAction": "last changed", "eventDate": "2025-08-14T07:01:31Z"},
+    {"eventAction": "expiration", "eventDate": "2026-08-13T04:00:00Z"}
+  ],
+  "nameservers": [
+    {"objectClassName": "nameserver", "ldhName": "a.iana-servers.net"},
+    {"objectClassName": "nameserver", "ldhName": "b.iana-servers.net"}
+  ],
+  "entities": [
+    {
+      "objectClassName": "entity",
+      "handle": "1234",
+      "roles": ["registrar"],
+      "vcardArray": [
+        "vcard",
+        [
+          ["version", {}, "text", "4.0"],
+          ["fn", {}, "text", "Example Registrar, Inc."]
+        ]
+      ]
+    },
+    {
+      "objectClassName": "entity",
+      "roles": ["abuse"],
+      "vcardArray": [
+        "vcard",
+        [
+          ["version", {}, "text", "4.0"],
+          ["fn", {}, "text", "Abuse Team"],
+          ["email", {}, "text", "abuse@example-registrar.example"],
+          ["tel", {}, "text", "+1.5555550100"]
+        ]
+      ]
+    },
+    {
+      "objectClassName": "entity",
+      "roles": ["registrant"],
+      "vcardArray": [
+        "vcard",
+        [
+          ["version", {}, "text", "4.0"],
+          ["fn", {}, "text", "REDACTED FOR PRIVACY"]
+        ]
+      ]
+    }
+  ],
+  "remarks": [
+    {
+      "title": "REDACTED FOR PRIVACY",
+      "type": "object redacted due to authorization",
+      "description": ["Some of the data in this object has been removed to protect personal information."]
+    }
+  ]
+}

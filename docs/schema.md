@@ -1,0 +1,123 @@
+# plat JSON output schema
+
+`plat <domain> -o json` and `plat <domain> -o ndjson` emit the unified
+domain record as JSON. This schema is a public API: a breaking change to
+any field's shape bumps `schemaVersion`. The current version is **1**.
+
+## Top-level shape
+
+```json
+{
+  "schemaVersion": 1,
+  "domain": { "value": "example.com", "sources": ["registry-rdap"] },
+  "handle": { "value": "2336799_DOMAIN_COM-VRSN", "sources": ["registry-rdap"] },
+  "registrar": {
+    "name": { "value": "Example Registrar, Inc.", "sources": ["registrar-rdap"] },
+    "abuseEmail": { "value": "abuse@example-registrar.example", "sources": ["registrar-rdap"] }
+  },
+  "status": { "value": ["clientTransferProhibited"], "sources": ["registry-rdap"] },
+  "created": { "value": "1995-08-14T04:00:00Z", "raw": "1995-08-14T04:00:00Z", "parsed": true, "sources": ["registry-rdap"] },
+  "expires": { "value": "2026-08-13T04:00:00Z", "raw": "2026-08-13T04:00:00Z", "parsed": true, "sources": ["registry-rdap"] },
+  "nameservers": { "value": ["a.iana-servers.net", "b.iana-servers.net"], "sources": ["registry-rdap"] },
+  "conflicts": [],
+  "redacted": [],
+  "sources": [
+    { "source": "registry-rdap", "ok": true, "notFound": false, "latencyMs": 89 },
+    { "source": "registrar-rdap", "ok": true, "notFound": false, "latencyMs": 145 }
+  ]
+}
+```
+
+## Field shapes
+
+Every optional field (`domain`, `handle`, `registrar.*`, `status`,
+`created`, `updated`, `expires`, `nameservers`, `dnssec`) is **omitted
+entirely** from the output when no source contributed a value — not
+`null`, not an empty object, simply absent. `jq '.expires.value'` on a
+record with no expires data returns `null` (jq's normal behavior for a
+missing path), so pipelines don't need to special-case absence.
+
+- **String field** (`domain`, `handle`, `registrar.name`, `registrar.ianaId`, `registrar.url`, `registrar.abuseEmail`, `registrar.abusePhone`):
+  ```json
+  { "value": "<string>", "sources": ["<source-id>", ...] }
+  ```
+- **List field** (`status`, `nameservers`):
+  ```json
+  { "value": ["<string>", ...], "sources": ["<source-id>", ...] }
+  ```
+- **Bool field** (`dnssec`):
+  ```json
+  { "value": true, "sources": ["<source-id>", ...] }
+  ```
+- **Time field** (`created`, `updated`, `expires`):
+  ```json
+  { "value": "<RFC3339 string or null>", "raw": "<original string>", "parsed": true, "sources": [...] }
+  ```
+  `value` is `null` when the source's date string couldn't be parsed — `raw`/`parsed` always reflect the underlying source data so nothing is silently dropped. `created`/`updated` keep the highest-precedence source's value even when sources disagree (see `conflicts[]`). `expires` is the one exception: on a genuine conflict, `value` is the *earliest* disputed date rather than the highest-precedence one — showing more runway than actually exists is the riskier failure mode for an expiration date, so a conflicted `expires` conservatively assumes the sooner date. `sources` always reflects whichever sources actually agree with the returned `value`, not merely every source that reported something.
+- **`registrar`** is an object of up to 5 string fields (`name`, `ianaId`, `url`, `abuseEmail`, `abusePhone`), each following the string-field shape above and each independently omittable. The whole `registrar` key is omitted only if every one of its sub-fields is absent.
+- **`conflicts[]`** — one entry per field where present sources disagreed:
+  ```json
+  { "field": "expires", "values": { "registry-rdap": "2026-08-13T04:00:00Z", "registry-whois": "2026-08-10" } }
+  ```
+  Always fully populated regardless of the CLI's `--conflicts` flag, which only affects whether the human/plain renderers print this detail inline — it has no effect on machine output.
+- **`redacted[]`** — one entry per field where a higher-precedence source's value was withheld:
+  ```json
+  { "field": "registrar.name", "source": "registrar-rdap", "reason": "redacted" }
+  ```
+- **`sources[]`** — one entry per source actually attempted, always present (an empty array if literally nothing was attempted):
+  ```json
+  { "source": "registry-rdap", "ok": true, "notFound": false, "latencyMs": 89, "error": "timeout" }
+  ```
+  `error` is omitted when empty. `source` is one of `registry-rdap`, `registrar-rdap`, `registry-whois`, `registrar-whois` — these full names are what every `sources` array uses throughout this schema, in JSON/NDJSON, always. The human/plain terminal views abbreviate them to 2-letter codes (`GR`/`RR`/`GW`/`RW`) purely for display, with a legend printed once per lookup; that abbreviation is a rendering choice, not part of this schema.
+
+## `--raw`
+
+Adding `--raw` includes each source's raw response payload as `sources[].raw`:
+
+```json
+{ "source": "registry-rdap", "ok": true, "raw": { "objectClassName": "domain", "ldhName": "EXAMPLE.COM", ... } }
+```
+
+For RDAP sources, `raw` is the actual response JSON embedded as-is (a JSON
+object, not a string). For WHOIS sources, `raw` is the plaintext response
+encoded as a JSON string, since WHOIS has no native JSON structure:
+
+```json
+{ "source": "registry-whois", "ok": true, "raw": "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar\n..." }
+```
+
+Without `--raw`, the `raw` key is omitted entirely from every source entry.
+
+## NDJSON (`-o ndjson`)
+
+For multiple domain arguments, each domain's record is written as one
+compact JSON object per line (no pretty-printing, no blank lines between
+records) — standard [NDJSON](http://ndjson.org/). `-o json` (the
+single-object form) only accepts exactly one domain argument; use
+`-o ndjson` for multiple.
+
+## Errors in machine mode
+
+If a domain can't be looked up at all (bad input, or no source returned
+usable data), the error goes to **stderr**, not stdout, as:
+
+```json
+{ "error": "is not registered (checked: registry-rdap)", "domain": "example-nonexistent-xyz.com" }
+```
+
+The message text itself isn't part of the stability guarantee below — only
+the `{error, domain}` shape is. A confirmed-unregistered domain (every
+attempted source agrees it doesn't exist) reads as "is not registered"; a
+genuine lookup failure (sources errored, so non-existence can't be
+confirmed) reads as "lookup inconclusive" or "lookup failed" instead.
+
+stdout only ever contains successfully-rendered records in machine mode —
+scripts consuming stdout never need to distinguish a partial/error object
+from a real record.
+
+## Stability policy
+
+This schema is versioned via the top-level `schemaVersion` field (currently
+`1`). Any backward-incompatible change — a field renamed, removed, or its
+type changed — bumps `schemaVersion`. Purely additive changes (a new
+optional field) do not require a version bump.

@@ -1,0 +1,191 @@
+package collect
+
+import (
+	"context"
+	"net/url"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/patramsey/plat/internal/domain"
+	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/rdap"
+	"github.com/patramsey/plat/internal/whois"
+)
+
+// Options controls Collect's behavior.
+type Options struct {
+	// NoFollow skips the registrar RDAP related-link hop even if the
+	// registry response advertises one.
+	NoFollow bool
+	// Timeout bounds each individual fetch (registry RDAP, registrar
+	// RDAP, and the whole WHOIS chain).
+	Timeout time.Duration
+	// Sources restricts which of the four possible sources Collect
+	// includes in its output. nil (the zero value) means all four are
+	// allowed. This does not always suppress the underlying network
+	// call: registrar RDAP can only be discovered via the registry
+	// RDAP response's related link, and the WHOIS registrar hop can
+	// only be reached by completing the same referral chain that
+	// visits the registry hop — in both cases the upstream fetch still
+	// happens when needed to reach an allowed downstream source, but
+	// its own SourceRecord is only emitted if it is itself allowed.
+	Sources []model.SourceID
+}
+
+func (o Options) allows(id model.SourceID) bool {
+	return len(o.Sources) == 0 || slices.Contains(o.Sources, id)
+}
+
+// Collect fans out to registry RDAP (and, unless NoFollow, the registrar
+// RDAP hop via the registry's "related" link) and the WHOIS chain
+// concurrently — the two branches share no state (separate rdap.Client and
+// whois.Client instances) and neither depends on the other's result, so
+// they run in parallel goroutines rather than one after the other; only
+// the registrar RDAP hop within the RDAP branch, and the registry ->
+// registrar chasing within the WHOIS branch, are genuinely sequential
+// (each depends on its predecessor's response to find the next hop).
+// Collect returns one model.SourceRecord per source actually attempted AND
+// allowed by opts.Sources, always in a fixed registry-rdap,
+// registrar-rdap, registry-whois, registrar-whois order regardless of
+// which goroutine finished first, so callers (e.g. the CLI's -v output)
+// see a stable order across runs. registryBaseURL is the already-resolved
+// RDAP service base for the domain's TLD (empty string means no RDAP
+// coverage — Collect degrades to WHOIS-only). whoisIANAServer overrides
+// the WHOIS client's IANA server (empty string uses whois.Client's own
+// "whois.iana.org" default) — this parameter exists so tests can point
+// the WHOIS chain at a local fake IANA server, the same way internal/whois's
+// own tests do.
+//
+// After both branches finish, if the WHOIS chain didn't discover a
+// registrar-whois server itself (the registry hop gave no "Registrar
+// WHOIS Server:" referral — e.g. because the registry doesn't run WHOIS
+// for this TLD at all, as several of Identity Digital's newer gTLDs
+// don't) but the registrar-RDAP hop's response carries RFC 9083's
+// optional port43 field, Collect makes one direct fallback WHOIS query
+// to that server. This is a genuinely sequential extra step (it needs
+// both branches' results to decide whether it's even needed), not part
+// of the concurrent fan-out above, and only fires when registrar-whois
+// is actually a wanted source.
+//
+// A single source failing is normal, not fatal — Collect never returns an
+// error; callers pass the (possibly partial) result straight to
+// merge.Merge.
+func Collect(ctx context.Context, name domain.Name, registryBaseURL string, whoisIANAServer string, opts Options) []model.SourceRecord {
+	var rdapOut, whoisOut []model.SourceRecord
+	var registrarPort43 string
+
+	needRDAP := registryBaseURL != "" &&
+		(opts.allows(model.SourceRegistryRDAP) || (!opts.NoFollow && opts.allows(model.SourceRegistrarRDAP)))
+	needWHOIS := opts.allows(model.SourceRegistryWHOIS) || opts.allows(model.SourceRegistrarWHOIS)
+
+	var wg sync.WaitGroup
+	if needRDAP {
+		wg.Go(func() {
+			rdapOut, registrarPort43 = collectRDAP(ctx, name, registryBaseURL, opts)
+		})
+	}
+	if needWHOIS {
+		wg.Go(func() {
+			whoisOut = collectWHOIS(ctx, name, whoisIANAServer, opts)
+		})
+	}
+	wg.Wait()
+
+	if opts.allows(model.SourceRegistrarWHOIS) && registrarPort43 != "" && !hasSource(whoisOut, model.SourceRegistrarWHOIS) {
+		whoisClient := &whois.Client{Timeout: opts.Timeout}
+		hop := whoisClient.QueryServer(ctx, registrarPort43, name)
+		whoisOut = append(whoisOut, fromHop(model.SourceRegistrarWHOIS, hop))
+	}
+
+	out := make([]model.SourceRecord, 0, len(rdapOut)+len(whoisOut))
+	out = append(out, rdapOut...)
+	out = append(out, whoisOut...)
+	return out
+}
+
+func hasSource(records []model.SourceRecord, id model.SourceID) bool {
+	for _, r := range records {
+		if r.Meta.Source == id {
+			return true
+		}
+	}
+	return false
+}
+
+// collectRDAP returns the RDAP source records plus, separately, the
+// registrar-RDAP hop's port43 value (if any) — kept out-of-band from
+// []model.SourceRecord since it isn't itself a per-field provenance
+// value, just a hint Collect may use for the registrar-WHOIS fallback.
+func collectRDAP(ctx context.Context, name domain.Name, registryBaseURL string, opts Options) ([]model.SourceRecord, string) {
+	var out []model.SourceRecord
+	var registrarPort43 string
+
+	rdapClient := &rdap.Client{Timeout: opts.Timeout}
+	start := time.Now()
+	result, err := rdapClient.Domain(ctx, registryBaseURL, name.Punycode)
+	if opts.allows(model.SourceRegistryRDAP) {
+		out = append(out, FromRDAP(model.SourceRegistryRDAP, result, time.Since(start), err))
+	}
+
+	if !opts.NoFollow && opts.allows(model.SourceRegistrarRDAP) && err == nil && result.Domain != nil {
+		if registrarURL, ok := result.Domain.RelatedRegistrarURL(); ok && differentHost(registryBaseURL, registrarURL) {
+			rStart := time.Now()
+			rResult, rErr := rdapClient.DomainURL(ctx, registrarURL)
+			out = append(out, FromRDAP(model.SourceRegistrarRDAP, rResult, time.Since(rStart), rErr))
+			if rErr == nil && rResult.Domain != nil {
+				registrarPort43 = rResult.Domain.Port43
+			}
+		}
+	}
+
+	return out, registrarPort43
+}
+
+func collectWHOIS(ctx context.Context, name domain.Name, whoisIANAServer string, opts Options) []model.SourceRecord {
+	var out []model.SourceRecord
+
+	timeout := opts.Timeout
+	if timeout <= 0 {
+		timeout = 5 * time.Second // matches whois.Client.timeout()'s own default
+	}
+	// Bound the WHOIS chain as a whole, not just each hop — see
+	// Options.Timeout's doc comment. whois.Client still applies its own
+	// per-hop context.WithTimeout inside query(), but nested inside this
+	// outer deadline (context.WithTimeout always takes the earlier of two
+	// nested deadlines), so a hop's own budget only ever shrinks as
+	// earlier hops spend it, and the total wall time across
+	// IANA -> registry -> registrar never exceeds timeout.
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer}
+	wResult, _ := whoisClient.Lookup(ctx, name)
+	for _, sr := range FromWHOIS(wResult) {
+		if opts.allows(sr.Meta.Source) {
+			out = append(out, sr)
+		}
+	}
+
+	return out
+}
+
+// differentHost reports whether registrarURL points at a DIFFERENT network
+// authority (host:port) than registryBaseURL — a loop guard against a
+// registry advertising itself as its own registrar, or a misconfigured
+// related link pointing back at the same server. Comparing the full Host
+// (not just Hostname) matters for tests that run registry and registrar
+// as separate local listeners sharing the loopback address on different
+// ports — those are genuinely different servers, not a loop. Any URL
+// parse failure is treated as "same host" (i.e. skip) — DomainURL itself
+// would also reject a genuinely malformed or non-http(s) URL, but there's
+// no reason to attempt a fetch this function already can't make sense of.
+func differentHost(registryBaseURL, registrarURL string) bool {
+	rb, err1 := url.Parse(registryBaseURL)
+	ru, err2 := url.Parse(registrarURL)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return !strings.EqualFold(rb.Host, ru.Host)
+}

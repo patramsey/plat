@@ -1,0 +1,5 @@
+/plat
+/dist/
+/.gendocs/
+*.test
+*.out

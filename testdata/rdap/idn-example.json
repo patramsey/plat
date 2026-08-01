@@ -1,0 +1,16 @@
+{
+  "objectClassName": "domain",
+  "handle": "D987654321-LROR",
+  "ldhName": "XN--MNCHEN-3YA.DE",
+  "unicodeName": "münchen.de",
+  "status": ["active"],
+  "events": [
+    { "eventAction": "registration", "eventDate": "2015-05-20T00:00:00Z" },
+    { "eventAction": "expiration", "eventDate": "2026-05-20T00:00:00Z" }
+  ],
+  "nameservers": [
+    { "objectClassName": "nameserver", "ldhName": "NS1.EXAMPLE.DE" },
+    { "objectClassName": "nameserver", "ldhName": "NS2.EXAMPLE.DE" }
+  ],
+  "rdapConformance": ["rdap_level_0"]
+}

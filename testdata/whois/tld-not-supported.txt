@@ -1,0 +1,4 @@
+TLD is not supported.
+>>> Last update of WHOIS database: 2026-07-14T02:05:46Z <<<
+
+Terms of Use: Access to WHOIS information is provided to assist persons in determining the contents of a domain name registration record in the registry database. The data in this record is provided by Identity Digital or the Registry Operator for informational purposes only, and accuracy is not guaranteed.

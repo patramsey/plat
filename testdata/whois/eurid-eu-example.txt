@@ -1,0 +1,11 @@
+Domain:	example.eu
+Status:	ACTIVE
+Registrant:	Not Disclosed - Visit www.eurid.eu for webbased WHOIS.
+Registrar:
+   Name:	Example Registrar B.V.
+   Website:	www.example-registrar.eu
+
+Name servers: ns1.example.eu
+Name servers: ns2.example.eu
+
+Please visit www.eurid.eu for more information.
