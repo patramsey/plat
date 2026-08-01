@@ -135,6 +135,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var showConflicts bool
 	var showVersion bool
 	var quiet bool
+	var noColorFlag bool
 
 	root := &cobra.Command{
 		Use:           "plat <domain> [domain...]",
@@ -177,6 +178,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 				Verbose:          verbose,
 				ShowConflicts:    showConflicts,
 				Quiet:            quiet,
+				NoColor:          noColorFlag,
 			}, ui)
 		},
 	}
@@ -202,10 +204,11 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	root.Flags().BoolVar(&showConflicts, "conflicts", false, "show the full per-source breakdown for every conflicted field (a field with a conflict is always marked with ⚠, even without this flag)")
 	root.Flags().BoolVar(&showVersion, "version", false, "print the plat version and exit")
 	root.Flags().BoolVarP(&quiet, "quiet", "q", false, "print a one-line summary per domain (lock status, expiry, conflict count) instead of the full view -- ignored for -o json/ndjson")
+	root.Flags().BoolVar(&noColorFlag, "no-color", false, "disable color output (same effect as the NO_COLOR env var)")
 
-	// --no-color is still reserved for a later addition. `completion` is
-	// a real subcommand (M7, cobra's built-in generator); man pages are a
-	// build-time-only artifact (M7's gendocs, not a runtime subcommand).
+	// `completion` is a real subcommand (M7, cobra's built-in generator);
+	// man pages are a build-time-only artifact (M7's gendocs, not a
+	// runtime subcommand).
 
 	var versionOutput string
 	var versionFull bool
@@ -248,13 +251,22 @@ type lookupOptions struct {
 	Verbose          bool
 	ShowConflicts    bool
 	Quiet            bool
+	NoColor          bool
+}
+
+// effectiveNoColor reports whether color output should be suppressed:
+// the NO_COLOR env var (captured once in main() into ui.NoColor) or the
+// --no-color flag, either one is sufficient — matching NO_COLOR's own
+// "presence, not value" convention (https://no-color.org/).
+func effectiveNoColor(ui uiConfig, noColorFlag bool) bool {
+	return ui.NoColor || noColorFlag
 }
 
 // runLookup validates flags/args once, resolves the output format and
 // bootstrap resolver once, then loops domains sequentially — each
 // domain's own outcome (0/1/2/3) is tracked and the worst wins overall.
 func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, opts lookupOptions, ui uiConfig) error {
-	format, err := render.Select(opts.Output, render.IsTerminal(os.Stdout), ui.NoColor)
+	format, err := render.Select(opts.Output, render.IsTerminal(os.Stdout), effectiveNoColor(ui, opts.NoColor))
 	if err != nil {
 		return usageError{err}
 	}
