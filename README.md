@@ -74,6 +74,10 @@ plat example.com --source registrar  # registrar RDAP + registrar WHOIS only
 # Skip the registrar RDAP related-link hop
 plat example.com --no-follow
 
+# One-line summary per domain (lock status, expiry, conflict count)
+# instead of the full view -- ignored for -o json/ndjson
+plat example.com -q
+
 # Adjust the per-source timeout (default 5s)
 plat example.com --timeout 10s
 

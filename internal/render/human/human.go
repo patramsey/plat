@@ -187,6 +187,39 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 // least one) — joined with a muted separator. Returns "" when none of
 // the three have anything to say, so Render can skip the line entirely
 // rather than print an empty one.
+// QuietSummary composes the one-line, unstyled description --quiet
+// prints instead of the full boxed/field-listing view: the same lock
+// status, expiry countdown, and conflict count buildSummary's styled
+// line shows, but as plain text with no ANSI codes regardless of output
+// format (human or plain) -- quick to read and safe to pipe into other
+// tools. Returns "" when none of the three have anything to say, same
+// as buildSummary.
+func QuietSummary(r model.Record) string {
+	var parts []string
+	switch domainVerdict(r.Status.Value) {
+	case verdictCrit:
+		parts = append(parts, "at risk")
+	case verdictGood:
+		parts = append(parts, "locked")
+	}
+	if r.Expires.Present() && r.Expires.Value.Parsed {
+		days := int(time.Until(r.Expires.Value.Time).Hours() / 24)
+		if days < 0 {
+			parts = append(parts, fmt.Sprintf("expired %d days ago", -days))
+		} else {
+			parts = append(parts, fmt.Sprintf("expires in %d days", days))
+		}
+	}
+	if n := len(r.Conflicts); n > 0 {
+		word := "conflict"
+		if n > 1 {
+			word = "conflicts"
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", n, word))
+	}
+	return strings.Join(parts, " · ")
+}
+
 func buildSummary(th Theme, r model.Record) string {
 	var parts []string
 	if lock := lockBadge(th, r.Status.Value); lock != "" {

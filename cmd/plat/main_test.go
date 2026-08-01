@@ -393,10 +393,10 @@ func TestRenderRecord_DispatchesFormatHumanToStyledRenderer(t *testing.T) {
 	var humanBuf, plainBuf bytes.Buffer
 	ui := uiConfig{Dark: false, Width: 80}
 
-	if err := renderRecord(&humanBuf, render.FormatHuman, rec, false, false, false, ui); err != nil {
+	if err := renderRecord(&humanBuf, render.FormatHuman, rec, false, false, false, false, ui); err != nil {
 		t.Fatalf("unexpected error rendering FormatHuman: %v", err)
 	}
-	if err := renderRecord(&plainBuf, render.FormatPlain, rec, false, false, false, ui); err != nil {
+	if err := renderRecord(&plainBuf, render.FormatPlain, rec, false, false, false, false, ui); err != nil {
 		t.Fatalf("unexpected error rendering FormatPlain: %v", err)
 	}
 	if humanBuf.String() == plainBuf.String() {
@@ -427,10 +427,10 @@ func TestRenderRecord_VerboseGatesSourcesBlockButNotConflicts(t *testing.T) {
 
 	for _, format := range []render.Format{render.FormatHuman, render.FormatPlain} {
 		var quietBuf, verboseBuf bytes.Buffer
-		if err := renderRecord(&quietBuf, format, rec, false, false, true, ui); err != nil {
+		if err := renderRecord(&quietBuf, format, rec, false, false, true, false, ui); err != nil {
 			t.Fatalf("format %v: unexpected error rendering non-verbose: %v", format, err)
 		}
-		if err := renderRecord(&verboseBuf, format, rec, false, true, true, ui); err != nil {
+		if err := renderRecord(&verboseBuf, format, rec, false, true, true, false, ui); err != nil {
 			t.Fatalf("format %v: unexpected error rendering verbose: %v", format, err)
 		}
 
@@ -471,10 +471,10 @@ func TestRenderRecord_ShowConflictsGatesConflictDetailBlock(t *testing.T) {
 
 	for _, format := range []render.Format{render.FormatHuman, render.FormatPlain} {
 		var hiddenBuf, shownBuf bytes.Buffer
-		if err := renderRecord(&hiddenBuf, format, rec, false, false, false, ui); err != nil {
+		if err := renderRecord(&hiddenBuf, format, rec, false, false, false, false, ui); err != nil {
 			t.Fatalf("format %v: unexpected error rendering with conflicts hidden: %v", format, err)
 		}
-		if err := renderRecord(&shownBuf, format, rec, false, false, true, ui); err != nil {
+		if err := renderRecord(&shownBuf, format, rec, false, false, true, false, ui); err != nil {
 			t.Fatalf("format %v: unexpected error rendering with conflicts shown: %v", format, err)
 		}
 
@@ -529,7 +529,7 @@ func TestRenderRecord_DispatchesJSONAndNDJSON(t *testing.T) {
 	ui := uiConfig{}
 
 	var jsonBuf bytes.Buffer
-	if err := renderRecord(&jsonBuf, render.FormatJSON, rec, false, false, false, ui); err != nil {
+	if err := renderRecord(&jsonBuf, render.FormatJSON, rec, false, false, false, false, ui); err != nil {
 		t.Fatalf("unexpected error rendering FormatJSON: %v", err)
 	}
 	if !strings.Contains(jsonBuf.String(), `"schemaVersion":1`) {
@@ -540,7 +540,7 @@ func TestRenderRecord_DispatchesJSONAndNDJSON(t *testing.T) {
 	}
 
 	var ndjsonBuf bytes.Buffer
-	if err := renderRecord(&ndjsonBuf, render.FormatNDJSON, rec, false, false, false, ui); err != nil {
+	if err := renderRecord(&ndjsonBuf, render.FormatNDJSON, rec, false, false, false, false, ui); err != nil {
 		t.Fatalf("unexpected error rendering FormatNDJSON: %v", err)
 	}
 	if !strings.Contains(ndjsonBuf.String(), `"domain"`) {
@@ -755,5 +755,60 @@ func TestRun_VersionSubcommand_FullJSON(t *testing.T) {
 		if !ok || v == "" {
 			t.Errorf("missing or empty key %q in %v", k, decoded)
 		}
+	}
+}
+
+func TestRenderRecord_Quiet(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Status: model.Field[[]string]{Value: []string{"clientTransferProhibited"}, Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	ui := uiConfig{Dark: false, Width: 80}
+
+	tests := []struct {
+		name   string
+		format render.Format
+	}{
+		{"human", render.FormatHuman},
+		{"plain", render.FormatPlain},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := renderRecord(&buf, tt.format, rec, false, false, false, true, ui); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			got := strings.TrimRight(buf.String(), "\n")
+			want := "example.com: locked"
+			if got != want {
+				t.Errorf("renderRecord(quiet=true, format=%v) = %q, want %q", tt.format, got, want)
+			}
+		})
+	}
+}
+
+func TestRenderRecord_QuietIgnoredForMachineFormats(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Status: model.Field[[]string]{Value: []string{"clientTransferProhibited"}, Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	ui := uiConfig{Dark: false, Width: 80}
+	var buf bytes.Buffer
+	if err := renderRecord(&buf, render.FormatJSON, rec, false, false, false, true, ui); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !json.Valid(buf.Bytes()) {
+		t.Errorf("expected --quiet to be ignored for -o json (full JSON still emitted), got: %s", buf.String())
+	}
+}
+
+func TestRun_QuietFlagRegistered(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	got := run([]string{"--help"}, &stdout, &stderr, uiConfig{})
+	if got != 0 {
+		t.Fatalf("run([--help]) exit code = %d, want 0", got)
+	}
+	if !strings.Contains(stdout.String(), "--quiet") {
+		t.Errorf("expected --quiet to be listed in --help output, got:\n%s", stdout.String())
 	}
 }
