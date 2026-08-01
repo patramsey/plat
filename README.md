@@ -1,5 +1,11 @@
 # plat
 
+[![Beta](https://img.shields.io/badge/status-beta-yellow)](https://github.com/patramsey/plat/releases)
+[![CI](https://github.com/patramsey/plat/actions/workflows/ci.yml/badge.svg)](https://github.com/patramsey/plat/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/patramsey/plat)](https://github.com/patramsey/plat/releases/latest)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/patramsey/plat)](go.mod)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 Look up a domain's registration record — RDAP and WHOIS, queried
 concurrently from both registry and registrar, merged into one record with
 **per-field source provenance**: which source supplied each value, and
