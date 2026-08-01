@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -206,15 +207,28 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	// are a build-time-only artifact (M7's gendocs, not a runtime
 	// subcommand).
 
-	root.AddCommand(&cobra.Command{
+	var versionOutput string
+	var versionFull bool
+	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the plat version",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			_, err := fmt.Fprintf(stdout, "plat %s (%s, built %s by %s)\n", version, commit, date, builtBy)
-			return err
+			info := currentVersionInfo(versionFull)
+			switch versionOutput {
+			case "human":
+				_, err := fmt.Fprintln(stdout, info.humanLine())
+				return err
+			case "json":
+				return json.NewEncoder(stdout).Encode(info)
+			default:
+				return usageError{fmt.Errorf("invalid --output value %q for version: must be human or json", versionOutput)}
+			}
 		},
-	})
+	}
+	versionCmd.Flags().StringVarP(&versionOutput, "output", "o", "human", "output format: human or json")
+	versionCmd.Flags().BoolVar(&versionFull, "full", false, "include Go version and platform (human: extra lines; json: extra keys)")
+	root.AddCommand(versionCmd)
 
 	root.AddCommand(newWhoisCommand(stdout))
 	root.AddCommand(newMergeCommand(stdout))
