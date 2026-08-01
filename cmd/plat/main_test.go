@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -615,6 +616,144 @@ func TestReportLookupError_VerboseIncludesSourceDiagnostics(t *testing.T) {
 		}
 		if !strings.Contains(verbose.String(), "dial tcp: timeout") {
 			t.Errorf("format %v: verbose error output missing source diagnostics, got:\n%s", format, verbose.String())
+		}
+	}
+}
+
+func TestVersionInfo_HumanLine(t *testing.T) {
+	vi := versionInfo{Version: "1.2.3", Commit: "abc1234", Date: "2026-01-01T00:00:00Z", BuiltBy: "goreleaser"}
+	got := vi.humanLine()
+	want := "plat 1.2.3 (abc1234, built 2026-01-01T00:00:00Z by goreleaser)"
+	if got != want {
+		t.Errorf("humanLine() = %q, want %q", got, want)
+	}
+}
+
+func TestVersionInfo_HumanLineWithFull(t *testing.T) {
+	vi := versionInfo{
+		Version: "1.2.3", Commit: "abc1234", Date: "2026-01-01T00:00:00Z", BuiltBy: "goreleaser",
+		GoVersion: "go1.25.0", Platform: "darwin/arm64",
+	}
+	got := vi.humanLine()
+	want := "plat 1.2.3 (abc1234, built 2026-01-01T00:00:00Z by goreleaser)\ngo:       go1.25.0\nplatform: darwin/arm64"
+	if got != want {
+		t.Errorf("humanLine() = %q, want %q", got, want)
+	}
+}
+
+func TestCurrentVersionInfo_Full(t *testing.T) {
+	vi := currentVersionInfo(true)
+	if vi.GoVersion == "" {
+		t.Error("expected GoVersion to be set when full=true")
+	}
+	if vi.Platform == "" {
+		t.Error("expected Platform to be set when full=true")
+	}
+}
+
+func TestCurrentVersionInfo_NotFull(t *testing.T) {
+	vi := currentVersionInfo(false)
+	if vi.GoVersion != "" || vi.Platform != "" {
+		t.Errorf("expected GoVersion/Platform empty when full=false, got %+v", vi)
+	}
+}
+
+func TestRun_RootVersionFlag(t *testing.T) {
+	var stdoutFlag, stderrFlag bytes.Buffer
+	gotFlag := run([]string{"--version"}, &stdoutFlag, &stderrFlag, uiConfig{})
+	if gotFlag != 0 {
+		t.Errorf("run([--version]) exit code = %d, want 0", gotFlag)
+	}
+
+	var stdoutCmd, stderrCmd bytes.Buffer
+	gotCmd := run([]string{"version"}, &stdoutCmd, &stderrCmd, uiConfig{})
+	if gotCmd != 0 {
+		t.Errorf("run([version]) exit code = %d, want 0", gotCmd)
+	}
+
+	if stdoutFlag.String() != stdoutCmd.String() {
+		t.Errorf("plat --version output = %q, want identical to plat version output %q", stdoutFlag.String(), stdoutCmd.String())
+	}
+}
+
+func TestRun_RootVersionFlagSkipsNoArgsHelp(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	got := run([]string{"--version"}, &stdout, &stderr, uiConfig{})
+	if got != 0 {
+		t.Fatalf("run([--version]) exit code = %d, want 0", got)
+	}
+	if strings.Contains(stdout.String(), "Usage:") {
+		t.Errorf("plat --version triggered the no-args help path instead of printing the version, got:\n%s", stdout.String())
+	}
+}
+
+func TestRun_VersionSubcommand_JSONOutput(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	got := run([]string{"version", "-o", "json"}, &stdout, &stderr, uiConfig{})
+	if got != 0 {
+		t.Fatalf("run([version -o json]) exit code = %d, want 0, stderr=%s", got, stderr.String())
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &decoded); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, stdout.String())
+	}
+	wantKeys := []string{"version", "commit", "date", "builtBy"}
+	for _, k := range wantKeys {
+		if _, ok := decoded[k]; !ok {
+			t.Errorf("missing key %q in %v", k, decoded)
+		}
+	}
+	if len(decoded) != len(wantKeys) {
+		t.Errorf("decoded = %v, want exactly %d keys (no goVersion/platform without --full)", decoded, len(wantKeys))
+	}
+}
+
+func TestRun_VersionSubcommand_InvalidOutputFormat(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	got := run([]string{"version", "-o", "bogus"}, &stdout, &stderr, uiConfig{})
+	if got != 2 {
+		t.Errorf("run([version -o bogus]) exit code = %d, want 2", got)
+	}
+}
+
+func TestRun_VersionSubcommand_Full(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	got := run([]string{"version", "--full"}, &stdout, &stderr, uiConfig{})
+	if got != 0 {
+		t.Fatalf("run([version --full]) exit code = %d, want 0, stderr=%s", got, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "go:") || !strings.Contains(out, "platform:") {
+		t.Errorf("expected go:/platform: lines with --full, got:\n%s", out)
+	}
+}
+
+func TestRun_VersionSubcommand_WithoutFullOmitsGoInfo(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	got := run([]string{"version"}, &stdout, &stderr, uiConfig{})
+	if got != 0 {
+		t.Fatalf("run([version]) exit code = %d, want 0", got)
+	}
+	out := stdout.String()
+	if strings.Contains(out, "go:") || strings.Contains(out, "platform:") {
+		t.Errorf("expected no go:/platform: lines without --full, got:\n%s", out)
+	}
+}
+
+func TestRun_VersionSubcommand_FullJSON(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	got := run([]string{"version", "-o", "json", "--full"}, &stdout, &stderr, uiConfig{})
+	if got != 0 {
+		t.Fatalf("run([version -o json --full]) exit code = %d, want 0, stderr=%s", got, stderr.String())
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &decoded); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, stdout.String())
+	}
+	for _, k := range []string{"version", "commit", "date", "builtBy", "goVersion", "platform"} {
+		v, ok := decoded[k]
+		if !ok || v == "" {
+			t.Errorf("missing or empty key %q in %v", k, decoded)
 		}
 	}
 }

@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -38,6 +40,46 @@ var (
 	date    = "unknown"
 	builtBy = "unknown"
 )
+
+// versionInfo holds the build metadata plat was compiled with. Shared by
+// the version subcommand and the root --version flag so their default
+// (non-JSON, non-full) output can never drift out of sync with each
+// other -- both ultimately call currentVersionInfo(false).humanLine().
+type versionInfo struct {
+	Version   string `json:"version"`
+	Commit    string `json:"commit"`
+	Date      string `json:"date"`
+	BuiltBy   string `json:"builtBy"`
+	GoVersion string `json:"goVersion,omitempty"`
+	Platform  string `json:"platform,omitempty"`
+}
+
+// currentVersionInfo builds a versionInfo from the package-level
+// version/commit/date/builtBy vars (overwritten via -ldflags at release
+// build time). full adds GoVersion/Platform, sourced from the standard
+// library -- runtime.Version() rather than runtime/debug.ReadBuildInfo's
+// GoVersion field, since it needs no error handling and reports the same
+// value for a normally built binary.
+func currentVersionInfo(full bool) versionInfo {
+	vi := versionInfo{Version: version, Commit: commit, Date: date, BuiltBy: builtBy}
+	if full {
+		vi.GoVersion = runtime.Version()
+		vi.Platform = runtime.GOOS + "/" + runtime.GOARCH
+	}
+	return vi
+}
+
+// humanLine formats v the way plat version's default output always has:
+// "plat X.Y.Z (commit, built DATE by BUILTBY)". When GoVersion is set (v
+// came from currentVersionInfo(true)), two extra labeled lines are
+// appended.
+func (v versionInfo) humanLine() string {
+	line := fmt.Sprintf("plat %s (%s, built %s by %s)", v.Version, v.Commit, v.Date, v.BuiltBy)
+	if v.GoVersion == "" {
+		return line
+	}
+	return fmt.Sprintf("%s\ngo:       %s\nplatform: %s", line, v.GoVersion, v.Platform)
+}
 
 func main() {
 	ui := uiConfig{NoColor: os.Getenv("NO_COLOR") != ""}
@@ -91,6 +133,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var noFollow bool
 	var verbose bool
 	var showConflicts bool
+	var showVersion bool
 
 	root := &cobra.Command{
 		Use:           "plat <domain> [domain...]",
@@ -98,6 +141,12 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args: func(cmd *cobra.Command, cliArgs []string) error {
+			if showVersion {
+				// --version is a valid zero-arg invocation -- skip the
+				// no-args-shows-help path below entirely; RunE handles
+				// printing and returns before runLookup is ever reached.
+				return nil
+			}
 			if len(cliArgs) < 1 {
 				// A bare invocation ("plat" with nothing else) almost
 				// always means someone is looking for how to use the
@@ -113,6 +162,10 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, cliArgs []string) error {
+			if showVersion {
+				_, err := fmt.Fprintln(stdout, currentVersionInfo(false).humanLine())
+				return err
+			}
 			return runLookup(cmd.Context(), stdout, stderr, cliArgs, lookupOptions{
 				RefreshBootstrap: refreshBootstrap,
 				Timeout:          timeout,
@@ -145,6 +198,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	root.Flags().BoolVar(&noFollow, "no-follow", false, "skip the registrar RDAP related-link hop")
 	root.Flags().BoolVarP(&verbose, "verbose", "v", false, "show the per-source diagnostic block (latency and status for every source attempted)")
 	root.Flags().BoolVar(&showConflicts, "conflicts", false, "show the full per-source breakdown for every conflicted field (a field with a conflict is always marked with ⚠, even without this flag)")
+	root.Flags().BoolVar(&showVersion, "version", false, "print the plat version and exit")
 
 	// Flags reserved for later milestones — intentionally not implemented
 	// here: -q/--quiet (condensed human view, M4 stretch/M5), --no-color
@@ -153,15 +207,28 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	// are a build-time-only artifact (M7's gendocs, not a runtime
 	// subcommand).
 
-	root.AddCommand(&cobra.Command{
+	var versionOutput string
+	var versionFull bool
+	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the plat version",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			_, err := fmt.Fprintf(stdout, "plat %s (%s, built %s by %s)\n", version, commit, date, builtBy)
-			return err
+			info := currentVersionInfo(versionFull)
+			switch versionOutput {
+			case "human":
+				_, err := fmt.Fprintln(stdout, info.humanLine())
+				return err
+			case "json":
+				return json.NewEncoder(stdout).Encode(info)
+			default:
+				return usageError{fmt.Errorf("invalid --output value %q for version: must be human or json", versionOutput)}
+			}
 		},
-	})
+	}
+	versionCmd.Flags().StringVarP(&versionOutput, "output", "o", "human", "output format: human or json")
+	versionCmd.Flags().BoolVar(&versionFull, "full", false, "include Go version and platform (human: extra lines; json: extra keys)")
+	root.AddCommand(versionCmd)
 
 	root.AddCommand(newWhoisCommand(stdout))
 	root.AddCommand(newMergeCommand(stdout))
