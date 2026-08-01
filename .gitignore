@@ -3,3 +3,9 @@
 /.gendocs/
 *.test
 *.out
+
+# Claude Code / superpowers working-process artifacts (plans, design
+# specs): useful locally while building, not useful to someone using or
+# contributing to plat -- kept out of the public repo, same treatment
+# .superpowers/sdd/ already gets.
+/docs/superpowers/
