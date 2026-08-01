@@ -34,13 +34,13 @@ instead of making you do that reconciliation by hand.
 ## Install
 
 ```bash
-# From within a checkout of this repo (works today):
-go install ./cmd/plat
+go install github.com/patramsey/plat/cmd/plat@latest
+brew install patramsey/tap/plat
+# — or download a prebuilt binary from the Releases page:
+# https://github.com/patramsey/plat/releases
 
-# Once published (not yet — this repo is currently local-only):
-# go install github.com/patramsey/plat/cmd/plat@latest
-# brew install patramsey/tap/plat
-# — or download a prebuilt binary from the Releases page
+# From within a checkout of this repo:
+go install ./cmd/plat
 ```
 
 ## Usage
