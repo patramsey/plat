@@ -1083,3 +1083,60 @@ func TestRender_SingleOverWideListItemNeverOverflowsWidth(t *testing.T) {
 		}
 	}
 }
+
+func TestQuietSummary(t *testing.T) {
+	// +1h buffer: same reasoning as TestRender_SummaryLine -- truncating
+	// hours-until/24 to whole days would flake to 299 otherwise.
+	expires := time.Now().Add(300*24*time.Hour + time.Hour)
+	rec := model.Record{
+		Domain:  model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Status:  model.Field[[]string]{Value: []string{"clientTransferProhibited"}, Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Expires: model.Field[model.TimeValue]{Value: model.TimeValue{Time: expires, Raw: expires.Format(time.RFC3339), Parsed: true}, Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Conflicts: []model.Conflict{
+			{Field: model.FieldUpdated, Values: map[model.SourceID]string{model.SourceRegistryRDAP: "a", model.SourceRegistrarRDAP: "b"}},
+		},
+	}
+	got := QuietSummary(rec)
+	want := "locked · expires in 300 days · 1 conflict"
+	if got != want {
+		t.Errorf("QuietSummary() = %q, want %q", got, want)
+	}
+	if strings.Contains(got, "\x1b[") {
+		t.Errorf("QuietSummary() must never contain ANSI escape codes, got: %q", got)
+	}
+}
+
+func TestQuietSummary_AtRisk(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Status: model.Field[[]string]{Value: []string{"pendingDelete"}, Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	got := QuietSummary(rec)
+	want := "at risk"
+	if got != want {
+		t.Errorf("QuietSummary() = %q, want %q", got, want)
+	}
+}
+
+func TestQuietSummary_NoRecognizedStatusNoExpiryNoConflicts(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	got := QuietSummary(rec)
+	if got != "" {
+		t.Errorf("QuietSummary() = %q, want empty string", got)
+	}
+}
+
+func TestQuietSummary_ExpiredInThePast(t *testing.T) {
+	expired := time.Now().Add(-10*24*time.Hour - time.Hour)
+	rec := model.Record{
+		Domain:  model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Expires: model.Field[model.TimeValue]{Value: model.TimeValue{Time: expired, Raw: expired.Format(time.RFC3339), Parsed: true}, Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	got := QuietSummary(rec)
+	want := "expired 10 days ago"
+	if got != want {
+		t.Errorf("QuietSummary() = %q, want %q", got, want)
+	}
+}

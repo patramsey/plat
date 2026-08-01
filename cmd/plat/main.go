@@ -134,6 +134,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var verbose bool
 	var showConflicts bool
 	var showVersion bool
+	var quiet bool
 
 	root := &cobra.Command{
 		Use:           "plat <domain> [domain...]",
@@ -175,6 +176,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 				NoFollow:         noFollow,
 				Verbose:          verbose,
 				ShowConflicts:    showConflicts,
+				Quiet:            quiet,
 			}, ui)
 		},
 	}
@@ -199,13 +201,11 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	root.Flags().BoolVarP(&verbose, "verbose", "v", false, "show the per-source diagnostic block (latency and status for every source attempted)")
 	root.Flags().BoolVar(&showConflicts, "conflicts", false, "show the full per-source breakdown for every conflicted field (a field with a conflict is always marked with ⚠, even without this flag)")
 	root.Flags().BoolVar(&showVersion, "version", false, "print the plat version and exit")
+	root.Flags().BoolVarP(&quiet, "quiet", "q", false, "print a one-line summary per domain (lock status, expiry, conflict count) instead of the full view -- ignored for -o json/ndjson")
 
-	// Flags reserved for later milestones — intentionally not implemented
-	// here: -q/--quiet (condensed human view, M4 stretch/M5), --no-color
-	// (no-op before M5's styled human renderer exists). `completion` is
-	// now a real subcommand (M7, cobra's built-in generator); man pages
-	// are a build-time-only artifact (M7's gendocs, not a runtime
-	// subcommand).
+	// --no-color is still reserved for a later addition. `completion` is
+	// a real subcommand (M7, cobra's built-in generator); man pages are a
+	// build-time-only artifact (M7's gendocs, not a runtime subcommand).
 
 	var versionOutput string
 	var versionFull bool
@@ -247,6 +247,7 @@ type lookupOptions struct {
 	NoFollow         bool
 	Verbose          bool
 	ShowConflicts    bool
+	Quiet            bool
 }
 
 // runLookup validates flags/args once, resolves the output format and
@@ -319,7 +320,7 @@ func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstra
 
 	code := deriveOutcome(record.Sources)
 	if code == 0 {
-		if err := renderRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, ui); err != nil {
+		if err := renderRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
 			reportLookupError(stderr, format, name.Punycode, err, record.Sources, opts.Verbose, ui)
 			return 3
 		}
@@ -361,7 +362,16 @@ func lookupOutcomeError(code int, sources []model.SourceResult) error {
 	return fmt.Errorf("lookup inconclusive -- %d of %d sources failed, so non-existence can't be confirmed (checked: %s)", failed, len(sources), checked)
 }
 
-func renderRecord(w io.Writer, format render.Format, record model.Record, raw, verbose, showConflicts bool, ui uiConfig) error {
+func renderRecord(w io.Writer, format render.Format, record model.Record, raw, verbose, showConflicts, quiet bool, ui uiConfig) error {
+	if quiet && !render.IsMachine(format) {
+		summary := human.QuietSummary(record)
+		if summary == "" {
+			_, err := fmt.Fprintln(w, record.Domain.Value)
+			return err
+		}
+		_, err := fmt.Fprintf(w, "%s: %s\n", record.Domain.Value, summary)
+		return err
+	}
 	switch format {
 	case render.FormatJSON:
 		return machine.Encode(w, record, machine.Options{Raw: raw})
