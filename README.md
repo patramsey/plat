@@ -89,6 +89,9 @@ plat example.com --refresh-bootstrap
 
 # Version and shell completions
 plat version
+plat --version                # equivalent shortcut
+plat version -o json          # machine-readable
+plat version --full           # include Go version and platform
 plat completion bash > /etc/bash_completion.d/plat
 plat completion zsh > "${fpath[1]}/_plat"
 ```
