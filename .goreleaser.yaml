@@ -77,6 +77,12 @@ brews:
       # separate homebrew-tap repo — a dedicated token with access to
       # both is required, set as the HOMEBREW_TAP_GITHUB_TOKEN secret.
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    # homebrew-tap already uses the Formula/ subdirectory convention (it
+    # has an existing Formula/namecom.rb from another project) -- once a
+    # tap has that directory, brew only scans it, not the repo root, so
+    # this must be set explicitly or the formula is invisible to `brew
+    # install` despite existing in the repo.
+    directory: Formula
     homepage: "https://github.com/patramsey/plat"
     description: "Domain lookup via WHOIS and RDAP with per-field source provenance"
     license: "MIT"
