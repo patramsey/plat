@@ -812,3 +812,36 @@ func TestRun_QuietFlagRegistered(t *testing.T) {
 		t.Errorf("expected --quiet to be listed in --help output, got:\n%s", stdout.String())
 	}
 }
+
+func TestEffectiveNoColor(t *testing.T) {
+	tests := []struct {
+		name        string
+		envNoColor  bool
+		flagNoColor bool
+		want        bool
+	}{
+		{"neither set", false, false, false},
+		{"NO_COLOR env var only", true, false, true},
+		{"--no-color flag only", false, true, true},
+		{"both set", true, true, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := effectiveNoColor(uiConfig{NoColor: tt.envNoColor}, tt.flagNoColor)
+			if got != tt.want {
+				t.Errorf("effectiveNoColor(NoColor=%v, flag=%v) = %v, want %v", tt.envNoColor, tt.flagNoColor, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRun_NoColorFlagRegistered(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	got := run([]string{"--help"}, &stdout, &stderr, uiConfig{})
+	if got != 0 {
+		t.Fatalf("run([--help]) exit code = %d, want 0", got)
+	}
+	if !strings.Contains(stdout.String(), "--no-color") {
+		t.Errorf("expected --no-color to be listed in --help output, got:\n%s", stdout.String())
+	}
+}
