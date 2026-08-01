@@ -656,3 +656,32 @@ func TestCurrentVersionInfo_NotFull(t *testing.T) {
 		t.Errorf("expected GoVersion/Platform empty when full=false, got %+v", vi)
 	}
 }
+
+func TestRun_RootVersionFlag(t *testing.T) {
+	var stdoutFlag, stderrFlag bytes.Buffer
+	gotFlag := run([]string{"--version"}, &stdoutFlag, &stderrFlag, uiConfig{})
+	if gotFlag != 0 {
+		t.Errorf("run([--version]) exit code = %d, want 0", gotFlag)
+	}
+
+	var stdoutCmd, stderrCmd bytes.Buffer
+	gotCmd := run([]string{"version"}, &stdoutCmd, &stderrCmd, uiConfig{})
+	if gotCmd != 0 {
+		t.Errorf("run([version]) exit code = %d, want 0", gotCmd)
+	}
+
+	if stdoutFlag.String() != stdoutCmd.String() {
+		t.Errorf("plat --version output = %q, want identical to plat version output %q", stdoutFlag.String(), stdoutCmd.String())
+	}
+}
+
+func TestRun_RootVersionFlagSkipsNoArgsHelp(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	got := run([]string{"--version"}, &stdout, &stderr, uiConfig{})
+	if got != 0 {
+		t.Fatalf("run([--version]) exit code = %d, want 0", got)
+	}
+	if strings.Contains(stdout.String(), "Usage:") {
+		t.Errorf("plat --version triggered the no-args help path instead of printing the version, got:\n%s", stdout.String())
+	}
+}

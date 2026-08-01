@@ -132,6 +132,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var noFollow bool
 	var verbose bool
 	var showConflicts bool
+	var showVersion bool
 
 	root := &cobra.Command{
 		Use:           "plat <domain> [domain...]",
@@ -139,6 +140,12 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args: func(cmd *cobra.Command, cliArgs []string) error {
+			if showVersion {
+				// --version is a valid zero-arg invocation -- skip the
+				// no-args-shows-help path below entirely; RunE handles
+				// printing and returns before runLookup is ever reached.
+				return nil
+			}
 			if len(cliArgs) < 1 {
 				// A bare invocation ("plat" with nothing else) almost
 				// always means someone is looking for how to use the
@@ -154,6 +161,10 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, cliArgs []string) error {
+			if showVersion {
+				_, err := fmt.Fprintln(stdout, currentVersionInfo(false).humanLine())
+				return err
+			}
 			return runLookup(cmd.Context(), stdout, stderr, cliArgs, lookupOptions{
 				RefreshBootstrap: refreshBootstrap,
 				Timeout:          timeout,
@@ -186,6 +197,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	root.Flags().BoolVar(&noFollow, "no-follow", false, "skip the registrar RDAP related-link hop")
 	root.Flags().BoolVarP(&verbose, "verbose", "v", false, "show the per-source diagnostic block (latency and status for every source attempted)")
 	root.Flags().BoolVar(&showConflicts, "conflicts", false, "show the full per-source breakdown for every conflicted field (a field with a conflict is always marked with ⚠, even without this flag)")
+	root.Flags().BoolVar(&showVersion, "version", false, "print the plat version and exit")
 
 	// Flags reserved for later milestones — intentionally not implemented
 	// here: -q/--quiet (condensed human view, M4 stretch/M5), --no-color
