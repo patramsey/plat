@@ -618,3 +618,41 @@ func TestReportLookupError_VerboseIncludesSourceDiagnostics(t *testing.T) {
 		}
 	}
 }
+
+func TestVersionInfo_HumanLine(t *testing.T) {
+	vi := versionInfo{Version: "1.2.3", Commit: "abc1234", Date: "2026-01-01T00:00:00Z", BuiltBy: "goreleaser"}
+	got := vi.humanLine()
+	want := "plat 1.2.3 (abc1234, built 2026-01-01T00:00:00Z by goreleaser)"
+	if got != want {
+		t.Errorf("humanLine() = %q, want %q", got, want)
+	}
+}
+
+func TestVersionInfo_HumanLineWithFull(t *testing.T) {
+	vi := versionInfo{
+		Version: "1.2.3", Commit: "abc1234", Date: "2026-01-01T00:00:00Z", BuiltBy: "goreleaser",
+		GoVersion: "go1.25.0", Platform: "darwin/arm64",
+	}
+	got := vi.humanLine()
+	want := "plat 1.2.3 (abc1234, built 2026-01-01T00:00:00Z by goreleaser)\ngo:       go1.25.0\nplatform: darwin/arm64"
+	if got != want {
+		t.Errorf("humanLine() = %q, want %q", got, want)
+	}
+}
+
+func TestCurrentVersionInfo_Full(t *testing.T) {
+	vi := currentVersionInfo(true)
+	if vi.GoVersion == "" {
+		t.Error("expected GoVersion to be set when full=true")
+	}
+	if vi.Platform == "" {
+		t.Error("expected Platform to be set when full=true")
+	}
+}
+
+func TestCurrentVersionInfo_NotFull(t *testing.T) {
+	vi := currentVersionInfo(false)
+	if vi.GoVersion != "" || vi.Platform != "" {
+		t.Errorf("expected GoVersion/Platform empty when full=false, got %+v", vi)
+	}
+}

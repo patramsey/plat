@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -38,6 +39,46 @@ var (
 	date    = "unknown"
 	builtBy = "unknown"
 )
+
+// versionInfo holds the build metadata plat was compiled with. Shared by
+// the version subcommand and the root --version flag so their default
+// (non-JSON, non---full) output can never drift out of sync with each
+// other -- both ultimately call currentVersionInfo(false).humanLine().
+type versionInfo struct {
+	Version   string `json:"version"`
+	Commit    string `json:"commit"`
+	Date      string `json:"date"`
+	BuiltBy   string `json:"builtBy"`
+	GoVersion string `json:"goVersion,omitempty"`
+	Platform  string `json:"platform,omitempty"`
+}
+
+// currentVersionInfo builds a versionInfo from the package-level
+// version/commit/date/builtBy vars (overwritten via -ldflags at release
+// build time). full adds GoVersion/Platform, sourced from the standard
+// library -- runtime.Version() rather than runtime/debug.ReadBuildInfo's
+// GoVersion field, since it needs no error handling and reports the same
+// value for a normally built binary.
+func currentVersionInfo(full bool) versionInfo {
+	vi := versionInfo{Version: version, Commit: commit, Date: date, BuiltBy: builtBy}
+	if full {
+		vi.GoVersion = runtime.Version()
+		vi.Platform = runtime.GOOS + "/" + runtime.GOARCH
+	}
+	return vi
+}
+
+// humanLine formats v the way plat version's default output always has:
+// "plat X.Y.Z (commit, built DATE by BUILTBY)". When GoVersion is set (v
+// came from currentVersionInfo(true)), two extra labeled lines are
+// appended.
+func (v versionInfo) humanLine() string {
+	line := fmt.Sprintf("plat %s (%s, built %s by %s)", v.Version, v.Commit, v.Date, v.BuiltBy)
+	if v.GoVersion == "" {
+		return line
+	}
+	return fmt.Sprintf("%s\ngo:       %s\nplatform: %s", line, v.GoVersion, v.Platform)
+}
 
 func main() {
 	ui := uiConfig{NoColor: os.Getenv("NO_COLOR") != ""}
