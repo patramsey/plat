@@ -43,7 +43,7 @@ var (
 
 // versionInfo holds the build metadata plat was compiled with. Shared by
 // the version subcommand and the root --version flag so their default
-// (non-JSON, non---full) output can never drift out of sync with each
+// (non-JSON, non-full) output can never drift out of sync with each
 // other -- both ultimately call currentVersionInfo(false).humanLine().
 type versionInfo struct {
 	Version   string `json:"version"`
