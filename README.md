@@ -34,10 +34,15 @@ instead of making you do that reconciliation by hand.
 ## Install
 
 ```bash
-go install github.com/patramsey/plat/cmd/plat@latest
 brew install patramsey/tap/plat
 # — or download a prebuilt binary from the Releases page:
 # https://github.com/patramsey/plat/releases
+
+# go install works too, but builds from source without goreleaser's
+# version stamping -- `plat version` will show "dev" instead of a real
+# version/commit/date, since that's only injected via -ldflags at
+# release build time:
+# go install github.com/patramsey/plat/cmd/plat@latest
 
 # From within a checkout of this repo:
 go install ./cmd/plat
