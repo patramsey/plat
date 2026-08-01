@@ -72,6 +72,11 @@ brews:
     repository:
       owner: patramsey
       name: homebrew-tap
+      # The default GITHUB_TOKEN Actions injects is scoped only to the
+      # repo that triggered the workflow (plat) and can't push to this
+      # separate homebrew-tap repo — a dedicated token with access to
+      # both is required, set as the HOMEBREW_TAP_GITHUB_TOKEN secret.
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/patramsey/plat"
     description: "Domain lookup via WHOIS and RDAP with per-field source provenance"
     license: "MIT"
