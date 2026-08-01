@@ -8,6 +8,14 @@ uk:
   format: indent
 eu:
   format: kv
+  synonyms:
+    # EURid nests the registrar name under a sub-key ("Registrar:" has no
+    # value of its own; the name is the next line's "Name:") -- the
+    # generic kv tokenizer sees that as its own "name" pair, which isn't
+    # a registrar synonym anywhere else (too generic/ambiguous to add
+    # globally: it would just as easily mean a contact's name in a
+    # different registry's format), so it's scoped to this template only.
+    name: registrar
 fr:
   format: kv
 nl:
