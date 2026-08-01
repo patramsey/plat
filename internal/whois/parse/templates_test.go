@@ -66,6 +66,24 @@ func TestParse_DENICSynonymOverride(t *testing.T) {
 	}
 }
 
+func TestParse_EURIDNestedRegistrarSynonymOverride(t *testing.T) {
+	// EURid's real format nests the registrar name under a sub-key
+	// ("Registrar:" itself has no value; the name is on the next line's
+	// "Name:") -- the generic kv tokenizer treats "Name:" as its own
+	// pair (key "name"), which isn't a registrar synonym anywhere else
+	// (too generic/ambiguous to add globally), so without a eu-specific
+	// override it lands in Unmapped instead of populating Registrar.
+	raw := loadFixture(t, "eurid-eu-example.txt")
+	f := Parse(raw, "eu")
+
+	if f.Domain != "example.eu" {
+		t.Errorf("Domain = %q, want example.eu", f.Domain)
+	}
+	if f.Registrar != "Example Registrar B.V." {
+		t.Errorf("Registrar = %q, want %q (synonym override for 'name' -> registrar failed)", f.Registrar, "Example Registrar B.V.")
+	}
+}
+
 func TestParse_JPRSBracketDialect(t *testing.T) {
 	raw := loadFixture(t, "jprs-jp-example.txt")
 	f := Parse(raw, "jp")
