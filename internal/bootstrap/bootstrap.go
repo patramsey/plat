@@ -29,6 +29,15 @@ type Resolver struct {
 	byTLD map[string]string
 }
 
+// NewResolver builds a Resolver directly from a TLD -> RDAP base URL map,
+// bypassing Load's fetch/cache/embedded-fallback chain entirely. Load
+// remains the only production entry point; this exists so other packages'
+// tests can point a Resolver at a fake RDAP server without hitting the
+// real network or the real IANA bootstrap file.
+func NewResolver(byTLD map[string]string) *Resolver {
+	return &Resolver{byTLD: byTLD}
+}
+
 // BaseURL returns the RDAP base URL for tld and whether the TLD has RDAP
 // coverage at all. tld should not include a leading dot.
 func (r *Resolver) BaseURL(tld string) (string, bool) {

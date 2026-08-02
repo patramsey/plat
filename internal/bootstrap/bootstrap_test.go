@@ -32,6 +32,19 @@ func TestEmbeddedSnapshotParses(t *testing.T) {
 	}
 }
 
+func TestNewResolver(t *testing.T) {
+	r := NewResolver(map[string]string{"com": "https://rdap.example.test/"})
+
+	u, ok := r.BaseURL("com")
+	if !ok || u != "https://rdap.example.test/" {
+		t.Errorf(`BaseURL("com") = %q, %v, want "https://rdap.example.test/", true`, u, ok)
+	}
+
+	if _, ok := r.BaseURL("xyz"); ok {
+		t.Error(`BaseURL("xyz") ok = true, want false for a TLD not in the map`)
+	}
+}
+
 func TestLoad_UsesFreshCache(t *testing.T) {
 	withIsolatedCacheDir(t)
 	path, ok := cachePath()
