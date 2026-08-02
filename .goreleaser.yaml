@@ -37,6 +37,7 @@ builds:
 
 archives:
   - id: plat
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
     format_overrides:
       - goos: windows
