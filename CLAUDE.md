@@ -26,21 +26,28 @@ Live/integration tests are opt-in via build tag: `go test -tags=live ./...` — 
 ## Architecture
 
 ```
-cmd/plat/                # main.go, cobra root command
+cmd/plat/                # main.go, cobra root command, gendocs (man/completions)
 internal/
+  domain/                # input normalization: lowercase, IDN -> punycode, validation
   bootstrap/             # IANA RDAP bootstrap (dns.json) fetch + cache + go:embed fallback
   rdap/                  # RDAP client: registry query + registrar link-following
   whois/                 # WHOIS client: port-43 dialer + referral chasing
     parse/               # heuristic key/value parser + per-registry quirks
+  collect/               # concurrent fan-out: registry/registrar RDAP + WHOIS -> SourceRecords
   model/                 # unified Record types, provenance types
   merge/                 # merge engine: source records -> unified Record
   render/
     human/                # lipgloss-styled TTY output
     plain/                # no-frills text for pipes
     machine/              # JSON / NDJSON encoders
-  netx/                  # shared dialer, timeouts, proxy support, retries
+  spinner/               # animated progress indicator for long-running lookups
 testdata/                # golden files: recorded RDAP JSON + WHOIS blobs
 ```
+
+Each RDAP/WHOIS client (`internal/rdap`, `internal/whois`) carries its own
+small timeout/dialer/user-agent defaults rather than sharing a `netx`
+package — their retry and connection-handling needs (HTTP client vs. raw
+`net.Dialer`) diverged enough that a shared abstraction wasn't worth it.
 
 ### Lookup flow (`plat example.com`)
 
