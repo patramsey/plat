@@ -4,6 +4,8 @@ Thanks for considering a contribution. `plat` is a small Go CLI — the
 bar for a good change here is: it's correct, it's tested, and it doesn't
 grow the tool beyond what a domain-lookup tool needs.
 
+Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Development setup
 
 Requires Go 1.25+.
