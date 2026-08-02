@@ -6,6 +6,7 @@
 
 [![Beta](https://img.shields.io/badge/status-beta-yellow)](https://github.com/patramsey/plat/releases)
 [![CI](https://github.com/patramsey/plat/actions/workflows/ci.yml/badge.svg)](https://github.com/patramsey/plat/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/patramsey/plat/branch/main/graph/badge.svg)](https://codecov.io/gh/patramsey/plat)
 [![Latest Release](https://img.shields.io/github/v/release/patramsey/plat)](https://github.com/patramsey/plat/releases/latest)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/patramsey/plat)](go.mod)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
