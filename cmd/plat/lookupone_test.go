@@ -77,3 +77,37 @@ func TestLookupOne_HappyPath_RDAPAndWHOIS(t *testing.T) {
 		t.Errorf("stdout missing WHOIS-sourced registrar name, got:\n%s", stdout.String())
 	}
 }
+
+func TestLookupOne_WHOISOnlyDegradedMode(t *testing.T) {
+	// An empty resolver map means BaseURL always returns ("", false) --
+	// no TLD has RDAP coverage, so collect.Collect degrades to
+	// WHOIS-only (its needRDAP check requires a non-empty base URL).
+	resolver := bootstrap.NewResolver(map[string]string{})
+
+	registryWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + registryWHOISAddr + "\n"
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &stdout, &stderr, resolver, "example.com",
+		lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true},
+		nil, render.FormatJSON, uiConfig{},
+	)
+
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Example Registrar") {
+		t.Errorf("stdout missing WHOIS-sourced registrar name, got:\n%s", stdout.String())
+	}
+	// RDAP was never queried -- the RDAP-only Handle field from
+	// testdata/rdap/com-example.json must be absent, confirming this
+	// really is WHOIS-only rather than RDAP silently having succeeded.
+	if strings.Contains(stdout.String(), "2336799_DOMAIN_COM-VRSN") {
+		t.Errorf("stdout contains the RDAP-only Handle value -- RDAP should never have been queried, got:\n%s", stdout.String())
+	}
+}
