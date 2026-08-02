@@ -111,3 +111,35 @@ func TestLookupOne_WHOISOnlyDegradedMode(t *testing.T) {
 		t.Errorf("stdout contains the RDAP-only Handle value -- RDAP should never have been queried, got:\n%s", stdout.String())
 	}
 }
+
+func TestLookupOne_NotFound_ExitCode1(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer rdapSrv.Close()
+
+	registryWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		// "no match" is one of internal/whois/parse's notFoundMarkers
+		// (case-insensitive substring match).
+		return "No match for domain.\n"
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + registryWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
+
+	var stdout, stderr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &stdout, &stderr, resolver, "example.com",
+		lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true},
+		nil, render.FormatPlain, uiConfig{},
+	)
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "is not registered") {
+		t.Errorf("stderr missing not-registered message, got:\n%s", stderr.String())
+	}
+}
