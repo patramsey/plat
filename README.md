@@ -61,20 +61,35 @@ instead of making you do that reconciliation by hand.
 
 ## Install
 
+**Homebrew (macOS / Linux):**
 ```bash
 brew install patramsey/tap/plat
-# — or download a prebuilt binary from the Releases page:
-# https://github.com/patramsey/plat/releases
-
-# go install works too, but builds from source without goreleaser's
-# version stamping -- `plat version` will show "dev" instead of a real
-# version/commit/date, since that's only injected via -ldflags at
-# release build time:
-# go install github.com/patramsey/plat/cmd/plat@latest
-
-# From within a checkout of this repo:
-go install ./cmd/plat
 ```
+
+**Download a release binary:**
+```bash
+# macOS (Apple Silicon)
+curl -L https://github.com/patramsey/plat/releases/latest/download/plat_darwin_arm64.tar.gz | tar xz
+sudo mv plat /usr/local/bin/
+
+# macOS (Intel)
+curl -L https://github.com/patramsey/plat/releases/latest/download/plat_darwin_amd64.tar.gz | tar xz
+sudo mv plat /usr/local/bin/
+
+# Linux (amd64)
+curl -L https://github.com/patramsey/plat/releases/latest/download/plat_linux_amd64.tar.gz | tar xz
+sudo mv plat /usr/local/bin/
+```
+
+All platforms and checksums on the [releases page](https://github.com/patramsey/plat/releases).
+
+**Go install:**
+```bash
+go install github.com/patramsey/plat/cmd/plat@latest
+```
+This builds from source without goreleaser's version stamping — `plat version`
+will show `dev` instead of a real version/commit/date, since that's only
+injected via `-ldflags` at release build time.
 
 ## Usage
 
