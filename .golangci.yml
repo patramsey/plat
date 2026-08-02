@@ -8,6 +8,17 @@ linters:
     - ineffassign
     - staticcheck
     - unused
+    - gosec
+  exclusions:
+    rules:
+      # G304 (file path from variable) flags every _test.go helper that
+      # reads a fixture from testdata/ by a name the test itself picked --
+      # not attacker-controlled input, the exact pattern this project's
+      # golden-file and table-driven tests use throughout.
+      - path: _test\.go
+        linters:
+          - gosec
+        text: "G304"
 
 formatters:
   enable:

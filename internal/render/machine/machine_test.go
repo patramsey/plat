@@ -20,7 +20,7 @@ func checkGolden(t *testing.T, name string, got []byte) {
 		t.Fatalf("output is not valid JSON:\n%s", got)
 	}
 	if *update {
-		if err := os.WriteFile(path, got, 0o644); err != nil {
+		if err := os.WriteFile(path, got, 0o600); err != nil {
 			t.Fatalf("writing golden file: %v", err)
 		}
 		return

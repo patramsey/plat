@@ -33,10 +33,10 @@ func newGendocsCommand(root *cobra.Command) *cobra.Command {
 func genDocs(root *cobra.Command, outputDir string) error {
 	manDir := filepath.Join(outputDir, "man")
 	compDir := filepath.Join(outputDir, "completions")
-	if err := os.MkdirAll(manDir, 0o755); err != nil {
+	if err := os.MkdirAll(manDir, 0o750); err != nil {
 		return fmt.Errorf("gendocs: creating %s: %w", manDir, err)
 	}
-	if err := os.MkdirAll(compDir, 0o755); err != nil {
+	if err := os.MkdirAll(compDir, 0o750); err != nil {
 		return fmt.Errorf("gendocs: creating %s: %w", compDir, err)
 	}
 
@@ -59,7 +59,7 @@ func genDocs(root *cobra.Command, outputDir string) error {
 		{"plat.ps1", func(f *os.File) error { return root.GenPowerShellCompletionWithDesc(f) }},
 	}
 	for _, c := range completions {
-		f, err := os.Create(filepath.Join(compDir, c.filename))
+		f, err := os.Create(filepath.Join(compDir, c.filename)) //nolint:gosec // c.filename is one of 4 hardcoded literals above, never external input
 		if err != nil {
 			return fmt.Errorf("gendocs: creating %s: %w", c.filename, err)
 		}
