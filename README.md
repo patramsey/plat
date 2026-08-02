@@ -24,6 +24,20 @@ where sources disagree.
 *(Recorded with [vhs](https://github.com/charmbracelet/vhs) — see
 [`docs/demo.tape`](docs/demo.tape) for the source script.)*
 
+## Contents
+
+- [Why not just `whois` or an RDAP client?](#why-not-just-whois-or-an-rdap-client)
+- [Install](#install)
+- [Usage](#usage)
+- [Output & Provenance](#output--provenance)
+  - [Source codes](#source-codes)
+  - [Conflicts](#conflicts)
+  - [Redaction and contacts](#redaction-and-contacts)
+  - [Human view vs. JSON](#human-view-vs-json)
+- [Exit Codes](#exit-codes)
+- [Changelog](CHANGELOG.md)
+- [License](#license)
+
 ## Why not just `whois` or an RDAP client?
 
 Domain registration data lives in two parallel, incompatible worlds.
@@ -110,6 +124,11 @@ plat example.com --conflicts
 # cached copy
 plat example.com --refresh-bootstrap
 
+# Disable color output -- same effect as setting NO_COLOR (any
+# non-empty value: https://no-color.org/), which plat also honors
+plat example.com --no-color
+NO_COLOR=1 plat example.com
+
 # Version and shell completions
 plat version
 plat --version                # equivalent shortcut
@@ -117,6 +136,8 @@ plat version -o json          # machine-readable
 plat version --full           # include Go version and platform
 plat completion bash > /etc/bash_completion.d/plat
 plat completion zsh > "${fpath[1]}/_plat"
+plat completion fish > "$(dirname "$(command -v fish)")/../share/fish/vendor_completions.d/plat.fish"
+plat completion powershell > plat.ps1
 ```
 
 ## Output & Provenance
