@@ -91,6 +91,33 @@ func TestRender_SkipsAbsentFields(t *testing.T) {
 	}
 }
 
+func TestRender_DNSSECBothValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		value bool
+		want  string
+	}{
+		{"signed", true, "true"},
+		{"unsigned", false, "false"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := model.Record{
+				Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+				DNSSEC: model.Field[bool]{Value: tt.value, Sources: []model.SourceID{model.SourceRegistryRDAP}},
+			}
+			var buf bytes.Buffer
+			if err := Render(&buf, rec, Options{}); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			out := buf.String()
+			if !strings.Contains(out, "DNSSEC:") || !strings.Contains(out, tt.want) {
+				t.Errorf("output missing DNSSEC row with value %q, got:\n%s", tt.want, out)
+			}
+		})
+	}
+}
+
 func TestRender_ConflictOrderingIsDeterministic(t *testing.T) {
 	rec := model.Record{
 		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},

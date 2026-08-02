@@ -20,6 +20,28 @@ func loadFixture(t *testing.T) []byte {
 	return b
 }
 
+func TestMalformedResponseError_ErrorAndUnwrap(t *testing.T) {
+	wrapped := errors.New("unexpected EOF")
+	e := &MalformedResponseError{
+		URL:         "https://rdap.example.com/domain/example.com",
+		StatusCode:  http.StatusOK,
+		ContentType: "text/html",
+		Snippet:     "<html>oops</html>",
+		Err:         wrapped,
+	}
+
+	got := e.Error()
+	for _, want := range []string{e.URL, "200", e.ContentType, e.Snippet} {
+		if !strings.Contains(got, want) {
+			t.Errorf("Error() = %q, want it to contain %q", got, want)
+		}
+	}
+
+	if !errors.Is(e, wrapped) {
+		t.Errorf("errors.Is(e, wrapped) = false, want true (Unwrap should expose Err)")
+	}
+}
+
 func TestClientDomain_HappyPath(t *testing.T) {
 	fixture := loadFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
