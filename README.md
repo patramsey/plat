@@ -1,4 +1,8 @@
+<div align="center">
+
 # plat
+
+**Domain lookups, reconciled — RDAP and WHOIS, together**
 
 [![Beta](https://img.shields.io/badge/status-beta-yellow)](https://github.com/patramsey/plat/releases)
 [![CI](https://github.com/patramsey/plat/actions/workflows/ci.yml/badge.svg)](https://github.com/patramsey/plat/actions/workflows/ci.yml)
@@ -10,6 +14,10 @@ Look up a domain's registration record — RDAP and WHOIS, queried
 concurrently from both registry and registrar, merged into one record with
 **per-field source provenance**: which source supplied each value, and
 where sources disagree.
+
+</div>
+
+---
 
 ![demo](docs/demo.gif)
 
