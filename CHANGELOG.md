@@ -6,6 +6,14 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-02
+
+### Changed
+- Release archive filenames no longer include the version number (e.g.
+  `plat_darwin_arm64.tar.gz` instead of `plat_0.1.2_darwin_arm64.tar.gz`),
+  so the Releases page's "latest" download links stay valid across
+  releases.
+
 ## [0.1.2] - 2026-08-02
 
 ### Added
@@ -51,7 +59,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/patramsey/plat/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/patramsey/plat/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/patramsey/plat/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/patramsey/plat/releases/tag/v0.1.0
