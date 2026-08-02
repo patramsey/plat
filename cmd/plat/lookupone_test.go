@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/patramsey/plat/internal/bootstrap"
 	"github.com/patramsey/plat/internal/render"
@@ -141,5 +142,26 @@ func TestLookupOne_NotFound_ExitCode1(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "is not registered") {
 		t.Errorf("stderr missing not-registered message, got:\n%s", stderr.String())
+	}
+}
+
+func TestLookupOne_FailurePath_ExitCode3(t *testing.T) {
+	// The "http://127.0.0.1:1/unreachable" / "127.0.0.1:1" convention
+	// (also used in internal/bootstrap/bootstrap_test.go) forces a fast,
+	// hermetic connection-refused failure -- no real network needed.
+	resolver := bootstrap.NewResolver(map[string]string{"com": "http://127.0.0.1:1/unreachable"})
+
+	var stdout, stderr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &stdout, &stderr, resolver, "example.com",
+		lookupOptions{whoisIANAServer: "127.0.0.1:1", NoFollow: true, Timeout: time.Second},
+		nil, render.FormatPlain, uiConfig{},
+	)
+
+	if code != 3 {
+		t.Errorf("exit code = %d, want 3\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "example.com") {
+		t.Errorf("stderr missing domain in failure message, got:\n%s", stderr.String())
 	}
 }
