@@ -6,6 +6,20 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-02
+
+### Added
+- `--no-color` flag, equivalent to the existing `NO_COLOR` environment
+  variable.
+- `-q`/`--quiet` flag: a one-line summary per domain (lock status,
+  expiry, conflict count) instead of the full view. Ignored for `-o
+  json`/`-o ndjson`.
+
+### Fixed
+- `.eu` domains: the registrar name wasn't parsed out of EURid's nested
+  WHOIS structure (`Registrar:` header with the name on an indented
+  `Name:` line beneath it).
+
 ## [0.1.1] - 2026-08-01
 
 ### Fixed
@@ -37,6 +51,7 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/patramsey/plat/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/patramsey/plat/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/patramsey/plat/releases/tag/v0.1.0
