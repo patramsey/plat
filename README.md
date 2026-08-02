@@ -36,6 +36,7 @@ where sources disagree.
   - [Human view vs. JSON](#human-view-vs-json)
 - [Exit Codes](#exit-codes)
 - [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
 - [License](#license)
 
 ## Why not just `whois` or an RDAP client?
