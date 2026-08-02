@@ -252,6 +252,13 @@ type lookupOptions struct {
 	ShowConflicts    bool
 	Quiet            bool
 	NoColor          bool
+	// whoisIANAServer overrides the WHOIS server lookupOne queries first
+	// to resolve a TLD's registry server (see collect.Collect's
+	// whoisIANAServer parameter). Unexported and unset by every real flag
+	// -- it's always "" (collect.Collect's real-network default) outside
+	// of this package's own tests, which construct lookupOptions directly
+	// to point it at a fake local listener.
+	whoisIANAServer string
 }
 
 // effectiveNoColor reports whether color output should be suppressed:
@@ -320,7 +327,7 @@ func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstra
 
 	var records []model.SourceRecord
 	work := func() {
-		records = collect.Collect(ctx, name, baseURL, "", collectOpts)
+		records = collect.Collect(ctx, name, baseURL, opts.whoisIANAServer, collectOpts)
 	}
 	if ui.StderrTTY && format == render.FormatHuman {
 		spinner.Run(stderr, "looking up "+name.Punycode+"...", work)
