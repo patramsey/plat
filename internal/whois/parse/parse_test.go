@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func loadFixture(t *testing.T, name string) string {
+func loadFixture(t testing.TB, name string) string {
 	t.Helper()
 	b, err := os.ReadFile("../../../testdata/whois/" + name)
 	if err != nil {

@@ -36,6 +36,14 @@ via a build tag and excluded from CI:
 go test -tags=live ./...
 ```
 
+`internal/whois/parse` has Go fuzz tests (`FuzzParse`, `FuzzParseDate`) —
+its parser runs on untrusted network text, so a change there is worth a
+quick local fuzz run, not just the seed corpus in CI:
+
+```bash
+go test -fuzz='^FuzzParse$' -fuzztime=30s ./internal/whois/parse/...
+```
+
 ## Workflow
 
 - Branch off `main`, open a PR — direct pushes to `main` aren't used here.
