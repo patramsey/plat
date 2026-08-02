@@ -218,8 +218,8 @@ func (d *DomainResponse) RelatedRegistrarURL() (string, bool) {
 
 // Entity is a trimmed RFC 9083 entity object — only the fields needed to
 // extract a registrar's or abuse contact's identity from its vCard.
-// Contact modeling beyond this (registrant/admin/tech/billing values) is
-// deferred to a later milestone.
+// Registrant/admin/tech/billing contact values are deliberately not
+// modeled — see the "Redaction and contacts" section of README.md.
 type Entity struct {
 	Roles      []string   `json:"roles"`
 	VCardArray VCardArray `json:"vcardArray"`

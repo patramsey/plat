@@ -38,21 +38,9 @@ type Options struct {
 func Render(w io.Writer, r model.Record, opts Options) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 
-	stringField(tw, "Domain", r.Domain, hasConflict(r.Conflicts, model.FieldDomain))
-	stringField(tw, "Handle", r.Handle, hasConflict(r.Conflicts, model.FieldHandle))
-	stringField(tw, "Registrar", r.Registrar.Name, hasConflict(r.Conflicts, model.FieldRegistrarName))
-	stringField(tw, "Registrar IANA ID", r.Registrar.IANAID, hasConflict(r.Conflicts, model.FieldRegistrarIANAID))
-	stringField(tw, "Registrar URL", r.Registrar.URL, hasConflict(r.Conflicts, model.FieldRegistrarURL))
-	stringField(tw, "Abuse Email", r.Registrar.AbuseEmail, hasConflict(r.Conflicts, model.FieldRegistrarAbuseEmail))
-	stringField(tw, "Abuse Phone", r.Registrar.AbusePhone, hasConflict(r.Conflicts, model.FieldRegistrarAbusePhone))
-	// Status never conflicts -- differing sets are unioned, never flagged
-	// -- so it never needs the marker.
-	listField(tw, "Status", r.Status, false)
-	timeField(tw, "Created", r.Created, hasConflict(r.Conflicts, model.FieldCreated))
-	timeField(tw, "Updated", r.Updated, hasConflict(r.Conflicts, model.FieldUpdated))
-	timeField(tw, "Expires", r.Expires, hasConflict(r.Conflicts, model.FieldExpires))
-	listField(tw, "Nameservers", r.Nameservers, hasConflict(r.Conflicts, model.FieldNameservers))
-	boolField(tw, "DNSSEC", r.DNSSEC, hasConflict(r.Conflicts, model.FieldDNSSEC))
+	for _, fd := range model.FieldOrder {
+		writeField(tw, r, fd)
+	}
 	writeSourceLegend(tw)
 
 	if opts.Verbose {
@@ -111,6 +99,44 @@ func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult) {
 			status = s.Err
 		}
 		_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", s.Source, s.Latency.Round(time.Millisecond), status)
+	}
+}
+
+// writeField dispatches one model.FieldOrder entry to the write* helper
+// matching its Record field's type. Status is passed conflicted=false
+// unconditionally -- differing sets are unioned, never flagged -- so it
+// never needs the marker.
+func writeField(tw *tabwriter.Writer, r model.Record, fd model.FieldSpec) {
+	conflicted := hasConflict(r.Conflicts, fd.Key)
+	switch fd.Key {
+	case model.FieldDomain:
+		stringField(tw, fd.Label, r.Domain, conflicted)
+	case model.FieldHandle:
+		stringField(tw, fd.Label, r.Handle, conflicted)
+	case model.FieldRegistrarName:
+		stringField(tw, fd.Label, r.Registrar.Name, conflicted)
+	case model.FieldRegistrarIANAID:
+		stringField(tw, fd.Label, r.Registrar.IANAID, conflicted)
+	case model.FieldRegistrarURL:
+		stringField(tw, fd.Label, r.Registrar.URL, conflicted)
+	case model.FieldRegistrarAbuseEmail:
+		stringField(tw, fd.Label, r.Registrar.AbuseEmail, conflicted)
+	case model.FieldRegistrarAbusePhone:
+		stringField(tw, fd.Label, r.Registrar.AbusePhone, conflicted)
+	case model.FieldStatus:
+		listField(tw, fd.Label, r.Status, false)
+	case model.FieldCreated:
+		timeField(tw, fd.Label, r.Created, conflicted)
+	case model.FieldUpdated:
+		timeField(tw, fd.Label, r.Updated, conflicted)
+	case model.FieldExpires:
+		timeField(tw, fd.Label, r.Expires, conflicted)
+	case model.FieldNameservers:
+		listField(tw, fd.Label, r.Nameservers, conflicted)
+	case model.FieldDNSSEC:
+		boolField(tw, fd.Label, r.DNSSEC, conflicted)
+	default:
+		panic(fmt.Sprintf("plain: unhandled model.FieldOrder entry %q", fd.Key))
 	}
 }
 
