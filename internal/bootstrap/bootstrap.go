@@ -107,7 +107,7 @@ func Load(ctx context.Context, opts Options) (*Resolver, error) {
 	}
 
 	if haveCachePath {
-		if data, err := os.ReadFile(path); err == nil {
+		if data, err := os.ReadFile(path); err == nil { //nolint:gosec // path is cachePath(), derived from os.UserCacheDir() + fixed constants, never user input
 			if r, err := parseResolver(data); err == nil {
 				return r, nil
 			}
@@ -125,7 +125,7 @@ func readFreshCache(path string) ([]byte, bool) {
 	if time.Since(info.ModTime()) >= cacheTTL {
 		return nil, false
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path is cachePath(), derived from os.UserCacheDir() + fixed constants, never user input
 	if err != nil {
 		return nil, false
 	}
@@ -134,10 +134,10 @@ func readFreshCache(path string) ([]byte, bool) {
 
 func writeCache(path string, data []byte) {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return
 	}
-	_ = os.WriteFile(path, data, 0o644)
+	_ = os.WriteFile(path, data, 0o600)
 }
 
 func fetch(ctx context.Context, timeout time.Duration) ([]byte, error) {

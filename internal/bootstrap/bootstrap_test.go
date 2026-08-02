@@ -38,11 +38,11 @@ func TestLoad_UsesFreshCache(t *testing.T) {
 	if !ok {
 		t.Fatal("cachePath() unexpectedly unavailable")
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	fakeDoc := []byte(`{"services":[[["test"],["https://rdap.example.test/"]]]}`)
-	if err := os.WriteFile(path, fakeDoc, 0o644); err != nil {
+	if err := os.WriteFile(path, fakeDoc, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -66,11 +66,11 @@ func TestLoad_StaleCacheTriggersFetchFallback(t *testing.T) {
 	if !ok {
 		t.Fatal("cachePath() unexpectedly unavailable")
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	staleDoc := []byte(`{"services":[[["stale"],["https://stale.example.test/"]]]}`)
-	if err := os.WriteFile(path, staleDoc, 0o644); err != nil {
+	if err := os.WriteFile(path, staleDoc, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	oldTime := time.Now().Add(-8 * 24 * time.Hour)

@@ -465,8 +465,14 @@ func TestCollect_RDAPAndWHOISRunConcurrently(t *testing.T) {
 	// roughly 2x branchDelay wall-clock, while a concurrent one takes
 	// roughly 1x. The assertion checks for well under 2x, with plenty of
 	// margin for scheduler/test-runner jitter, rather than pinning to 1x
-	// exactly.
-	const branchDelay = 150 * time.Millisecond
+	// exactly. branchDelay is 400ms, not a tighter value, so that margin
+	// stays an absolute ~250ms-plus even under -race's added scheduling
+	// overhead combined with other packages' tests running concurrently
+	// (`go test ./...` runs packages in parallel by default) -- confirmed
+	// flaky at 150ms under that combination (elapsed 344ms vs. a 300ms
+	// threshold) despite passing 5/5 in isolation, i.e. contention
+	// jitter, not a real concurrency regression.
+	const branchDelay = 400 * time.Millisecond
 
 	registryFixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
 	if err != nil {
