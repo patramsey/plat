@@ -14,7 +14,7 @@ const clockSkew = 24 * time.Hour
 // annotated Record. It is a pure function — no I/O — and never errors: a
 // source with no usable data simply doesn't contribute to any field.
 func Merge(sources []model.SourceRecord) model.Record {
-	rec := model.Record{Contacts: map[model.Role]model.Contact{}}
+	var rec model.Record
 	for _, s := range sources {
 		rec.Sources = append(rec.Sources, s.Meta)
 	}

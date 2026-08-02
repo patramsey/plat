@@ -20,6 +20,36 @@ const (
 	FieldDNSSEC              = "dnssec"
 )
 
+// FieldSpec names one Record field's display label and Conflict/
+// RedactionNotice key.
+type FieldSpec struct {
+	Label string
+	Key   string
+}
+
+// FieldOrder is the canonical field sequence and label for any renderer
+// that shows every populated Record field — human and plain both iterate
+// this instead of hand-listing the fields themselves, so a field added
+// here can't be wired into one renderer and silently forgotten in the
+// other: each renderer's Render function panics on an entry it doesn't
+// recognize, which fails that renderer's own tests immediately rather
+// than drifting unnoticed.
+var FieldOrder = []FieldSpec{
+	{"Domain", FieldDomain},
+	{"Handle", FieldHandle},
+	{"Registrar", FieldRegistrarName},
+	{"Registrar IANA ID", FieldRegistrarIANAID},
+	{"Registrar URL", FieldRegistrarURL},
+	{"Abuse Email", FieldRegistrarAbuseEmail},
+	{"Abuse Phone", FieldRegistrarAbusePhone},
+	{"Status", FieldStatus},
+	{"Created", FieldCreated},
+	{"Updated", FieldUpdated},
+	{"Expires", FieldExpires},
+	{"Nameservers", FieldNameservers},
+	{"DNSSEC", FieldDNSSEC},
+}
+
 // Field carries a merged value plus the sources that agree on it.
 type Field[T any] struct {
 	Value   T
@@ -37,27 +67,9 @@ type TimeValue struct {
 	Parsed bool
 }
 
-// Role identifies a contact's relationship to the domain.
-type Role string
-
-const (
-	RoleRegistrant Role = "registrant"
-	RoleAdmin      Role = "admin"
-	RoleTech       Role = "tech"
-	RoleBilling    Role = "billing"
-)
-
-// Contact models one contact role. M3 defines the shape but does not
-// populate values for any role — that's deferred to a later milestone.
-type Contact struct {
-	Name         Field[string]
-	Organization Field[string]
-	Email        Field[string]
-	Phone        Field[string]
-}
-
-// RegistrarInfo is the registrar's own identity — distinct from Contacts,
-// which models the domain's registrant/admin/tech/billing contacts.
+// RegistrarInfo is the registrar's own identity. Registrant/admin/tech/
+// billing contact details are deliberately not modeled — see the
+// "Redaction and contacts" section of README.md for why.
 type RegistrarInfo struct {
 	Name       Field[string]
 	IANAID     Field[string]
@@ -108,7 +120,6 @@ type Record struct {
 	Expires     Field[TimeValue]
 	Nameservers Field[[]string]
 	DNSSEC      Field[bool]
-	Contacts    map[Role]Contact
 	Redacted    []RedactionNotice
 	Sources     []SourceResult
 	Conflicts   []Conflict
