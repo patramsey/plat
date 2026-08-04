@@ -545,7 +545,7 @@ func TestMerge_LifecycleStageEstimates(t *testing.T) {
 		wantAnchor   time.Time
 		wantDuration time.Duration
 	}{
-		{"auto-renew grace, anchored to Expires", "autoRenewPeriod", model.LifecycleAutoRenewGrace, "Auto-Renew Grace Period", expires, 45 * 24 * time.Hour},
+		{"auto-renew grace, anchored to Updated", "autoRenewPeriod", model.LifecycleAutoRenewGrace, "Auto-Renew Grace Period", updated, 45 * 24 * time.Hour},
 		{"redemption grace, anchored to Updated", "redemptionPeriod", model.LifecycleRedemptionGrace, "Redemption Grace Period", updated, 30 * 24 * time.Hour},
 		{"pending delete, anchored to Updated", "pendingDelete", model.LifecyclePendingDelete, "Pending Delete", updated, 5 * 24 * time.Hour},
 	}
@@ -667,5 +667,74 @@ func TestMerge_LifecyclePriorityPendingDeleteBeatsRedemptionGrace(t *testing.T) 
 	}
 	if rec.Lifecycle.Stage != model.LifecyclePendingDelete {
 		t.Errorf("Stage = %q, want %q (pendingDelete is more urgent/definitive than redemptionPeriod)", rec.Lifecycle.Stage, model.LifecyclePendingDelete)
+	}
+}
+
+func TestMerge_LifecyclePriorityPendingRestoreBeatsAutoRenewPeriod(t *testing.T) {
+	a := sr(model.SourceRegistryRDAP, true)
+	a.Domain = "example.com"
+	a.Status = []string{"autoRenewPeriod", "pendingRestore"}
+	a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
+
+	rec := Merge([]model.SourceRecord{a})
+
+	if rec.Lifecycle == nil {
+		t.Fatal("Lifecycle = nil, want populated")
+	}
+	if rec.Lifecycle.Stage != model.LifecyclePendingRestore {
+		t.Errorf("Stage = %q, want %q (pendingRestore is more urgent/definitive than autoRenewPeriod)", rec.Lifecycle.Stage, model.LifecyclePendingRestore)
+	}
+}
+
+func TestMerge_LifecycleNilForIDNCCTLD(t *testing.T) {
+	// internal/collect/adapt_rdap.go prefers the Unicode domain form over
+	// the punycode/LDH form, so both shapes need to be checked: the raw
+	// Unicode ccTLD directly, and the punycode-encoded (xn--) form a
+	// source might still report.
+	tests := []struct {
+		name   string
+		domain string
+	}{
+		{"Unicode ccTLD", "пример.рф"},
+		{"punycode-encoded IDN ccTLD", "xn--e1afmkfd.xn--p1ai"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := sr(model.SourceRegistryRDAP, true)
+			a.Domain = tt.domain
+			a.Status = []string{"redemptionPeriod"}
+			a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
+
+			rec := Merge([]model.SourceRecord{a})
+
+			if rec.Lifecycle != nil {
+				t.Errorf("Lifecycle = %+v, want nil for IDN ccTLD %q (byte length must not be mistaken for character length, and the punycode form must be recognized too)", rec.Lifecycle, tt.domain)
+			}
+		})
+	}
+}
+
+func TestMerge_LifecycleNilForMalformedDomain(t *testing.T) {
+	tests := []struct {
+		name   string
+		domain string
+	}{
+		{"trailing dot", "example.com."},
+		{"dot-less", "localhost"},
+		{"empty string", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := sr(model.SourceRegistryRDAP, true)
+			a.Domain = tt.domain
+			a.Status = []string{"redemptionPeriod"}
+			a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
+
+			rec := Merge([]model.SourceRecord{a})
+
+			if rec.Lifecycle != nil {
+				t.Errorf("Lifecycle = %+v, want nil for malformed domain %q", rec.Lifecycle, tt.domain)
+			}
+		})
 	}
 }

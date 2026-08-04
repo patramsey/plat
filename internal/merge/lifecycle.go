@@ -59,6 +59,16 @@ func deriveLifecycle(rec model.Record) *model.LifecycleInfo {
 // or more characters -- the standard ICANN/ISO 3166 convention that every
 // ccTLD is exactly 2 letters and every gTLD is 3 or more, so no lookup
 // table is needed. An empty or dot-less domain is treated as not a gTLD.
+//
+// The length check only applies once the TLD is confirmed plain ASCII: a
+// non-ASCII (IDN) ccTLD's character count doesn't match its UTF-8 byte
+// count (e.g. .рф, a genuine 2-character ccTLD, is 4 bytes), and
+// internal/collect/adapt_rdap.go prefers the Unicode domain form over the
+// punycode/LDH form when building SourceRecord.Domain, so that's the
+// normal shape rec.Domain.Value takes for an IDN domain -- not an edge
+// case. A punycode-encoded IDN ccTLD (e.g. xn--p1ai for .рф) is always
+// well over 2 ASCII characters, so the xn-- prefix needs its own check;
+// the plain length check alone can't catch it.
 func isGTLD(domain string) bool {
 	if domain == "" {
 		return false
@@ -67,7 +77,21 @@ func isGTLD(domain string) bool {
 	if i < 0 || i == len(domain)-1 {
 		return false
 	}
-	return len(domain)-i-1 >= 3
+	tld := domain[i+1:]
+	if strings.HasPrefix(tld, "xn--") || !isASCII(tld) {
+		return false
+	}
+	return len(tld) >= 3
+}
+
+// isASCII reports whether s contains only plain ASCII bytes.
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
 }
 
 func matchLifecycleStage(statuses []string) (model.LifecycleStage, bool) {
@@ -125,10 +149,10 @@ func autoRenewGraceInfo(rec model.Record) *model.LifecycleInfo {
 		Label:       "Auto-Renew Grace Period",
 		Description: "The domain has expired. The registrar may still renew it automatically during this window, or let it lapse further into the Redemption Grace Period. Nothing to do yet unless you want to ensure renewal goes through.",
 	}
-	if anchor, ok := parsedTime(rec.Expires); ok {
+	if anchor, ok := parsedTime(rec.Updated); ok {
 		end := anchor.Add(autoRenewGraceCap)
 		info.EstimatedEndsBy = &end
-		info.EstimateBasis = "Estimate based on ICANN's 45-day cap on the optional Auto-Renew Grace Period for gTLDs, calculated from this record's expiration date. Many registrars use a shorter window, so this domain's actual renew/delete decision could come sooner."
+		info.EstimateBasis = "Estimate based on ICANN's 45-day cap on the optional Auto-Renew Grace Period for gTLDs, calculated from this record's last-updated time. Many registrars use a shorter window, so this domain's actual renew/delete decision could come sooner."
 	}
 	return info
 }
