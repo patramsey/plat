@@ -351,6 +351,40 @@ func TestMerge_StatusUnionNoConflict(t *testing.T) {
 	}
 }
 
+func TestMerge_StatusDropsBareFormWhenPrefixedVariantPresent(t *testing.T) {
+	// Real GoDaddy pattern: registrar RDAP reports the ambiguous bare EPP
+	// vocabulary term while registry RDAP reports the properly
+	// client/server-prefixed form for the same restriction.
+	registrarRDAP := sr(model.SourceRegistrarRDAP, true)
+	registrarRDAP.Status = []string{"deleteProhibited", "transferProhibited", "renewProhibited", "updateProhibited"}
+	registryRDAP := sr(model.SourceRegistryRDAP, true)
+	registryRDAP.Status = []string{"clientDeleteProhibited", "clientRenewProhibited", "clientTransferProhibited", "clientUpdateProhibited", "serverDeleteProhibited", "serverTransferProhibited", "serverUpdateProhibited"}
+
+	rec := Merge([]model.SourceRecord{registrarRDAP, registryRDAP})
+
+	if len(rec.Status.Value) != 7 {
+		t.Fatalf("Status.Value = %v, want only the 7 client/server-prefixed entries (bare duplicates dropped)", rec.Status.Value)
+	}
+	for _, bare := range []string{"deleteProhibited", "transferProhibited", "renewProhibited", "updateProhibited"} {
+		for _, got := range rec.Status.Value {
+			if got == bare {
+				t.Errorf("Status.Value contains bare %q, want it dropped since a client/server-prefixed variant is present", bare)
+			}
+		}
+	}
+}
+
+func TestMerge_StatusKeepsBareFormWhenNoPrefixedVariantExists(t *testing.T) {
+	a := sr(model.SourceRegistrarRDAP, true)
+	a.Status = []string{"ok"}
+
+	rec := Merge([]model.SourceRecord{a})
+
+	if len(rec.Status.Value) != 1 || rec.Status.Value[0] != "ok" {
+		t.Errorf(`Status.Value = %v, want ["ok"] preserved (no client/server-prefixed variant exists to make it redundant)`, rec.Status.Value)
+	}
+}
+
 func TestMerge_ZeroPresentSources(t *testing.T) {
 	rec := Merge(nil)
 	if rec.Domain.Present() || rec.Registrar.Name.Present() {
