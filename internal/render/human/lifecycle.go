@@ -31,7 +31,7 @@ func writeLifecycle(b *strings.Builder, th Theme, width int, l *model.LifecycleI
 		b.WriteString("  " + line + "\n")
 	}
 	if l.EstimatedEndsBy != nil {
-		estimate := "Estimated no later than " + l.EstimatedEndsBy.UTC().Format("Jan 2, 2006") + " -- " + l.EstimateBasis
+		estimate := "No later than " + l.EstimatedEndsBy.UTC().Format("Jan 2, 2006") + " — " + l.EstimateBasis
 		for _, line := range wrapValue(estimate, bodyWidth) {
 			b.WriteString("  " + th.Muted.Render(line) + "\n")
 		}

@@ -1162,8 +1162,8 @@ func TestRender_LifecycleSection(t *testing.T) {
 	for _, want := range []string{
 		"Redemption Grace Period",
 		"no longer eligible for normal renewal",
-		"Estimated no later than Aug 31, 2026",
-		"30-day Redemption Grace Period",
+		"No later than Aug 31, 2026",
+		"ICANN's fixed 30-day",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q\nfull output:\n%s", want, out)
@@ -1176,7 +1176,47 @@ func TestRender_LifecycleAbsentWhenNil(t *testing.T) {
 	if err := Render(&buf, fullRecord(), Options{Theme: NewTheme(false), Width: 80}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if strings.Contains(buf.String(), "Grace Period") {
-		t.Errorf("output contains lifecycle text, want none when Record.Lifecycle is nil:\n%s", buf.String())
+	out := buf.String()
+	for _, label := range []string{
+		"Auto-Renew Grace Period",
+		"Redemption Grace Period",
+		"Pending Restore",
+		"Pending Delete",
+	} {
+		if strings.Contains(out, label) {
+			t.Errorf("output contains lifecycle label %q, want none when Record.Lifecycle is nil:\n%s", label, out)
+		}
+	}
+}
+
+// TestRender_LifecycleSectionOmitsEstimateWhenAbsent covers the real
+// pendingRestore case (see internal/merge's pendingRestoreInfo): the
+// stage's label/description should still render, but with no
+// EstimatedEndsBy, the estimate line must be omitted entirely rather than
+// e.g. rendering an empty or zero-valued date.
+func TestRender_LifecycleSectionOmitsEstimateWhenAbsent(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Lifecycle: &model.LifecycleInfo{
+			Stage:       model.LifecyclePendingRestore,
+			Label:       "Pending Restore",
+			Description: "A restore request is being processed by the registry; this is normally resolved within a few days.",
+		},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{Theme: NewTheme(false), Width: 80}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Pending Restore") {
+		t.Errorf("output missing lifecycle label, got:\n%s", out)
+	}
+	if !strings.Contains(out, "restore request is being processed") {
+		t.Errorf("output missing lifecycle description, got:\n%s", out)
+	}
+	for _, absent := range []string{"Estimated", "estimate"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("output contains %q, want no estimate line when EstimatedEndsBy is nil:\n%s", absent, out)
+		}
 	}
 }
