@@ -34,6 +34,7 @@ where sources disagree.
   - [Source codes](#source-codes)
   - [Conflicts](#conflicts)
   - [Redaction and contacts](#redaction-and-contacts)
+  - [Lifecycle](#lifecycle)
   - [Human view vs. JSON](#human-view-vs-json)
 - [Exit Codes](#exit-codes)
 - [Changelog](CHANGELOG.md)
@@ -240,6 +241,17 @@ status, abuse contact — where per-field provenance actually earns its keep.
 (Registrar Abuse Email/Phone are shown: they're the registrar's own
 operational contact, not a registrant's personal data, and aren't typically
 redacted.)
+
+### Lifecycle
+
+For a gTLD domain that's expired, `plat` interprets its EPP status into a
+plain-language lifecycle stage — Auto-Renew Grace Period, Redemption Grace
+Period, Pending Restore, or Pending Delete — with an estimated (never
+confirmed) end date where ICANN's Expired Domain Deletion Policy gives one
+a fixed or capped duration to derive from. It's shown as its own section in
+the human/plain views and as a `lifecycle` object in JSON (see
+[`docs/schema.md`](docs/schema.md)); ccTLDs and domains without a
+recognized lifecycle-relevant status don't get one.
 
 ### Human view vs. JSON
 

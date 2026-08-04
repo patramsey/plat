@@ -32,10 +32,12 @@ any field's shape bumps `schemaVersion`. The current version is **1**.
 
 Every optional field (`domain`, `handle`, `registrar.*`, `status`,
 `created`, `updated`, `expires`, `nameservers`, `dnssec`, `lifecycle`) is
-**omitted entirely** from the output when no source contributed a value —
-not `null`, not an empty object, simply absent. `jq '.expires.value'` on a
-record with no expires data returns `null` (jq's normal behavior for a
-missing path), so pipelines don't need to special-case absence.
+**omitted entirely** from the output when no source contributed a value, or
+— for `lifecycle`, a field plat derives rather than any source reporting
+directly — when it isn't computable or doesn't apply. Never `null`, never
+an empty object, simply absent. `jq '.expires.value'` on a record with no
+expires data returns `null` (jq's normal behavior for a missing path), so
+pipelines don't need to special-case absence.
 
 - **String field** (`domain`, `handle`, `registrar.name`, `registrar.ianaId`, `registrar.url`, `registrar.abuseEmail`, `registrar.abusePhone`):
   ```json
@@ -62,7 +64,7 @@ missing path), so pipelines don't need to special-case absence.
     "label": "Redemption Grace Period",
     "description": "This domain has expired and is no longer eligible for normal renewal. The registrant can still recover it by asking the registrar for a restore, typically for an added fee. If it isn't restored, the domain moves to Pending Delete and is later released for new registration.",
     "estimatedEndsBy": "2026-09-02T00:00:00Z",
-    "estimateBasis": "Estimate based on ICANN's 30-day Redemption Grace Period policy for gTLDs, calculated from this record's last-updated time. Actual timing is set by the registry/registrar and may be earlier."
+    "estimateBasis": "Estimate based on ICANN's fixed 30-day Redemption Grace Period policy for gTLDs, calculated from this record's last-updated time. Actual timing is set by the registry/registrar and may be earlier."
   }
   ```
   `stage` is one of `autoRenewGrace`, `redemptionGrace`, `pendingRestore`, `pendingDelete`. `estimatedEndsBy`/`estimateBasis` are omitted together when no estimate could be computed (missing/unparsed anchor timestamp, or `pendingRestore`, which has no ICANN-fixed duration to estimate from) — `estimatedEndsBy` is always explicitly an *estimate*, never a confirmed date; `estimateBasis` always states which policy and anchor it was derived from.
