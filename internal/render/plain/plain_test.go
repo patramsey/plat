@@ -246,3 +246,46 @@ func TestRender_NameserversWithEmptySourcesStillShowsField(t *testing.T) {
 		t.Errorf("expected a Nameservers row even with empty Sources, got:\n%s", out)
 	}
 }
+
+func TestRender_LifecycleSection(t *testing.T) {
+	updated, _ := time.Parse(time.RFC3339, "2026-08-01T00:00:00Z")
+	endsBy := updated.Add(30 * 24 * time.Hour)
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Lifecycle: &model.LifecycleInfo{
+			Stage:           model.LifecycleRedemptionGrace,
+			Label:           "Redemption Grace Period",
+			Description:     "This domain has expired and is no longer eligible for normal renewal.",
+			EstimatedEndsBy: &endsBy,
+			EstimateBasis:   "Estimate based on ICANN's fixed 30-day Redemption Grace Period policy for gTLDs.",
+		},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		"Lifecycle (Redemption Grace Period):",
+		"no longer eligible for normal renewal",
+		"2026-08-31T00:00:00Z",
+		"30-day Redemption Grace Period",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q\nfull output:\n%s", want, out)
+		}
+	}
+}
+
+func TestRender_LifecycleAbsentWhenNil(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(buf.String(), "Lifecycle") {
+		t.Errorf("output contains Lifecycle section, want none when Record.Lifecycle is nil:\n%s", buf.String())
+	}
+}

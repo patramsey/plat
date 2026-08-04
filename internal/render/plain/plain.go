@@ -69,6 +69,14 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 		}
 	}
 
+	if r.Lifecycle != nil {
+		_, _ = fmt.Fprintln(tw, "---")
+		_, _ = fmt.Fprintf(tw, "Lifecycle (%s):\t%s\n", r.Lifecycle.Label, r.Lifecycle.Description)
+		if r.Lifecycle.EstimatedEndsBy != nil {
+			_, _ = fmt.Fprintf(tw, "Lifecycle estimate:\t%s (%s)\n", r.Lifecycle.EstimatedEndsBy.UTC().Format(time.RFC3339), r.Lifecycle.EstimateBasis)
+		}
+	}
+
 	return tw.Flush()
 }
 
