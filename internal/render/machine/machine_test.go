@@ -271,3 +271,50 @@ func TestEncode_NameserversWithEmptySourcesStillPresent(t *testing.T) {
 		t.Errorf("nameservers.sources = %v, want an empty array", nsMap["sources"])
 	}
 }
+
+func TestEncode_LifecycleField(t *testing.T) {
+	updated, _ := time.Parse(time.RFC3339, "2026-08-01T00:00:00Z")
+	endsBy := updated.Add(30 * 24 * time.Hour)
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Lifecycle: &model.LifecycleInfo{
+			Stage:           model.LifecycleRedemptionGrace,
+			Label:           "Redemption Grace Period",
+			Description:     "This domain has expired and is no longer eligible for normal renewal.",
+			EstimatedEndsBy: &endsBy,
+			EstimateBasis:   "Estimate based on ICANN's fixed 30-day Redemption Grace Period policy for gTLDs.",
+		},
+	}
+	var buf bytes.Buffer
+	if err := Encode(&buf, rec, Options{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	checkGolden(t, "lifecycle.json", buf.Bytes())
+
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
+		t.Fatalf("output did not unmarshal: %v", err)
+	}
+	lifecycle := decoded["lifecycle"].(map[string]interface{})
+	if lifecycle["stage"] != "redemptionGrace" {
+		t.Errorf("lifecycle.stage = %v, want %q", lifecycle["stage"], "redemptionGrace")
+	}
+	if lifecycle["estimatedEndsBy"] != "2026-08-31T00:00:00Z" {
+		t.Errorf("lifecycle.estimatedEndsBy = %v, want %q", lifecycle["estimatedEndsBy"], "2026-08-31T00:00:00Z")
+	}
+}
+
+func TestEncode_LifecycleAbsentWhenNil(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	var buf bytes.Buffer
+	if err := Encode(&buf, rec, Options{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var decoded map[string]interface{}
+	_ = json.Unmarshal(buf.Bytes(), &decoded)
+	if _, ok := decoded["lifecycle"]; ok {
+		t.Errorf("lifecycle key present, want omitted when Record.Lifecycle is nil")
+	}
+}
