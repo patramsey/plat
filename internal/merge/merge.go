@@ -360,6 +360,16 @@ func sortedKeys(m map[string]bool) []string {
 // Conflict — thick vs. thin registries legitimately report different
 // status vocabularies for the same domain, so a set difference here isn't
 // evidence of disagreement the way a differing nameserver or expiry is.
+//
+// Some registrar RDAP servers (e.g. GoDaddy) report the bare, ambiguous
+// RDAP vocabulary term (normalizing to e.g. "transferProhibited") instead
+// of a client/server-prefixed EPP status, even when another source reports
+// the same restriction properly attributed (e.g. registry RDAP's
+// "clientTransferProhibited"/"serverTransferProhibited"). Once every
+// source has contributed, a bare status is dropped if a prefixed variant
+// of the same status is also present, since it names the same restriction
+// with strictly less information. A bare status with no prefixed variant
+// anywhere is kept — it's the only information available.
 func (m *mergeState) status(present []model.SourceRecord) model.Field[[]string] {
 	seen := map[string]bool{}
 	var order []string
@@ -380,7 +390,26 @@ func (m *mergeState) status(present []model.SourceRecord) model.Field[[]string] 
 	if len(contributors) == 0 {
 		return model.Field[[]string]{}
 	}
-	return model.Field[[]string]{Value: order, Sources: contributors}
+	return model.Field[[]string]{Value: dropRedundantBareStatuses(order, seen), Sources: contributors}
+}
+
+// dropRedundantBareStatuses removes any status in order that is a bare
+// (unprefixed) form for which "client"+status or "server"+status is also
+// in seen.
+func dropRedundantBareStatuses(order []string, seen map[string]bool) []string {
+	out := make([]string, 0, len(order))
+	for _, st := range order {
+		if strings.HasPrefix(st, "client") || strings.HasPrefix(st, "server") {
+			out = append(out, st)
+			continue
+		}
+		titled := strings.ToUpper(st[:1]) + st[1:]
+		if seen["client"+titled] || seen["server"+titled] {
+			continue
+		}
+		out = append(out, st)
+	}
+	return out
 }
 
 // dnssec picks the first present source that expressed an opinion
