@@ -535,7 +535,6 @@ func TestMerge_PartialParseTimestampStillChecksClockSkew(t *testing.T) {
 
 func TestMerge_LifecycleStageEstimates(t *testing.T) {
 	updated, _ := time.Parse(time.RFC3339, "2026-08-01T00:00:00Z")
-	expires, _ := time.Parse(time.RFC3339, "2026-07-20T00:00:00Z")
 
 	tests := []struct {
 		name         string
@@ -545,7 +544,6 @@ func TestMerge_LifecycleStageEstimates(t *testing.T) {
 		wantAnchor   time.Time
 		wantDuration time.Duration
 	}{
-		{"auto-renew grace, anchored to Updated", "autoRenewPeriod", model.LifecycleAutoRenewGrace, "Auto-Renew Grace Period", updated, 45 * 24 * time.Hour},
 		{"redemption grace, anchored to Updated", "redemptionPeriod", model.LifecycleRedemptionGrace, "Redemption Grace Period", updated, 30 * 24 * time.Hour},
 		{"pending delete, anchored to Updated", "pendingDelete", model.LifecyclePendingDelete, "Pending Delete", updated, 5 * 24 * time.Hour},
 	}
@@ -555,7 +553,6 @@ func TestMerge_LifecycleStageEstimates(t *testing.T) {
 			a.Domain = "example.com"
 			a.Status = []string{tt.status}
 			a.Updated = model.TimeValue{Time: updated, Raw: "2026-08-01T00:00:00Z", Parsed: true}
-			a.Expires = model.TimeValue{Time: expires, Raw: "2026-07-20T00:00:00Z", Parsed: true}
 
 			rec := Merge([]model.SourceRecord{a})
 
@@ -582,6 +579,65 @@ func TestMerge_LifecycleStageEstimates(t *testing.T) {
 				t.Error("EstimateBasis is empty, want prose explaining the estimate")
 			}
 		})
+	}
+}
+
+func TestMerge_LifecycleAutoRenewGraceAnchoredToRegistrarExpires(t *testing.T) {
+	registrarExpires, _ := time.Parse(time.RFC3339, "2026-08-03T02:51:21Z")
+	registryExpires, _ := time.Parse(time.RFC3339, "2027-08-03T02:51:21Z")
+
+	registrarWHOIS := sr(model.SourceRegistrarWHOIS, true)
+	registrarWHOIS.Domain = "example.com"
+	registrarWHOIS.Status = []string{"autoRenewPeriod"}
+	registrarWHOIS.Expires = model.TimeValue{Time: registrarExpires, Raw: "2026-08-03T02:51:21Z", Parsed: true}
+
+	registryWHOIS := sr(model.SourceRegistryWHOIS, true)
+	registryWHOIS.Domain = "example.com"
+	// The registry's own Expires reflects its already-performed
+	// auto-renewal (bumped a year forward) -- it must NOT be used as the
+	// anchor. This mirrors a real observed registry/registrar WHOIS pair.
+	registryWHOIS.Expires = model.TimeValue{Time: registryExpires, Raw: "2027-08-03T02:51:21Z", Parsed: true}
+
+	rec := Merge([]model.SourceRecord{registrarWHOIS, registryWHOIS})
+
+	if rec.Lifecycle == nil {
+		t.Fatal("Lifecycle = nil, want populated")
+	}
+	if rec.Lifecycle.Stage != model.LifecycleAutoRenewGrace {
+		t.Errorf("Stage = %q, want %q", rec.Lifecycle.Stage, model.LifecycleAutoRenewGrace)
+	}
+	if rec.Lifecycle.EstimatedEndsBy == nil {
+		t.Fatal("EstimatedEndsBy = nil, want a computed estimate anchored to the registrar's Expires")
+	}
+	want := registrarExpires.Add(45 * 24 * time.Hour)
+	if !rec.Lifecycle.EstimatedEndsBy.Equal(want) {
+		t.Errorf("EstimatedEndsBy = %v, want %v (anchored to the registrar's Expires, NOT the registry's later, already-auto-renewed date)", rec.Lifecycle.EstimatedEndsBy, want)
+	}
+	if rec.Lifecycle.EstimateBasis == "" {
+		t.Error("EstimateBasis is empty, want prose explaining the estimate")
+	}
+}
+
+func TestMerge_LifecycleAutoRenewGraceNoEstimateWithoutRegistrarSource(t *testing.T) {
+	expires, _ := time.Parse(time.RFC3339, "2027-08-03T00:00:00Z")
+	a := sr(model.SourceRegistryRDAP, true)
+	a.Domain = "example.com"
+	a.Status = []string{"autoRenewPeriod"}
+	a.Expires = model.TimeValue{Time: expires, Raw: "2027-08-03T00:00:00Z", Parsed: true}
+
+	rec := Merge([]model.SourceRecord{a})
+
+	if rec.Lifecycle == nil {
+		t.Fatal("Lifecycle = nil, want populated (Stage/Label/Description don't need the anchor)")
+	}
+	if rec.Lifecycle.Stage != model.LifecycleAutoRenewGrace {
+		t.Errorf("Stage = %q, want %q", rec.Lifecycle.Stage, model.LifecycleAutoRenewGrace)
+	}
+	if rec.Lifecycle.EstimatedEndsBy != nil {
+		t.Errorf("EstimatedEndsBy = %v, want nil when no registrar source is present to anchor from", rec.Lifecycle.EstimatedEndsBy)
+	}
+	if rec.Lifecycle.EstimateBasis != "" {
+		t.Errorf("EstimateBasis = %q, want empty when no estimate was computed", rec.Lifecycle.EstimateBasis)
 	}
 }
 

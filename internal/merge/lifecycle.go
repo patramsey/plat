@@ -29,12 +29,13 @@ var lifecycleStatusPriority = []struct {
 	{"autoRenewPeriod", model.LifecycleAutoRenewGrace},
 }
 
-// deriveLifecycle interprets rec's already-merged Status/Updated/Expires
-// into a LifecycleInfo describing where the domain sits in ICANN's
-// Expired Domain Deletion Policy (EDDP) timeline. Returns nil for ccTLDs
-// (2-letter TLDs, which set independent policies EDDP doesn't govern) and
-// for gTLDs with no recognized lifecycle-relevant status.
-func deriveLifecycle(rec model.Record) *model.LifecycleInfo {
+// deriveLifecycle interprets rec's already-merged Status/Updated/Expires,
+// plus present (the sorted, attempted SourceRecords Merge derived rec
+// from), into a LifecycleInfo describing where the domain sits in
+// ICANN's Expired Domain Deletion Policy (EDDP) timeline. Returns nil for
+// ccTLDs (2-letter TLDs, which set independent policies EDDP doesn't
+// govern) and for gTLDs with no recognized lifecycle-relevant status.
+func deriveLifecycle(rec model.Record, present []model.SourceRecord) *model.LifecycleInfo {
 	if !isGTLD(rec.Domain.Value) {
 		return nil
 	}
@@ -50,7 +51,7 @@ func deriveLifecycle(rec model.Record) *model.LifecycleInfo {
 	case model.LifecyclePendingRestore:
 		return pendingRestoreInfo()
 	case model.LifecycleAutoRenewGrace:
-		return autoRenewGraceInfo(rec)
+		return autoRenewGraceInfo(present)
 	}
 	return nil
 }
@@ -143,18 +144,42 @@ func pendingRestoreInfo() *model.LifecycleInfo {
 	}
 }
 
-func autoRenewGraceInfo(rec model.Record) *model.LifecycleInfo {
+func autoRenewGraceInfo(present []model.SourceRecord) *model.LifecycleInfo {
 	info := &model.LifecycleInfo{
 		Stage:       model.LifecycleAutoRenewGrace,
 		Label:       "Auto-Renew Grace Period",
 		Description: "The domain has expired. The registrar may still renew it automatically during this window, or let it lapse further into the Redemption Grace Period. Nothing to do yet unless you want to ensure renewal goes through.",
 	}
-	if anchor, ok := parsedTime(rec.Updated); ok {
+	if anchor, ok := registrarExpires(present); ok {
 		end := anchor.Add(autoRenewGraceCap)
 		info.EstimatedEndsBy = &end
-		info.EstimateBasis = "Estimate based on ICANN's 45-day cap on the optional Auto-Renew Grace Period for gTLDs, calculated from this record's last-updated time. Many registrars use a shorter window, so this domain's actual renew/delete decision could come sooner."
+		info.EstimateBasis = "Estimate based on ICANN's 45-day cap on the optional Auto-Renew Grace Period for gTLDs, calculated from the registrar's reported expiration date -- the registry's own expiration date reflects the registry's already-performed auto-renewal, not the domain's original term, so it isn't used here. Many registrars use a shorter window, so this domain's actual renew/delete decision could come sooner."
 	}
 	return info
+}
+
+// registrarExpires returns the first present, parsed Expires timestamp
+// reported directly by a registrar source (registrar-rdap preferred over
+// registrar-whois, since present is already precedence-sorted). Only a
+// registrar source is trustworthy here: during Auto-Renew Grace Period
+// the registry has already bumped its own Expires forward by a full
+// renewal term as part of the grace-period mechanic itself, while the
+// registrar's reported Expires continues to reflect the domain's real,
+// original expiration -- confirmed against a live registry/registrar
+// WHOIS pair (registry showed a date bumped a year forward; registrar
+// showed the true original expiration and the autoRenewPeriod status).
+// Verisign's own WHOIS notice text says as much: "consult the sponsoring
+// registrar's Whois database" for the actual date.
+func registrarExpires(present []model.SourceRecord) (time.Time, bool) {
+	for _, s := range present {
+		if s.Meta.Source != model.SourceRegistrarRDAP && s.Meta.Source != model.SourceRegistrarWHOIS {
+			continue
+		}
+		if s.Expires.Raw != "" && s.Expires.Parsed {
+			return s.Expires.Time, true
+		}
+	}
+	return time.Time{}, false
 }
 
 func parsedTime(f model.Field[model.TimeValue]) (time.Time, bool) {
