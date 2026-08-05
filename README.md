@@ -247,11 +247,16 @@ redacted.)
 For a gTLD domain that's expired, `plat` interprets its EPP status into a
 plain-language lifecycle stage — Auto-Renew Grace Period, Redemption Grace
 Period, Pending Restore, or Pending Delete — with an estimated (never
-confirmed) end date where ICANN's Expired Domain Deletion Policy gives one
-a fixed or capped duration to derive from. It's shown as its own section in
-the human/plain views and as a `lifecycle` object in JSON (see
-[`docs/schema.md`](docs/schema.md)); ccTLDs and domains without a
-recognized lifecycle-relevant status don't get one.
+confirmed) end date wherever ICANN's Expired Registration Recovery Policy
+(ERRP) or a common registry convention gives one a fixed or capped
+duration to derive from. Only Redemption Grace's 30 days is actually
+ICANN-mandated (ERRP §3.1); Auto-Renew Grace's 45 days is a registry
+convention (e.g. Verisign's for `.com`/`.net`), and ERRP explicitly leaves
+registrars free to act sooner at their own discretion. It's shown as its
+own section in the human/plain views and as a `lifecycle` object in JSON
+(see [`docs/schema.md`](docs/schema.md)); ccTLDs, internationalized (IDN)
+TLDs, and domains without a recognized lifecycle-relevant status don't get
+one.
 
 ### Human view vs. JSON
 
