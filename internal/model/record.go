@@ -120,6 +120,7 @@ type Record struct {
 	Expires     Field[TimeValue]
 	Nameservers Field[[]string]
 	DNSSEC      Field[bool]
+	Lifecycle   *LifecycleInfo
 	Redacted    []RedactionNotice
 	Sources     []SourceResult
 	Conflicts   []Conflict

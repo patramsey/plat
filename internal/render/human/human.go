@@ -11,7 +11,8 @@
 // color/style decisions (status classification, expiry ramp, source
 // codes); rows.go holds the per-field row writers and their wrapping;
 // tables.go holds the Sources diagnostic table; conflicts.go holds the
-// Conflicts/Redacted blocks and the conflict value diff-highlighting.
+// Conflicts/Redacted blocks and the conflict value diff-highlighting;
+// lifecycle.go holds the Lifecycle interpretation block.
 package human
 
 import (
@@ -112,6 +113,7 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 		writeConflictsHint(&b, th, r.Conflicts)
 	}
 	writeRedacted(&b, th, innerWidth, r.Redacted)
+	writeLifecycle(&b, th, innerWidth, r.Lifecycle)
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).

@@ -532,3 +532,294 @@ func TestMerge_PartialParseTimestampStillChecksClockSkew(t *testing.T) {
 		t.Errorf("Conflict.Values = %+v, want all 3 present candidates' Raw values listed (including the unparsed winner)", rec.Conflicts[0].Values)
 	}
 }
+
+func TestMerge_LifecycleStageEstimates(t *testing.T) {
+	updated, _ := time.Parse(time.RFC3339, "2026-08-01T00:00:00Z")
+
+	tests := []struct {
+		name         string
+		status       string
+		wantStage    model.LifecycleStage
+		wantLabel    string
+		wantAnchor   time.Time
+		wantDuration time.Duration
+	}{
+		{"redemption grace, anchored to Updated", "redemptionPeriod", model.LifecycleRedemptionGrace, "Redemption Grace Period", updated, 30 * 24 * time.Hour},
+		{"pending delete, anchored to Updated", "pendingDelete", model.LifecyclePendingDelete, "Pending Delete", updated, 5 * 24 * time.Hour},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := sr(model.SourceRegistryRDAP, true)
+			a.Domain = "example.com"
+			a.Status = []string{tt.status}
+			a.Updated = model.TimeValue{Time: updated, Raw: "2026-08-01T00:00:00Z", Parsed: true}
+
+			rec := Merge([]model.SourceRecord{a})
+
+			if rec.Lifecycle == nil {
+				t.Fatal("Lifecycle = nil, want populated")
+			}
+			if rec.Lifecycle.Stage != tt.wantStage {
+				t.Errorf("Stage = %q, want %q", rec.Lifecycle.Stage, tt.wantStage)
+			}
+			if rec.Lifecycle.Label != tt.wantLabel {
+				t.Errorf("Label = %q, want %q", rec.Lifecycle.Label, tt.wantLabel)
+			}
+			if rec.Lifecycle.Description == "" {
+				t.Error("Description is empty, want an explanation of the stage")
+			}
+			if rec.Lifecycle.EstimatedEndsBy == nil {
+				t.Fatal("EstimatedEndsBy = nil, want a computed estimate")
+			}
+			want := tt.wantAnchor.Add(tt.wantDuration)
+			if !rec.Lifecycle.EstimatedEndsBy.Equal(want) {
+				t.Errorf("EstimatedEndsBy = %v, want %v", rec.Lifecycle.EstimatedEndsBy, want)
+			}
+			if rec.Lifecycle.EstimateBasis == "" {
+				t.Error("EstimateBasis is empty, want prose explaining the estimate")
+			}
+		})
+	}
+}
+
+func TestMerge_LifecycleAutoRenewGraceAnchoredToRegistrarExpires(t *testing.T) {
+	registrarExpires, _ := time.Parse(time.RFC3339, "2026-08-03T02:51:21Z")
+	registryExpires, _ := time.Parse(time.RFC3339, "2027-08-03T02:51:21Z")
+
+	registrarWHOIS := sr(model.SourceRegistrarWHOIS, true)
+	registrarWHOIS.Domain = "example.com"
+	registrarWHOIS.Status = []string{"autoRenewPeriod"}
+	registrarWHOIS.Expires = model.TimeValue{Time: registrarExpires, Raw: "2026-08-03T02:51:21Z", Parsed: true}
+
+	registryWHOIS := sr(model.SourceRegistryWHOIS, true)
+	registryWHOIS.Domain = "example.com"
+	// The registry's own Expires reflects its already-performed
+	// auto-renewal (bumped a year forward) -- it must NOT be used as the
+	// anchor. This mirrors a real observed registry/registrar WHOIS pair.
+	registryWHOIS.Expires = model.TimeValue{Time: registryExpires, Raw: "2027-08-03T02:51:21Z", Parsed: true}
+
+	rec := Merge([]model.SourceRecord{registrarWHOIS, registryWHOIS})
+
+	if rec.Lifecycle == nil {
+		t.Fatal("Lifecycle = nil, want populated")
+	}
+	if rec.Lifecycle.Stage != model.LifecycleAutoRenewGrace {
+		t.Errorf("Stage = %q, want %q", rec.Lifecycle.Stage, model.LifecycleAutoRenewGrace)
+	}
+	if rec.Lifecycle.EstimatedEndsBy == nil {
+		t.Fatal("EstimatedEndsBy = nil, want a computed estimate anchored to the registrar's Expires")
+	}
+	want := registrarExpires.Add(45 * 24 * time.Hour)
+	if !rec.Lifecycle.EstimatedEndsBy.Equal(want) {
+		t.Errorf("EstimatedEndsBy = %v, want %v (anchored to the registrar's Expires, NOT the registry's later, already-auto-renewed date)", rec.Lifecycle.EstimatedEndsBy, want)
+	}
+	if rec.Lifecycle.EstimateBasis == "" {
+		t.Error("EstimateBasis is empty, want prose explaining the estimate")
+	}
+}
+
+func TestMerge_LifecycleAutoRenewGraceNoEstimateWithoutRegistrarSource(t *testing.T) {
+	expires, _ := time.Parse(time.RFC3339, "2027-08-03T00:00:00Z")
+	a := sr(model.SourceRegistryRDAP, true)
+	a.Domain = "example.com"
+	a.Status = []string{"autoRenewPeriod"}
+	a.Expires = model.TimeValue{Time: expires, Raw: "2027-08-03T00:00:00Z", Parsed: true}
+
+	rec := Merge([]model.SourceRecord{a})
+
+	if rec.Lifecycle == nil {
+		t.Fatal("Lifecycle = nil, want populated (Stage/Label/Description don't need the anchor)")
+	}
+	if rec.Lifecycle.Stage != model.LifecycleAutoRenewGrace {
+		t.Errorf("Stage = %q, want %q", rec.Lifecycle.Stage, model.LifecycleAutoRenewGrace)
+	}
+	if rec.Lifecycle.EstimatedEndsBy != nil {
+		t.Errorf("EstimatedEndsBy = %v, want nil when no registrar source is present to anchor from", rec.Lifecycle.EstimatedEndsBy)
+	}
+	if rec.Lifecycle.EstimateBasis != "" {
+		t.Errorf("EstimateBasis = %q, want empty when no estimate was computed", rec.Lifecycle.EstimateBasis)
+	}
+}
+
+func TestMerge_LifecyclePendingRestoreHasNoEstimate(t *testing.T) {
+	a := sr(model.SourceRegistryRDAP, true)
+	a.Domain = "example.com"
+	a.Status = []string{"pendingRestore"}
+	a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
+
+	rec := Merge([]model.SourceRecord{a})
+
+	if rec.Lifecycle == nil {
+		t.Fatal("Lifecycle = nil, want populated for pendingRestore")
+	}
+	if rec.Lifecycle.Stage != model.LifecyclePendingRestore {
+		t.Errorf("Stage = %q, want %q", rec.Lifecycle.Stage, model.LifecyclePendingRestore)
+	}
+	if rec.Lifecycle.EstimatedEndsBy != nil {
+		t.Errorf("EstimatedEndsBy = %v, want nil (no ICANN-fixed cap exists for Pending Restore)", rec.Lifecycle.EstimatedEndsBy)
+	}
+	if rec.Lifecycle.EstimateBasis != "" {
+		t.Errorf("EstimateBasis = %q, want empty since EstimatedEndsBy is nil", rec.Lifecycle.EstimateBasis)
+	}
+}
+
+func TestMerge_LifecycleNilForCCTLD(t *testing.T) {
+	a := sr(model.SourceRegistryRDAP, true)
+	a.Domain = "example.de"
+	a.Status = []string{"redemptionPeriod"}
+	a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
+
+	rec := Merge([]model.SourceRecord{a})
+
+	if rec.Lifecycle != nil {
+		t.Errorf("Lifecycle = %+v, want nil for a ccTLD regardless of status -- ccTLD registries set independent policies plat doesn't model", rec.Lifecycle)
+	}
+}
+
+func TestMerge_LifecycleNilWhenNoRecognizedStatus(t *testing.T) {
+	a := sr(model.SourceRegistryRDAP, true)
+	a.Domain = "example.com"
+	a.Status = []string{"clientTransferProhibited"}
+
+	rec := Merge([]model.SourceRecord{a})
+
+	if rec.Lifecycle != nil {
+		t.Errorf("Lifecycle = %+v, want nil when Status carries no lifecycle-relevant EPP code", rec.Lifecycle)
+	}
+}
+
+func TestMerge_LifecycleMissingAnchorLeavesEstimateEmpty(t *testing.T) {
+	a := sr(model.SourceRegistryRDAP, true)
+	a.Domain = "example.com"
+	a.Status = []string{"redemptionPeriod"}
+	// Updated deliberately left zero-value (Raw "") -- no usable anchor.
+
+	rec := Merge([]model.SourceRecord{a})
+
+	if rec.Lifecycle == nil {
+		t.Fatal("Lifecycle = nil, want populated (Stage/Label/Description don't need the anchor)")
+	}
+	if rec.Lifecycle.EstimatedEndsBy != nil {
+		t.Errorf("EstimatedEndsBy = %v, want nil when Updated isn't present/parsed", rec.Lifecycle.EstimatedEndsBy)
+	}
+	if rec.Lifecycle.EstimateBasis != "" {
+		t.Errorf("EstimateBasis = %q, want empty when no estimate was computed", rec.Lifecycle.EstimateBasis)
+	}
+	if rec.Lifecycle.Description == "" {
+		t.Error("Description is empty, want the stage explanation regardless of the missing estimate")
+	}
+}
+
+func TestMerge_LifecyclePriorityPendingDeleteBeatsRedemptionGrace(t *testing.T) {
+	a := sr(model.SourceRegistryRDAP, true)
+	a.Domain = "example.com"
+	a.Status = []string{"redemptionPeriod", "pendingDelete"}
+	a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
+
+	rec := Merge([]model.SourceRecord{a})
+
+	if rec.Lifecycle == nil {
+		t.Fatal("Lifecycle = nil, want populated")
+	}
+	if rec.Lifecycle.Stage != model.LifecyclePendingDelete {
+		t.Errorf("Stage = %q, want %q (pendingDelete is more urgent/definitive than redemptionPeriod)", rec.Lifecycle.Stage, model.LifecyclePendingDelete)
+	}
+}
+
+func TestMerge_LifecyclePriorityPendingRestoreBeatsAutoRenewPeriod(t *testing.T) {
+	a := sr(model.SourceRegistryRDAP, true)
+	a.Domain = "example.com"
+	a.Status = []string{"autoRenewPeriod", "pendingRestore"}
+	a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
+
+	rec := Merge([]model.SourceRecord{a})
+
+	if rec.Lifecycle == nil {
+		t.Fatal("Lifecycle = nil, want populated")
+	}
+	if rec.Lifecycle.Stage != model.LifecyclePendingRestore {
+		t.Errorf("Stage = %q, want %q (pendingRestore is more urgent/definitive than autoRenewPeriod)", rec.Lifecycle.Stage, model.LifecyclePendingRestore)
+	}
+}
+
+func TestMerge_LifecycleNilForIDNCCTLD(t *testing.T) {
+	// internal/collect/adapt_rdap.go prefers the Unicode domain form over
+	// the punycode/LDH form, so both shapes need to be checked: the raw
+	// Unicode ccTLD directly, and the punycode-encoded (xn--) form a
+	// source might still report.
+	tests := []struct {
+		name   string
+		domain string
+	}{
+		{"Unicode ccTLD", "пример.рф"},
+		{"punycode-encoded IDN ccTLD", "xn--e1afmkfd.xn--p1ai"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := sr(model.SourceRegistryRDAP, true)
+			a.Domain = tt.domain
+			a.Status = []string{"redemptionPeriod"}
+			a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
+
+			rec := Merge([]model.SourceRecord{a})
+
+			if rec.Lifecycle != nil {
+				t.Errorf("Lifecycle = %+v, want nil for IDN ccTLD %q (byte length must not be mistaken for character length, and the punycode form must be recognized too)", rec.Lifecycle, tt.domain)
+			}
+		})
+	}
+}
+
+func TestMerge_LifecycleNilForIDNGTLD(t *testing.T) {
+	// Documented limitation: IDN gTLDs (here, the real gTLD ".在线",
+	// punycode "xn--3ds443g") are excluded from lifecycle interpretation
+	// alongside IDN ccTLDs, since the two can't be reliably told apart
+	// without a real TLD-type classification list. See isGTLD's doc
+	// comment.
+	tests := []struct {
+		name   string
+		domain string
+	}{
+		{"Unicode gTLD form", "example.在线"},
+		{"punycode gTLD form", "xn--e1afmkfd.xn--3ds443g"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := sr(model.SourceRegistryRDAP, true)
+			a.Domain = tt.domain
+			a.Status = []string{"redemptionPeriod"}
+			a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
+
+			rec := Merge([]model.SourceRecord{a})
+
+			if rec.Lifecycle != nil {
+				t.Errorf("Lifecycle = %+v, want nil -- IDN gTLDs are out of scope for lifecycle interpretation alongside IDN ccTLDs (documented limitation, see isGTLD)", rec.Lifecycle)
+			}
+		})
+	}
+}
+
+func TestMerge_LifecycleNilForMalformedDomain(t *testing.T) {
+	tests := []struct {
+		name   string
+		domain string
+	}{
+		{"trailing dot", "example.com."},
+		{"dot-less", "localhost"},
+		{"empty string", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := sr(model.SourceRegistryRDAP, true)
+			a.Domain = tt.domain
+			a.Status = []string{"redemptionPeriod"}
+			a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
+
+			rec := Merge([]model.SourceRecord{a})
+
+			if rec.Lifecycle != nil {
+				t.Errorf("Lifecycle = %+v, want nil for malformed domain %q", rec.Lifecycle, tt.domain)
+			}
+		})
+	}
+}

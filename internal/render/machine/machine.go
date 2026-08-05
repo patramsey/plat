@@ -64,6 +64,14 @@ type redactionView struct {
 	Reason string `json:"reason"`
 }
 
+type lifecycleView struct {
+	Stage           string  `json:"stage"`
+	Label           string  `json:"label"`
+	Description     string  `json:"description"`
+	EstimatedEndsBy *string `json:"estimatedEndsBy,omitempty"`
+	EstimateBasis   string  `json:"estimateBasis,omitempty"`
+}
+
 type sourceView struct {
 	Source    string          `json:"source"`
 	OK        bool            `json:"ok"`
@@ -84,6 +92,7 @@ type recordView struct {
 	Expires       *timeFieldValue `json:"expires,omitempty"`
 	Nameservers   *listFieldValue `json:"nameservers,omitempty"`
 	DNSSEC        *boolFieldValue `json:"dnssec,omitempty"`
+	Lifecycle     *lifecycleView  `json:"lifecycle,omitempty"`
 	Conflicts     []conflictView  `json:"conflicts"`
 	Redacted      []redactionView `json:"redacted"`
 	Sources       []sourceView    `json:"sources"`
@@ -126,6 +135,23 @@ func boolFieldView(f model.Field[bool]) *boolFieldValue {
 	return &boolFieldValue{Value: f.Value, Sources: sourceIDs(f.Sources)}
 }
 
+func lifecycleFieldView(l *model.LifecycleInfo) *lifecycleView {
+	if l == nil {
+		return nil
+	}
+	v := &lifecycleView{
+		Stage:         string(l.Stage),
+		Label:         l.Label,
+		Description:   l.Description,
+		EstimateBasis: l.EstimateBasis,
+	}
+	if l.EstimatedEndsBy != nil {
+		s := l.EstimatedEndsBy.UTC().Format(time.RFC3339)
+		v.EstimatedEndsBy = &s
+	}
+	return v
+}
+
 func timeFieldView(f model.Field[model.TimeValue]) *timeFieldValue {
 	if !f.Present() {
 		return nil
@@ -162,6 +188,7 @@ func buildView(r model.Record, opts Options) recordView {
 		Expires:       timeFieldView(r.Expires),
 		Nameservers:   listFieldView(r.Nameservers),
 		DNSSEC:        boolFieldView(r.DNSSEC),
+		Lifecycle:     lifecycleFieldView(r.Lifecycle),
 		Conflicts:     []conflictView{},
 		Redacted:      []redactionView{},
 		Sources:       []sourceView{},

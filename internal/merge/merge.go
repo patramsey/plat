@@ -44,6 +44,7 @@ func Merge(sources []model.SourceRecord) model.Record {
 
 	rec.Conflicts = st.conflicts
 	rec.Redacted = st.redactions
+	rec.Lifecycle = deriveLifecycle(rec, present)
 	return rec
 }
 
