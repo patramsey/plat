@@ -7,6 +7,13 @@ follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- IP-address input is now rejected with a clear error instead of
+  producing a meaningless record. `plat 8.8.8.8` previously exited 0 and
+  emitted a schema-clean record built from a WHOIS response about the
+  "TLD" `8`; bare IPv6 leaked an IDNA library internal rather than a
+  friendly message. IPv4, IPv6, bracketed IPv6, and CIDR input now exit 2
+  and point at the issue tracking real RDAP IP-object support. Domains
+  whose labels are numeric (`123.com`) are unaffected.
 - Lifecycle stage text misattributed two of its three timeline durations
   to ICANN policy. Only the 30-day Redemption Grace Period is actually
   ICANN-mandated (Expired Registration Recovery Policy §3.1); the 45-day
