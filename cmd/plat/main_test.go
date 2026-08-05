@@ -291,6 +291,38 @@ func TestRun_AcceptsMultipleDomainArgs(t *testing.T) {
 	}
 }
 
+func TestRun_IPAddressInputRejected(t *testing.T) {
+	// Guards the wiring, not the parsing: internal/domain already unit-
+	// tests that Normalize rejects these, but the bug this fixes was that
+	// an IP produced exit 0 and a schema-clean record built from a WHOIS
+	// response about the "TLD" 8. Asserting the exit code here is what
+	// actually pins that shut -- a lookup path that swallowed the error
+	// would still pass every internal/domain test.
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"bare IPv4", "8.8.8.8"},
+		{"bare IPv6", "2001:4860:4860::8888"},
+		{"CIDR prefix", "8.8.8.0/24"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			got := run([]string{tt.input}, &stdout, &stderr, uiConfig{})
+			if got != 2 {
+				t.Errorf("run([%s]) exit code = %d, want 2 (usage error)", tt.input, got)
+			}
+			if stdout.Len() != 0 {
+				t.Errorf("stdout = %q, want empty -- a rejected input must not emit a record", stdout.String())
+			}
+			if !strings.Contains(stderr.String(), "IP address lookups are not supported") {
+				t.Errorf("stderr = %q, want the IP-address rejection message", stderr.String())
+			}
+		})
+	}
+}
+
 func TestRun_NoArgsStillRejected(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	got := run([]string{}, &stdout, &stderr, uiConfig{})
