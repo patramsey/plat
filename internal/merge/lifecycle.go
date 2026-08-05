@@ -32,9 +32,10 @@ var lifecycleStatusPriority = []struct {
 // deriveLifecycle interprets rec's already-merged Status/Updated/Expires,
 // plus present (the sorted, attempted SourceRecords Merge derived rec
 // from), into a LifecycleInfo describing where the domain sits in
-// ICANN's Expired Domain Deletion Policy (EDDP) timeline. Returns nil for
-// ccTLDs (2-letter TLDs, which set independent policies EDDP doesn't
-// govern) and for gTLDs with no recognized lifecycle-relevant status.
+// ICANN's Expired Registration Recovery Policy (ERRP) timeline. Returns
+// nil for ccTLDs (2-letter TLDs, which set independent policies ERRP
+// doesn't govern) and for gTLDs with no recognized lifecycle-relevant
+// status.
 func deriveLifecycle(rec model.Record, present []model.SourceRecord) *model.LifecycleInfo {
 	if !isGTLD(rec.Domain.Value) {
 		return nil
@@ -122,7 +123,7 @@ func pendingDeleteInfo(rec model.Record) *model.LifecycleInfo {
 	if anchor, ok := parsedTime(rec.Updated); ok {
 		end := anchor.Add(pendingDeleteLen)
 		info.EstimatedEndsBy = &end
-		info.EstimateBasis = "Estimate based on ICANN's fixed 5-day Pending Delete period for gTLDs, calculated from this record's last-updated time. Actual timing is set by the registry and may differ slightly."
+		info.EstimateBasis = "Estimate based on the 5-day Pending Delete period most gTLD registries implement per RFC 3915's grace-period mapping (a registry convention, not an ICANN policy mandate), calculated from this record's last-updated time. Actual timing is set by the registry and may differ slightly."
 	}
 	return info
 }
@@ -153,12 +154,12 @@ func autoRenewGraceInfo(present []model.SourceRecord) *model.LifecycleInfo {
 	info := &model.LifecycleInfo{
 		Stage:       model.LifecycleAutoRenewGrace,
 		Label:       "Auto-Renew Grace Period",
-		Description: "The domain has expired. The registrar may still renew it automatically during this window, or let it lapse further into the Redemption Grace Period. Nothing to do yet unless you want to ensure renewal goes through.",
+		Description: "The domain has expired. Whether and when it moves toward Redemption Grace Period is entirely up to the registrar's own policy -- some act within days, others wait much longer -- so there's no fixed schedule to count on here; contact your registrar directly if you want certainty.",
 	}
 	if anchor, ok := registrarExpires(present); ok {
 		end := anchor.Add(autoRenewGraceCap)
 		info.EstimatedEndsBy = &end
-		info.EstimateBasis = "Estimate based on ICANN's 45-day cap on the optional Auto-Renew Grace Period for gTLDs, calculated from the registrar's reported expiration date -- the registry's own expiration date reflects the registry's already-performed auto-renewal, not the domain's original term, so it isn't used here. Many registrars use a shorter window, so this domain's actual renew/delete decision could come sooner."
+		info.EstimateBasis = "Estimate based on a 45-day Auto-Renew Grace Period, a common registry-configured convention (e.g. Verisign's for .com/.net) rather than an ICANN-mandated cap -- ICANN's own policy leaves the actual timing entirely up to the registrar's discretion. Calculated from the registrar's reported expiration date, since the registry's own expiration date reflects its already-performed auto-renewal, not the domain's original term. Many registrars act on a much shorter schedule in practice, so this domain's actual renew/delete decision could come sooner."
 	}
 	return info
 }
