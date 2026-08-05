@@ -56,20 +56,25 @@ func deriveLifecycle(rec model.Record, present []model.SourceRecord) *model.Life
 	return nil
 }
 
-// isGTLD reports whether domain's TLD (its last dot-separated label) is 3
-// or more characters -- the standard ICANN/ISO 3166 convention that every
-// ccTLD is exactly 2 letters and every gTLD is 3 or more, so no lookup
-// table is needed. An empty or dot-less domain is treated as not a gTLD.
+// isGTLD reports whether domain's TLD (its last dot-separated label) is
+// eligible for lifecycle interpretation: a plain-ASCII label 3 or more
+// characters long, following the standard ICANN/ISO 3166 convention that
+// every ccTLD is exactly 2 letters and every gTLD is 3 or more, so no
+// lookup table is needed for the ASCII case. An empty or dot-less domain
+// is treated as ineligible.
 //
-// The length check only applies once the TLD is confirmed plain ASCII: a
-// non-ASCII (IDN) ccTLD's character count doesn't match its UTF-8 byte
-// count (e.g. .рф, a genuine 2-character ccTLD, is 4 bytes), and
-// internal/collect/adapt_rdap.go prefers the Unicode domain form over the
-// punycode/LDH form when building SourceRecord.Domain, so that's the
-// normal shape rec.Domain.Value takes for an IDN domain -- not an edge
-// case. A punycode-encoded IDN ccTLD (e.g. xn--p1ai for .рф) is always
-// well over 2 ASCII characters, so the xn-- prefix needs its own check;
-// the plain length check alone can't catch it.
+// Deliberate limitation: ANY internationalized (IDN) TLD -- whether ccTLD
+// or gTLD, in punycode ("xn--..." ACE) or native Unicode form -- is
+// treated as ineligible, not just IDN ccTLDs. There is no reliable way to
+// tell an IDN ccTLD (e.g. "рф", Russian, punycode "xn--p1ai") apart from
+// an IDN gTLD (e.g. "在线", punycode "xn--3ds443g") using only length or
+// the "xn--" prefix -- both can be short or long once encoded.
+// Distinguishing them correctly requires a real ccTLD/gTLD classification
+// list (e.g. from IANA's root zone delegation data), which this package
+// deliberately doesn't carry, matching the plan's "no lookup table" choice.
+// The practical effect: expired IDN gTLD domains (a narrow, uncommon case)
+// don't get lifecycle interpretation either, alongside every IDN ccTLD
+// (which is the actual goal).
 func isGTLD(domain string) bool {
 	if domain == "" {
 		return false

@@ -770,6 +770,35 @@ func TestMerge_LifecycleNilForIDNCCTLD(t *testing.T) {
 	}
 }
 
+func TestMerge_LifecycleNilForIDNGTLD(t *testing.T) {
+	// Documented limitation: IDN gTLDs (here, the real gTLD ".在线",
+	// punycode "xn--3ds443g") are excluded from lifecycle interpretation
+	// alongside IDN ccTLDs, since the two can't be reliably told apart
+	// without a real TLD-type classification list. See isGTLD's doc
+	// comment.
+	tests := []struct {
+		name   string
+		domain string
+	}{
+		{"Unicode gTLD form", "example.在线"},
+		{"punycode gTLD form", "xn--e1afmkfd.xn--3ds443g"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := sr(model.SourceRegistryRDAP, true)
+			a.Domain = tt.domain
+			a.Status = []string{"redemptionPeriod"}
+			a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
+
+			rec := Merge([]model.SourceRecord{a})
+
+			if rec.Lifecycle != nil {
+				t.Errorf("Lifecycle = %+v, want nil -- IDN gTLDs are out of scope for lifecycle interpretation alongside IDN ccTLDs (documented limitation, see isGTLD)", rec.Lifecycle)
+			}
+		})
+	}
+}
+
 func TestMerge_LifecycleNilForMalformedDomain(t *testing.T) {
 	tests := []struct {
 		name   string
