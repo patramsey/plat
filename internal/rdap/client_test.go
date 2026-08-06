@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"strings"
 	"testing"
@@ -271,6 +272,64 @@ func TestClientDomain_RetriesOn429(t *testing.T) {
 	}
 	if result.Domain.LDHName != "EXAMPLE.ORG" {
 		t.Errorf("LDHName = %q, want EXAMPLE.ORG", result.Domain.LDHName)
+	}
+}
+
+func TestClient_IP(t *testing.T) {
+	const body = `{
+	  "objectClassName": "ip network",
+	  "handle": "NET-8-8-8-0-2",
+	  "startAddress": "8.8.8.0",
+	  "endAddress": "8.8.8.255",
+	  "ipVersion": "v4",
+	  "name": "GOGL",
+	  "type": "DIRECT ALLOCATION",
+	  "parentHandle": "NET-8-0-0-0-0",
+	  "status": ["active"],
+	  "cidr0_cidrs": [{"v4prefix": "8.8.8.0", "length": 24}],
+	  "events": [{"eventAction": "registration", "eventDate": "2023-12-28T17:24:33-05:00"}],
+	  "port43": "whois.arin.net"
+	}`
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.IP(context.Background(), srv.URL, netip.MustParseAddr("8.8.8.8"))
+	if err != nil {
+		t.Fatalf("IP: %v", err)
+	}
+	if gotPath != "/ip/8.8.8.8" {
+		t.Errorf("request path = %q, want /ip/8.8.8.8", gotPath)
+	}
+	if res.IPNetwork == nil {
+		t.Fatal("Result.IPNetwork = nil, want the parsed object")
+	}
+	if res.IPNetwork.Handle != "NET-8-8-8-0-2" {
+		t.Errorf("Handle = %q, want NET-8-8-8-0-2", res.IPNetwork.Handle)
+	}
+	if len(res.IPNetwork.CIDR0CIDRs) != 1 || res.IPNetwork.CIDR0CIDRs[0].Length != 24 {
+		t.Errorf("CIDR0CIDRs = %+v, want one /24 entry", res.IPNetwork.CIDR0CIDRs)
+	}
+	if res.IPNetwork.Port43 != "whois.arin.net" {
+		t.Errorf("Port43 = %q, want whois.arin.net", res.IPNetwork.Port43)
+	}
+}
+
+func TestClient_IP_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	_, err := c.IP(context.Background(), srv.URL, netip.MustParseAddr("8.8.8.8"))
+	if !errors.Is(err, ErrDomainNotFound) {
+		t.Errorf("err = %v, want ErrDomainNotFound", err)
 	}
 }
 

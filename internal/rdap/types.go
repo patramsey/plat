@@ -2,6 +2,7 @@ package rdap
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -359,4 +360,46 @@ func (d *DomainResponse) RedactionRemarks() []Remark {
 		}
 	}
 	return out
+}
+
+// CIDR0 is an RFC 9083 cidr0 extension entry: the CIDR form of an IP
+// network's range. Exactly one of V4Prefix/V6Prefix is populated.
+type CIDR0 struct {
+	V4Prefix string `json:"v4prefix"`
+	V6Prefix string `json:"v6prefix"`
+	Length   int    `json:"length"`
+}
+
+// Prefix renders the entry as standard CIDR notation ("8.8.8.0/24"),
+// or "" if neither prefix field was populated.
+func (c CIDR0) Prefix() string {
+	switch {
+	case c.V4Prefix != "":
+		return fmt.Sprintf("%s/%d", c.V4Prefix, c.Length)
+	case c.V6Prefix != "":
+		return fmt.Sprintf("%s/%d", c.V6Prefix, c.Length)
+	default:
+		return ""
+	}
+}
+
+// IPNetworkResponse is a trimmed RFC 9083 "ip network" object view. Note
+// what is absent relative to DomainResponse: no expiry, no registrar, no
+// nameservers, no DNSSEC -- IP allocations have none of those.
+type IPNetworkResponse struct {
+	ObjectClassName string     `json:"objectClassName"`
+	Handle          string     `json:"handle"`
+	StartAddress    string     `json:"startAddress"`
+	EndAddress      string     `json:"endAddress"`
+	IPVersion       string     `json:"ipVersion"`
+	Name            string     `json:"name"`
+	Type            string     `json:"type"`
+	Country         string     `json:"country"`
+	ParentHandle    string     `json:"parentHandle"`
+	Status          StatusList `json:"status"`
+	CIDR0CIDRs      []CIDR0    `json:"cidr0_cidrs"`
+	Events          []Event    `json:"events"`
+	Entities        EntityList `json:"entities"`
+	Remarks         RemarkList `json:"remarks"`
+	Port43          string     `json:"port43"`
 }
