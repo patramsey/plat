@@ -41,9 +41,14 @@ func fromIPRDAP(meta model.SourceResult, resp *rdap.IPNetworkResponse) model.IPS
 		sr.CIDR = resp.CIDR0CIDRs[0].Prefix()
 	}
 
-	for _, st := range resp.Status {
-		sr.Status = append(sr.Status, model.NormalizeEPPStatus(st))
-	}
+	// Unlike a domain's status list (RFC 8056 EPP vocabulary), an IP
+	// network's status is RIR-specific vocabulary (RIPE's "ASSIGNED PA",
+	// APNIC's "ALLOCATED NON-PORTABLE", ARIN's lowercase "active"...) --
+	// running it through model.NormalizeEPPStatus mangled multi-word
+	// values into meaningless tokens ("assignedPa") that match nothing a
+	// user would search for. RIR statuses pass through unchanged, per
+	// docs/schema.md's documented contract.
+	sr.Status = append(sr.Status, resp.Status...)
 
 	if registered, ok := resp.Registered(); ok {
 		sr.Registered = model.TimeValue{Time: registered.Time, Raw: registered.Raw, Parsed: registered.Parsed}
@@ -153,9 +158,10 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) model.IPSourceRecord {
 		sr.OrgName = f.OrgName
 	}
 
-	for _, st := range f.Statuses {
-		sr.Status = append(sr.Status, model.NormalizeEPPStatus(st))
-	}
+	// See fromIPRDAP's identical reasoning: RIR status vocabulary isn't
+	// EPP, so it passes through unchanged rather than being mangled by
+	// model.NormalizeEPPStatus.
+	sr.Status = append(sr.Status, f.Statuses...)
 
 	if registered := parse.ParseDate(f.Registered); registered.Raw != "" {
 		sr.Registered = model.TimeValue{Time: registered.Time, Raw: registered.Raw, Parsed: registered.Parsed}

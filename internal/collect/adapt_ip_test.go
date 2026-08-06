@@ -198,6 +198,25 @@ func TestFromIPRDAP_RedactedOrgName(t *testing.T) {
 	}
 }
 
+// TestFromIPRDAP_RIRStatusPassesThroughVerbatim is fromIPHop's RDAP-side
+// sibling: APNIC's real RDAP responses report "ALLOCATED NON-PORTABLE",
+// which model.NormalizeEPPStatus (designed for EPP's single-word/
+// camelCase vocabulary) mangled into "allocatedNon-portable" -- a token
+// that exists in no vocabulary. RIR status strings must survive
+// unchanged.
+func TestFromIPRDAP_RIRStatusPassesThroughVerbatim(t *testing.T) {
+	resp := &rdap.IPNetworkResponse{
+		Handle: "test",
+		Status: rdap.StatusList{"ALLOCATED NON-PORTABLE"},
+	}
+
+	sr := fromIPRDAP(model.SourceResult{Source: model.SourceRegistryRDAP, OK: true}, resp)
+
+	if len(sr.Status) != 1 || sr.Status[0] != "ALLOCATED NON-PORTABLE" {
+		t.Errorf("Status = %v, want [\"ALLOCATED NON-PORTABLE\"] unchanged (RIR vocabulary, not EPP)", sr.Status)
+	}
+}
+
 func TestFromIPHop_PopulatedFields(t *testing.T) {
 	hop := whois.Hop{
 		IPFields: &parse.IPFields{
@@ -304,6 +323,66 @@ func TestFromIPHop_HopError(t *testing.T) {
 	}
 	if sr.Meta.OK {
 		t.Error("Meta.OK = true, want false when hop.Err is set")
+	}
+}
+
+func TestFromIPHop_RateLimited(t *testing.T) {
+	hop := whois.Hop{
+		Fields:   parse.Fields{RateLimited: true},
+		IPFields: &parse.IPFields{Handle: "NET-1-2-3-0-1"},
+	}
+
+	sr := fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS, OK: true}, hop)
+
+	if sr.Meta.OK {
+		t.Error("Meta.OK = true, want false for a rate-limited response")
+	}
+	if sr.Present {
+		t.Error("Present = true, want false for a rate-limited response")
+	}
+	if sr.Meta.Err == "" {
+		t.Error("Meta.Err is empty, want a message explaining the rate-limit refusal")
+	}
+}
+
+func TestFromIPHop_Unsupported(t *testing.T) {
+	hop := whois.Hop{
+		Fields:   parse.Fields{Unsupported: true},
+		IPFields: &parse.IPFields{Handle: "NET-1-2-3-0-1"},
+	}
+
+	sr := fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS, OK: true}, hop)
+
+	if sr.Meta.OK {
+		t.Error("Meta.OK = true, want false for an unsupported-query refusal")
+	}
+	if sr.Present {
+		t.Error("Present = true, want false for an unsupported-query refusal")
+	}
+	if sr.Meta.Err == "" {
+		t.Error("Meta.Err is empty, want a message explaining the refusal")
+	}
+}
+
+// TestFromIPHop_RIRStatusPassesThroughVerbatim is a regression test for a
+// real defect caught during live verification: RIPE's "ASSIGNED PA" and
+// APNIC's "ALLOCATED NON-PORTABLE" are RIR-specific status vocabulary,
+// not EPP (RFC 8056) -- running them through model.NormalizeEPPStatus
+// mangled them into meaningless tokens ("assignedPa",
+// "allocatedNon-portable") that exist in no vocabulary and can't be
+// searched for.
+func TestFromIPHop_RIRStatusPassesThroughVerbatim(t *testing.T) {
+	hop := whois.Hop{
+		IPFields: &parse.IPFields{
+			Handle:   "test",
+			Statuses: []string{"ASSIGNED PA"},
+		},
+	}
+
+	sr := fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS, OK: true}, hop)
+
+	if len(sr.Status) != 1 || sr.Status[0] != "ASSIGNED PA" {
+		t.Errorf("Status = %v, want [\"ASSIGNED PA\"] unchanged (RIR vocabulary, not EPP)", sr.Status)
 	}
 }
 

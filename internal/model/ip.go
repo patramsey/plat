@@ -93,7 +93,7 @@ type IPSourceRecord struct {
 	OrgID          string
 	AbuseEmail     string
 	AbusePhone     string
-	Status         []string // already EPP-normalized by the adapter
+	Status         []string // RIR's own status strings, passed through unchanged (not EPP vocabulary)
 	Registered     TimeValue
 	Updated        TimeValue
 	RedactedFields map[string]bool
