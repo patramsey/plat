@@ -1,6 +1,7 @@
 package collect
 
 import (
+	"net/netip"
 	"strings"
 
 	"github.com/patramsey/plat/internal/model"
@@ -109,7 +110,7 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) model.IPSourceRecord {
 	}
 	meta.OK = true
 	f := hop.IPFields
-	start, end := splitNetRange(f.NetRange)
+	start, end, cidr := rangeAndCIDRFromNetRange(f.NetRange, f.CIDR)
 
 	sr := model.IPSourceRecord{
 		Meta:           meta,
@@ -118,7 +119,7 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) model.IPSourceRecord {
 		Type:           f.NetType,
 		StartAddress:   start,
 		EndAddress:     end,
-		CIDR:           f.CIDR,
+		CIDR:           cidr,
 		ParentHandle:   parentHandleFromWHOIS(f.Parent),
 		Country:        f.Country,
 		OrgID:          f.OrgID,
@@ -178,6 +179,77 @@ func splitNetRange(raw string) (start, end string) {
 		return "", ""
 	}
 	return start, end
+}
+
+// rangeAndCIDRFromNetRange derives a WHOIS hop's start address, end
+// address, and CIDR from its raw NetRange/inetnum/inet6num value plus
+// whatever separate CIDR line (ARIN's "CIDR:") was present, handling both
+// shapes RIRs report the netblock in:
+//
+//   - The hyphenated "<start> - <end>" form ARIN and (for IPv4) LACNIC
+//     use, split by splitNetRange. cidr is whatever the response's own
+//     CIDR field said (may be "" -- RIPE/APNIC/AFRINIC's inetnum has no
+//     hyphenated form at all, so this branch is really just ARIN/LACNIC
+//     IPv4, and only ARIN emits a separate CIDR line).
+//   - The bare CIDR form ("200.3.12.0/22", or, for every RIR's IPv6
+//     block, "2001:67c:2e8::/48") LACNIC uses for IPv4 and RIPE, APNIC,
+//     and AFRINIC use for all of IPv6. Tried only when the hyphenated
+//     form didn't parse, so it can't misinterpret a genuinely malformed
+//     hyphenated value as a prefix. start/end are derived from the
+//     prefix's masked network address and its last address; cidr keeps
+//     the response's own CIDR value if it had one (matching the
+//     hyphenated branch), else falls back to the prefix's own canonical
+//     string form.
+//
+// Anything that matches neither shape degrades to ("", "", cidr): an
+// unparseable range must not surface as a malformed StartAddress/
+// EndAddress value merge.MergeIP would then treat as real, disagreeing
+// data (mirrors splitNetRange's own degrade-safely reasoning).
+func rangeAndCIDRFromNetRange(netRange, cidr string) (start, end, cidrOut string) {
+	if start, end = splitNetRange(netRange); start != "" && end != "" {
+		return start, end, cidr
+	}
+	prefix, err := netip.ParsePrefix(strings.TrimSpace(netRange))
+	if err != nil {
+		return "", "", cidr
+	}
+	masked := prefix.Masked()
+	start = masked.Addr().String()
+	end = lastAddr(masked).String()
+	if cidr == "" {
+		cidr = masked.String()
+	}
+	return start, end, cidr
+}
+
+// lastAddr computes a masked prefix's last (broadcast, for IPv4)
+// address: its network address with every host bit set to 1, rather than
+// 0. p must already be masked (Prefix.Masked()) so the network bits it
+// leaves untouched are the correct starting point.
+func lastAddr(p netip.Prefix) netip.Addr {
+	bits := p.Addr().As16()
+	if p.Addr().Is4() {
+		b4 := p.Addr().As4()
+		setHostBits(b4[:], 32-p.Bits())
+		return netip.AddrFrom4(b4)
+	}
+	setHostBits(bits[:], 128-p.Bits())
+	return netip.AddrFrom16(bits)
+}
+
+// setHostBits ORs the low hostBits bits of b (a big-endian address byte
+// slice) to 1, starting from the last byte and working backward -- the
+// inverse of what Prefix.Masked() already did to zero them.
+func setHostBits(b []byte, hostBits int) {
+	for i := len(b) - 1; i >= 0 && hostBits > 0; i-- {
+		if hostBits >= 8 {
+			b[i] = 0xff
+			hostBits -= 8
+			continue
+		}
+		b[i] |= byte(0xff >> (8 - hostBits))
+		hostBits = 0
+	}
 }
 
 // parentHandleFromWHOIS extracts the bare handle from ARIN's

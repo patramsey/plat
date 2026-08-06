@@ -373,6 +373,62 @@ func TestSplitNetRange(t *testing.T) {
 	}
 }
 
+// TestRangeAndCIDRFromNetRange covers CIDR-form NetRange input -- LACNIC
+// reports IPv4 netblocks this way ("inetnum: 200.3.12.0/22"), and RIPE,
+// APNIC, and AFRINIC report *all* IPv6 netblocks this way
+// ("inet6num: 2001:67c:2e8::/48"). Before this fix, splitNetRange alone
+// degraded these to ("", "") and nothing else populated CIDR from
+// NetRange -- silently dropping the netblock, the most identifying field
+// on the record, from the WHOIS source.
+func TestRangeAndCIDRFromNetRange(t *testing.T) {
+	tests := []struct {
+		name                         string
+		netRange, cidrIn             string
+		wantStart, wantEnd, wantCIDR string
+	}{
+		{
+			name:      "hyphenated form still works, ARIN CIDR line kept",
+			netRange:  "8.8.8.0 - 8.8.8.255",
+			cidrIn:    "8.8.8.0/24",
+			wantStart: "8.8.8.0", wantEnd: "8.8.8.255", wantCIDR: "8.8.8.0/24",
+		},
+		{
+			name:      "LACNIC-style IPv4 CIDR inetnum",
+			netRange:  "200.3.12.0/22",
+			wantStart: "200.3.12.0", wantEnd: "200.3.15.255", wantCIDR: "200.3.12.0/22",
+		},
+		{
+			name:      "RIPE/APNIC/AFRINIC-style IPv6 CIDR inet6num",
+			netRange:  "2001:67c:2e8::/48",
+			wantStart: "2001:67c:2e8::", wantEnd: "2001:67c:2e8:ffff:ffff:ffff:ffff:ffff", wantCIDR: "2001:67c:2e8::/48",
+		},
+		{
+			name:      "CIDR-form with an unaligned host part still masks down",
+			netRange:  "10.0.0.5/24",
+			wantStart: "10.0.0.0", wantEnd: "10.0.0.255", wantCIDR: "10.0.0.0/24",
+		},
+		{
+			name:      "malformed input degrades safely, doesn't fabricate a range",
+			netRange:  "not a range at all",
+			wantStart: "", wantEnd: "", wantCIDR: "",
+		},
+		{
+			name:      "empty input degrades safely",
+			netRange:  "",
+			wantStart: "", wantEnd: "", wantCIDR: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotStart, gotEnd, gotCIDR := rangeAndCIDRFromNetRange(tt.netRange, tt.cidrIn)
+			if gotStart != tt.wantStart || gotEnd != tt.wantEnd || gotCIDR != tt.wantCIDR {
+				t.Errorf("rangeAndCIDRFromNetRange(%q, %q) = (%q, %q, %q), want (%q, %q, %q)",
+					tt.netRange, tt.cidrIn, gotStart, gotEnd, gotCIDR, tt.wantStart, tt.wantEnd, tt.wantCIDR)
+			}
+		})
+	}
+}
+
 func TestParentHandleFromWHOIS(t *testing.T) {
 	tests := []struct {
 		name string
