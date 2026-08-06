@@ -316,21 +316,26 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 // format is FormatHuman — never for Plain/JSON/NDJSON, and never when
 // stderr is redirected even if stdout is a terminal.
 func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, input string, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
-	name, err := domain.Normalize(input)
+	q, err := domain.Normalize(input)
 	if err != nil {
 		reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui)
 		return 2
 	}
+	if q.Kind != domain.KindDomain {
+		// Replaced with a real IP lookup in the final task of this plan.
+		reportLookupError(stderr, format, input, fmt.Errorf("plat: IP lookups are not wired up yet"), nil, opts.Verbose, ui)
+		return 2
+	}
 
-	baseURL, _ := resolver.BaseURL(name.TLD) // "" is fine — Collect degrades to WHOIS-only
+	baseURL, _ := resolver.BaseURL(q.Name.TLD) // "" is fine — Collect degrades to WHOIS-only
 	collectOpts := collect.Options{NoFollow: opts.NoFollow, Timeout: opts.Timeout, Sources: sources}
 
 	var records []model.SourceRecord
 	work := func() {
-		records = collect.Collect(ctx, name, baseURL, opts.whoisIANAServer, collectOpts)
+		records = collect.Collect(ctx, q.Name, baseURL, opts.whoisIANAServer, collectOpts)
 	}
 	if ui.StderrTTY && format == render.FormatHuman {
-		spinner.Run(stderr, "looking up "+name.Punycode+"...", work)
+		spinner.Run(stderr, "looking up "+q.Name.Punycode+"...", work)
 	} else {
 		work()
 	}
@@ -340,12 +345,12 @@ func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstra
 	code := deriveOutcome(record.Sources)
 	if code == 0 {
 		if err := renderRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
-			reportLookupError(stderr, format, name.Punycode, err, record.Sources, opts.Verbose, ui)
+			reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui)
 			return 3
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, name.Punycode, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
+	reportLookupError(stderr, format, q.Name.Punycode, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
 	return code
 }
 

@@ -45,18 +45,22 @@ func newMergeCommand(stdout io.Writer) *cobra.Command {
 }
 
 func mergeLookup(ctx context.Context, stdout io.Writer, input string, timeout time.Duration, noFollow bool) error {
-	name, err := domain.Normalize(input)
+	q, err := domain.Normalize(input)
 	if err != nil {
 		return usageError{err}
+	}
+	if q.Kind != domain.KindDomain {
+		// Replaced with a real IP lookup in the final task of this plan.
+		return usageError{fmt.Errorf("plat: IP lookups are not wired up yet")}
 	}
 
 	resolver, err := bootstrap.Load(ctx, bootstrap.Options{Timeout: timeout})
 	if err != nil {
 		return fmt.Errorf("resolving RDAP bootstrap: %w", err)
 	}
-	baseURL, _ := resolver.BaseURL(name.TLD) // "" is fine — Collect degrades to WHOIS-only
+	baseURL, _ := resolver.BaseURL(q.Name.TLD) // "" is fine — Collect degrades to WHOIS-only
 
-	sources := collect.Collect(ctx, name, baseURL, "", collect.Options{NoFollow: noFollow, Timeout: timeout})
+	sources := collect.Collect(ctx, q.Name, baseURL, "", collect.Options{NoFollow: noFollow, Timeout: timeout})
 	record := merge.Merge(sources)
 
 	return printRecord(stdout, record)

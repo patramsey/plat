@@ -39,13 +39,17 @@ func newWhoisCommand(stdout io.Writer) *cobra.Command {
 }
 
 func whoisLookup(ctx context.Context, stdout io.Writer, input string, timeout time.Duration) error {
-	name, err := domain.Normalize(input)
+	q, err := domain.Normalize(input)
 	if err != nil {
 		return usageError{err}
 	}
+	if q.Kind != domain.KindDomain {
+		// Replaced with a real IP lookup in the final task of this plan.
+		return usageError{fmt.Errorf("plat: IP lookups are not wired up yet")}
+	}
 
 	client := &whois.Client{Timeout: timeout}
-	result, err := client.Lookup(ctx, name)
+	result, err := client.Lookup(ctx, q.Name)
 	if err != nil {
 		return err
 	}

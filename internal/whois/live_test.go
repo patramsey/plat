@@ -11,12 +11,12 @@ import (
 )
 
 func TestLive_GoogleCom(t *testing.T) {
-	name, err := domain.Normalize("google.com")
+	q, err := domain.Normalize("google.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
 	c := &Client{Timeout: 10 * time.Second}
-	result, err := c.Lookup(context.Background(), name)
+	result, err := c.Lookup(context.Background(), q.Name)
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
 	}

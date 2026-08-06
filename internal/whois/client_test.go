@@ -115,10 +115,11 @@ func TestClient_ReferralChasing(t *testing.T) {
 	})
 
 	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 	result, err := c.Lookup(context.Background(), name)
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
@@ -158,10 +159,11 @@ func TestClient_LookupTimeoutReturnsPartialResult(t *testing.T) {
 	}()
 
 	c := &Client{IANAServer: ln.Addr().String(), Timeout: 200 * time.Millisecond}
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	start := time.Now()
 	result, err := c.Lookup(context.Background(), name)
@@ -198,10 +200,11 @@ func TestClient_ReferralChasing_BracketsDialectTLD(t *testing.T) {
 	_ = registrarAddr // the registry response above has no "Registrar WHOIS Server" field, so the chain stops at 2 hops — that's fine, this test's purpose is proving the IANA hop's whois: line parses correctly for a brackets-dialect TLD, not exercising a full 3-hop chain
 
 	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
-	name, err := domain.Normalize("example.jp")
+	q, err := domain.Normalize("example.jp")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 	result, err := c.Lookup(context.Background(), name)
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
@@ -235,10 +238,11 @@ func TestClient_ReferralChasing_LegacyReferFieldStillSupported(t *testing.T) {
 	})
 
 	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 	result, err := c.Lookup(context.Background(), name)
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
@@ -254,10 +258,11 @@ func TestClient_RateLimitDetected(t *testing.T) {
 	})
 
 	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 	result, err := c.Lookup(context.Background(), name)
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
@@ -291,10 +296,11 @@ func TestClient_QueryServerSkipsReferralChasing(t *testing.T) {
 		_, _ = conn.Write([]byte("Domain Name: EXAMPLE.COM\nRegistrar: Direct Registrar, Inc.\n"))
 	}()
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	c := &Client{Timeout: 2 * time.Second}
 	hop := c.QueryServer(context.Background(), ln.Addr().String(), name)
@@ -331,10 +337,11 @@ func TestClient_ReferralChasing_RegistrarHopUsesGenericTemplateNotDomainTLD(t *t
 	})
 
 	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
-	name, err := domain.Normalize("example.jp")
+	q, err := domain.Normalize("example.jp")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 	result, err := c.Lookup(context.Background(), name)
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)

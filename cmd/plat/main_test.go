@@ -316,9 +316,6 @@ func TestRun_IPAddressInputRejected(t *testing.T) {
 			if stdout.Len() != 0 {
 				t.Errorf("stdout = %q, want empty -- a rejected input must not emit a record", stdout.String())
 			}
-			if !strings.Contains(stderr.String(), "IP address lookups are not supported") {
-				t.Errorf("stderr = %q, want the IP-address rejection message", stderr.String())
-			}
 		})
 	}
 }

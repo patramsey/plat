@@ -52,31 +52,6 @@ func TestNormalize(t *testing.T) {
 			wantErr: ErrSingleLabel,
 		},
 		{
-			name:    "bare IPv4 rejected",
-			input:   "8.8.8.8",
-			wantErr: ErrIPAddress,
-		},
-		{
-			name:    "bare IPv6 rejected",
-			input:   "2001:4860:4860::8888",
-			wantErr: ErrIPAddress,
-		},
-		{
-			name:    "bracketed IPv6 rejected",
-			input:   "[2001:db8::1]",
-			wantErr: ErrIPAddress,
-		},
-		{
-			name:    "IPv4 CIDR prefix rejected",
-			input:   "8.8.8.0/24",
-			wantErr: ErrIPAddress,
-		},
-		{
-			name:    "IPv4 pasted as a URL rejected",
-			input:   "https://8.8.8.8/whois",
-			wantErr: ErrIPAddress,
-		},
-		{
 			name:         "domain whose labels are numeric is still a domain",
 			input:        "123.com",
 			wantPunycode: "123.com",
@@ -184,7 +159,7 @@ func TestNormalize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Normalize(tt.input)
+			q, err := Normalize(tt.input)
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) {
 					t.Fatalf("Normalize(%q) error = %v, want errors.Is match for %v", tt.input, err, tt.wantErr)
@@ -200,15 +175,67 @@ func TestNormalize(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Normalize(%q) unexpected error: %v", tt.input, err)
 			}
-			if got.Punycode != tt.wantPunycode {
-				t.Errorf("Punycode = %q, want %q", got.Punycode, tt.wantPunycode)
+			if q.Name.Punycode != tt.wantPunycode {
+				t.Errorf("Punycode = %q, want %q", q.Name.Punycode, tt.wantPunycode)
 			}
-			if got.TLD != tt.wantTLD {
-				t.Errorf("TLD = %q, want %q", got.TLD, tt.wantTLD)
+			if q.Name.TLD != tt.wantTLD {
+				t.Errorf("TLD = %q, want %q", q.Name.TLD, tt.wantTLD)
 			}
-			if tt.wantUnicode != "" && got.Unicode != tt.wantUnicode {
-				t.Errorf("Unicode = %q, want %q", got.Unicode, tt.wantUnicode)
+			if tt.wantUnicode != "" && q.Name.Unicode != tt.wantUnicode {
+				t.Errorf("Unicode = %q, want %q", q.Name.Unicode, tt.wantUnicode)
 			}
 		})
+	}
+}
+
+func TestNormalize_ClassifiesIPInput(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantKind Kind
+		wantIP   string
+	}{
+		{"bare IPv4", "8.8.8.8", KindIPv4, "8.8.8.8"},
+		{"bare IPv6", "2001:4860:4860::8888", KindIPv6, "2001:4860:4860::8888"},
+		{"bracketed IPv6", "[2001:db8::1]", KindIPv6, "2001:db8::1"},
+		{"IPv4 CIDR resolves to network address", "8.8.8.0/24", KindIPv4, "8.8.8.0"},
+		{"IPv4 pasted as a URL", "https://8.8.8.8/whois", KindIPv4, "8.8.8.8"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q, err := Normalize(tt.input)
+			if err != nil {
+				t.Fatalf("Normalize(%q) unexpected error: %v", tt.input, err)
+			}
+			if q.Kind != tt.wantKind {
+				t.Errorf("Kind = %v, want %v", q.Kind, tt.wantKind)
+			}
+			if q.IP.String() != tt.wantIP {
+				t.Errorf("IP = %q, want %q", q.IP.String(), tt.wantIP)
+			}
+		})
+	}
+}
+
+func TestNormalize_DomainStillClassifiesAsDomain(t *testing.T) {
+	q, err := Normalize("example.com")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if q.Kind != KindDomain {
+		t.Errorf("Kind = %v, want KindDomain", q.Kind)
+	}
+	if q.Name.Punycode != "example.com" || q.Name.TLD != "com" {
+		t.Errorf("Name = %+v, want punycode example.com / tld com", q.Name)
+	}
+}
+
+func TestNormalize_NumericLabelDomainIsNotAnIP(t *testing.T) {
+	q, err := Normalize("123.com")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if q.Kind != KindDomain {
+		t.Errorf("Kind = %v, want KindDomain for 123.com", q.Kind)
 	}
 }
