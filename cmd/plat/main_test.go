@@ -308,6 +308,33 @@ func TestRun_NoArgsStillRejected(t *testing.T) {
 	}
 }
 
+// TestRun_ReservedIPRejectedAtExit2 is a regression test for a real
+// defect caught during live verification: reserved/private IP input
+// (10.0.0.1, ::1, etc.) used to sail past domain.Normalize, spend several
+// seconds actually querying whois.iana.org, and then exit 3 with the
+// factually wrong message "lookup failed -- no sources could be
+// reached" (IANA's WHOIS server was reached and answered; it just had no
+// "refer:" line for private-use space). domain.Normalize now rejects
+// these up front, so this exits 2 immediately -- no network involved,
+// keeping this test hermetic -- with a message that doesn't misdescribe
+// what happened.
+func TestRun_ReservedIPRejectedAtExit2(t *testing.T) {
+	tests := []string{"10.0.0.1", "127.0.0.1", "0.0.0.0", "255.255.255.255", "::1"}
+	for _, input := range tests {
+		t.Run(input, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			got := run([]string{input}, &stdout, &stderr, uiConfig{})
+			if got != 2 {
+				t.Errorf("run([%s]) exit code = %d, want 2 (usage error, not exit 3)", input, got)
+			}
+			errMsg := stderr.String()
+			if strings.Contains(errMsg, "no sources could be reached") || strings.Contains(errMsg, "unreachable") {
+				t.Errorf("run([%s]) stderr = %q, must not claim sources were unreachable (whois.iana.org answers just fine for these)", input, errMsg)
+			}
+		})
+	}
+}
+
 func TestRun_InvalidOutputFormat(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	got := run([]string{"-o", "bogus", "example.com"}, &stdout, &stderr, uiConfig{})

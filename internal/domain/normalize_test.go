@@ -239,3 +239,79 @@ func TestNormalize_NumericLabelDomainIsNotAnIP(t *testing.T) {
 		t.Errorf("Kind = %v, want KindDomain for 123.com", q.Kind)
 	}
 }
+
+// TestNormalize_RejectsReservedIPs is a regression test for a real
+// defect caught during live verification: reserved/private IP input
+// (10.0.0.1, 127.0.0.1, ::1, 0.0.0.0, 255.255.255.255...) sailed through
+// Normalize as an ordinary KindIPv4/KindIPv6 Query, and ~5 seconds later
+// plat printed "lookup failed -- no sources could be reached" at exit
+// 3 -- a factually wrong message (whois.iana.org *was* reached and
+// answered "organisation: IANA - Private Use"; it just had no "refer:"
+// line, so nothing downstream ever surfaced that response). These must
+// now be rejected up front with ErrReservedIP, mirroring how a reserved
+// TLD is rejected for domains.
+func TestNormalize_RejectsReservedIPs(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"IPv4 private (RFC 1918)", "10.0.0.1"},
+		{"IPv4 private, 172.16/12", "172.16.5.5"},
+		{"IPv4 private, 192.168/16", "192.168.1.1"},
+		{"IPv4 loopback", "127.0.0.1"},
+		{"IPv4 unspecified", "0.0.0.0"},
+		{"IPv4 limited broadcast", "255.255.255.255"},
+		{"IPv4 link-local", "169.254.1.1"},
+		{"IPv4 multicast", "224.0.0.1"},
+		{"IPv6 loopback", "::1"},
+		{"IPv6 unspecified", "::"},
+		{"IPv6 unique local (RFC 4193)", "fc00::1"},
+		{"IPv6 link-local", "fe80::1"},
+		{"IPv6 multicast", "ff02::1"},
+		{"bracketed IPv6 loopback", "[::1]"},
+		{"private IPv4 CIDR", "10.0.0.0/8"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q, err := Normalize(tt.input)
+			if err == nil {
+				t.Fatalf("Normalize(%q) = %+v, nil, want an ErrReservedIP error", tt.input, q)
+			}
+			if !errors.Is(err, ErrReservedIP) {
+				t.Errorf("Normalize(%q) error = %v, want errors.Is(err, ErrReservedIP)", tt.input, err)
+			}
+			// The message must not claim sources were unreachable --
+			// that's the exact wrong-explanation bug this guard fixes.
+			if strings.Contains(err.Error(), "unreachable") || strings.Contains(err.Error(), "no sources") {
+				t.Errorf("Normalize(%q) error = %q, must not claim sources were unreachable", tt.input, err.Error())
+			}
+		})
+	}
+}
+
+// TestNormalize_OrdinaryPublicIPsStillAccepted guards against the
+// reserved-IP rejection being too broad: real, publicly-allocated
+// addresses across all five RIRs (used throughout this branch's live
+// verification) must still classify normally.
+func TestNormalize_OrdinaryPublicIPsStillAccepted(t *testing.T) {
+	tests := []string{
+		"8.8.8.8",              // ARIN
+		"193.0.6.139",          // RIPE
+		"1.1.1.1",              // APNIC
+		"200.3.12.1",           // LACNIC
+		"196.216.2.1",          // AFRINIC
+		"2001:67c:2e8::1",      // RIPE, IPv6
+		"2001:4860:4860::8888", // ARIN, IPv6
+	}
+	for _, input := range tests {
+		t.Run(input, func(t *testing.T) {
+			q, err := Normalize(input)
+			if err != nil {
+				t.Fatalf("Normalize(%q) unexpected error: %v", input, err)
+			}
+			if q.Kind != KindIPv4 && q.Kind != KindIPv6 {
+				t.Errorf("Kind = %v, want an IP kind", q.Kind)
+			}
+		})
+	}
+}
