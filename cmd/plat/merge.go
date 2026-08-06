@@ -49,15 +49,19 @@ func mergeLookup(ctx context.Context, stdout io.Writer, input string, timeout ti
 	if err != nil {
 		return usageError{err}
 	}
-	if q.Kind != domain.KindDomain {
-		// Replaced with a real IP lookup in the final task of this plan.
-		return usageError{fmt.Errorf("plat: IP lookups are not wired up yet")}
-	}
 
 	resolver, err := bootstrap.Load(ctx, bootstrap.Options{Timeout: timeout})
 	if err != nil {
 		return fmt.Errorf("resolving RDAP bootstrap: %w", err)
 	}
+
+	if q.Kind == domain.KindIPv4 || q.Kind == domain.KindIPv6 {
+		baseURL, _ := resolver.IPBaseURL(q.IP) // "" is fine — CollectIP degrades to WHOIS-only
+		sources := collect.CollectIP(ctx, q.IP, baseURL, "", collect.Options{Timeout: timeout})
+		record := merge.MergeIP(sources)
+		return printIPRecord(stdout, record)
+	}
+
 	baseURL, _ := resolver.BaseURL(q.Name.TLD) // "" is fine — Collect degrades to WHOIS-only
 
 	sources := collect.Collect(ctx, q.Name, baseURL, "", collect.Options{NoFollow: noFollow, Timeout: timeout})
@@ -83,6 +87,52 @@ func printRecord(stdout io.Writer, r model.Record) error {
 	if r.Nameservers.Present() {
 		_, _ = fmt.Fprintf(tw, "Nameservers:\t%v\t%v\n", r.Nameservers.Value, r.Nameservers.Sources)
 	}
+	_, _ = fmt.Fprintln(tw, "---")
+	for _, s := range r.Sources {
+		status := "ok"
+		if !s.OK {
+			status = s.Err
+		}
+		_, _ = fmt.Fprintf(tw, "Source %s:\t%s\t%s\n", s.Source, s.Latency.Round(time.Millisecond), status)
+	}
+	if len(r.Conflicts) > 0 {
+		_, _ = fmt.Fprintln(tw, "---")
+		for _, c := range r.Conflicts {
+			_, _ = fmt.Fprintf(tw, "Conflict %s:\t%v\n", c.Field, c.Values)
+		}
+	}
+	if len(r.Redacted) > 0 {
+		_, _ = fmt.Fprintln(tw, "---")
+		for _, red := range r.Redacted {
+			_, _ = fmt.Fprintf(tw, "Redacted %s:\t%s (%s)\n", red.Field, red.Source, red.Reason)
+		}
+	}
+	return tw.Flush()
+}
+
+// printIPRecord is printRecord's IP counterpart: same tabwriter-based
+// debug dump, but over model.IPRecord's field set (no registrar,
+// nameservers, or expiry -- an IP allocation has none of those).
+func printIPRecord(stdout io.Writer, r model.IPRecord) error {
+	tw := tabwriter.NewWriter(stdout, 0, 4, 2, ' ', 0)
+	printField(tw, "Handle", r.Handle)
+	printField(tw, "Name", r.Name)
+	printField(tw, "Type", r.Type)
+	printField(tw, "Start address", r.StartAddress)
+	printField(tw, "End address", r.EndAddress)
+	printField(tw, "CIDR", r.CIDR)
+	printField(tw, "IP version", r.IPVersion)
+	printField(tw, "Parent handle", r.ParentHandle)
+	printField(tw, "Country", r.Country)
+	printField(tw, "Org name", r.Org.Name)
+	printField(tw, "Org ID", r.Org.ID)
+	printField(tw, "Abuse email", r.Org.AbuseEmail)
+	printField(tw, "Abuse phone", r.Org.AbusePhone)
+	if r.Status.Present() {
+		_, _ = fmt.Fprintf(tw, "Status:\t%v\t%v\n", r.Status.Value, r.Status.Sources)
+	}
+	printTimeField(tw, "Registered", r.Registered)
+	printTimeField(tw, "Updated", r.Updated)
 	_, _ = fmt.Fprintln(tw, "---")
 	for _, s := range r.Sources {
 		status := "ok"
