@@ -133,6 +133,71 @@ func TestCollectIP_NotFoundBothSources(t *testing.T) {
 	}
 }
 
+// TestCollectIP_RateLimitedWHOISNotReportedOK is a regression test for a
+// real defect caught during live verification: fromIPHop set Meta.OK =
+// true unconditionally, so a rate-limited or refusing RIR WHOIS server
+// reported "registry-whois: ok" under -v, and -- paired with a failed
+// RDAP source, as would happen if the RIR's RDAP endpoint were also
+// struggling -- plat's deriveOutcome (cmd/plat) would see zero OK
+// sources, zero NotFound sources, at least one hard failure, and
+// correctly land on exit 3; but the false OK=true on the rate-limited
+// source alone would have made deriveOutcome return 0 (success) with an
+// empty record instead -- precisely the silent-wrong-data failure mode
+// issue #42 was created to prevent (see fromHop's identical handling in
+// adapt_whois.go, which fromIPHop now mirrors).
+func TestCollectIP_RateLimitedWHOISNotReportedOK(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "% Query rate limit exceeded. Please wait and try again later.\n"
+	})
+	ianaWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "refer:        " + rirWHOISAddr + "\n"
+	})
+
+	addr := netip.MustParseAddr("8.8.8.8")
+
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+
+	if len(records) != 2 {
+		t.Fatalf("len(records) = %d, want 2, got: %+v", len(records), records)
+	}
+
+	hasData, hasFailed := false, false
+	for _, r := range records {
+		switch {
+		case r.Meta.OK:
+			hasData = true
+		case !r.Meta.NotFound:
+			hasFailed = true
+		}
+		if r.Meta.Source == model.SourceRegistryWHOIS {
+			if r.Meta.OK {
+				t.Error("registry-whois: Meta.OK = true, want false for a rate-limited response")
+			}
+			if r.Present {
+				t.Error("registry-whois: Present = true, want false for a rate-limited response")
+			}
+			if r.Meta.Err == "" {
+				t.Error("registry-whois: Meta.Err is empty, want a message explaining the rate-limit refusal")
+			}
+		}
+	}
+
+	// Mirrors cmd/plat's deriveOutcome: with both sources refusing/
+	// failing (RDAP 500s, WHOIS rate-limited) and neither reporting OK or
+	// a confirmed NotFound, the overall outcome must not be success.
+	if hasData {
+		t.Error("hasData = true, want false: a rate-limited WHOIS source paired with a failed RDAP source must not read as a successful lookup")
+	}
+	if !hasFailed {
+		t.Error("hasFailed = false, want true")
+	}
+}
+
 func TestCollectIP_SourceFilter(t *testing.T) {
 	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("RDAP server should never be contacted when --source whois is set")

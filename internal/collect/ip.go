@@ -94,15 +94,16 @@ func collectIPWHOIS(ctx context.Context, addr netip.Addr, whoisIANAServer string
 // network failure isn't indistinguishable from an address with no WHOIS
 // referral at all.
 //
-// fromIPHop unconditionally sets Meta.OK = true whenever a hop completed
-// without a transport error, since parse.IPFields carries no NotFound
-// signal of its own -- unlike parse.Fields, whose NotFound is set by
-// scanning the raw response for markers like "no match". That scan does
-// run for IP hops too (ipHop populates Fields as well as IPFields, so the
-// referral chain can read "refer:"), so its result is available via
-// hop.Fields.NotFound; this function applies it after the fromIPHop call
-// to correct Meta.OK/NotFound/Present for a "no match"-style response,
-// the same outcome fromHop reaches directly for domains.
+// fromIPHop itself only handles the RateLimited/Unsupported refusal
+// signals (see its own doc comment) -- it has no NotFound signal of its
+// own to check, since parse.IPFields carries none, unlike parse.Fields,
+// whose NotFound is set by scanning the raw response for markers like
+// "no match". That scan does run for IP hops too (ipHop populates Fields
+// alongside IPFields, so the referral chain can read "refer:"), so its
+// result is available via hop.Fields.NotFound; this function applies it
+// after the fromIPHop call to correct Meta.OK/NotFound/Present for a
+// "no match"-style response, the same outcome fromHop reaches directly
+// for domains.
 func fromIPWHOIS(result *whois.Result) []model.IPSourceRecord {
 	if result == nil || len(result.Hops) == 0 {
 		return nil

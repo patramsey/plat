@@ -108,6 +108,25 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) model.IPSourceRecord {
 		meta.OK = false
 		return model.IPSourceRecord{Meta: meta}
 	}
+	// hop.Fields (not IPFields) is where parse.Parse's refusal signals
+	// land -- ipHop populates it alongside IPFields purely so the
+	// referral chain can read "refer:", but the NotFound/RateLimited/
+	// Unsupported markers it also scans for apply just the same to an IP
+	// hop's raw response. Without checking these here, a rate-limited or
+	// refusing RIR would fall through to Meta.OK=true below, reported as
+	// "registry-whois: ok" under -v with an empty record -- exactly the
+	// silent-wrong-data failure mode fromHop's own identical checks (see
+	// adapt_whois.go) exist to prevent for domains.
+	if hop.Fields.Unsupported {
+		meta.OK = false
+		meta.Err = "registry does not support WHOIS for this network"
+		return model.IPSourceRecord{Meta: meta}
+	}
+	if hop.Fields.RateLimited {
+		meta.OK = false
+		meta.Err = "WHOIS server rate-limited this query"
+		return model.IPSourceRecord{Meta: meta}
+	}
 	meta.OK = true
 	f := hop.IPFields
 	start, end, cidr := rangeAndCIDRFromNetRange(f.NetRange, f.CIDR)
