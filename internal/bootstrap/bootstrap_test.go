@@ -20,6 +20,24 @@ func withIsolatedCacheDir(t *testing.T) {
 	t.Setenv("HOME", tmp)
 }
 
+// unreachableURL is a loopback address nothing listens on, used to make a
+// registry fetch fail fast and deterministically without touching the real
+// network.
+const unreachableURL = "http://127.0.0.1:1/unreachable"
+
+// redirectRegistries points all three bootstrap registry URLs (dns, ipv4,
+// ipv6) at the given URLs for the duration of the test, restoring the
+// originals on cleanup. Load always fetches all three, so a test that only
+// cares about one registry's behavior must still redirect the other two —
+// typically to unreachableURL — or it would silently depend on the real
+// network.
+func redirectRegistries(t *testing.T, dns, ipv4, ipv6 string) {
+	t.Helper()
+	origDNS, origV4, origV6 := bootstrapURL, ipv4URL, ipv6URL
+	bootstrapURL, ipv4URL, ipv6URL = dns, ipv4, ipv6
+	t.Cleanup(func() { bootstrapURL, ipv4URL, ipv6URL = origDNS, origV4, origV6 })
+}
+
 func TestEmbeddedSnapshotParses(t *testing.T) {
 	r, err := parseResolver(embedded)
 	if err != nil {
@@ -60,9 +78,7 @@ func TestLoad_UsesFreshCache(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	orig := bootstrapURL
-	bootstrapURL = "http://127.0.0.1:1/unreachable"
-	defer func() { bootstrapURL = orig }()
+	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL)
 
 	r, err := Load(context.Background(), Options{})
 	if err != nil {
@@ -92,9 +108,7 @@ func TestLoad_StaleCacheTriggersFetchFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	orig := bootstrapURL
-	bootstrapURL = "http://127.0.0.1:1/unreachable" // fetch will fail
-	defer func() { bootstrapURL = orig }()
+	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL) // fetch will fail
 
 	r, err := Load(context.Background(), Options{})
 	if err != nil {
@@ -108,9 +122,7 @@ func TestLoad_StaleCacheTriggersFetchFallback(t *testing.T) {
 func TestLoad_RefreshFailsFallsBackToEmbedded(t *testing.T) {
 	withIsolatedCacheDir(t)
 
-	orig := bootstrapURL
-	bootstrapURL = "http://127.0.0.1:1/unreachable"
-	defer func() { bootstrapURL = orig }()
+	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL)
 
 	r, err := Load(context.Background(), Options{Refresh: true, Timeout: 500 * time.Millisecond})
 	if err != nil {
@@ -131,9 +143,7 @@ func TestLoad_FetchSuccessWritesCache(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	orig := bootstrapURL
-	bootstrapURL = srv.URL
-	defer func() { bootstrapURL = orig }()
+	redirectRegistries(t, srv.URL, unreachableURL, unreachableURL)
 
 	r, err := Load(context.Background(), Options{})
 	if err != nil {
@@ -240,7 +250,14 @@ func TestNewIPResolver_IPv6(t *testing.T) {
 
 func TestLoad_EmbeddedIPRegistriesParse(t *testing.T) {
 	// The embedded snapshots must parse and cover a well-known address,
-	// so an offline/first-run lookup still resolves.
+	// so an offline/first-run lookup still resolves. Redirect all three
+	// registries to an unreachable address (and use an isolated, empty
+	// cache dir) so this genuinely exercises the no-network, no-cache,
+	// embedded-only path rather than incidentally succeeding via a real
+	// fetch or a leftover cache file.
+	withIsolatedCacheDir(t)
+	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL)
+
 	r, err := Load(context.Background(), Options{})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
