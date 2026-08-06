@@ -6,6 +6,15 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Lifecycle stage text misattributed two of its three timeline durations
+  to ICANN policy. Only the 30-day Redemption Grace Period is actually
+  ICANN-mandated (Expired Registration Recovery Policy §3.1); the 45-day
+  Auto-Renew Grace and 5-day Pending Delete figures are common registry
+  conventions. The Auto-Renew Grace description now also states plainly
+  that ICANN leaves the timing of that stage entirely to the registrar's
+  discretion.
+
 ## [0.1.4] - 2026-08-04
 
 ### Added
