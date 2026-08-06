@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 
@@ -12,6 +13,14 @@ import (
 // ErrSingleLabel is returned when the input has no dot at all (e.g.
 // "localhost"), which can never be a registrable domain.
 var ErrSingleLabel = errors.New("domain: single-label input is not a valid domain")
+
+// ErrIPAddress is returned when the input is an IP address (or CIDR
+// prefix) rather than a domain name. RDAP does define IP network objects,
+// but plat doesn't query them yet, so this is rejected up front: without
+// it an IPv4 address sails through as a "domain" whose TLD is its last
+// octet, and the resulting IANA WHOIS response gets scraped for fields it
+// never contained -- a confident-looking, entirely meaningless record.
+var ErrIPAddress = errors.New("domain: IP address lookups are not supported yet (tracking issue: https://github.com/patramsey/plat/issues/32)")
 
 var reservedTLDs = map[string]bool{
 	"local":    true,
@@ -31,12 +40,26 @@ type Name struct {
 
 // Normalize lowercases, strips a trailing dot, reduces a pasted URL down to
 // its bare host, converts IDN input to punycode, extracts the TLD, and
-// rejects single-label or reserved/private TLD input with a friendly error.
+// rejects IP-address, single-label, or reserved/private TLD input with a
+// friendly error.
 func Normalize(input string) (Name, error) {
 	s := strings.ToLower(strings.TrimSpace(input))
+	// Checked before stripURLParts as well as after: that helper reads a
+	// bare IPv6 address's trailing group as a port ("2001:db8::1" becomes
+	// "2001:db8:"), so by the time it returns there's nothing left that
+	// still parses as an IP.
+	if isIPAddress(s) {
+		return Name{}, ErrIPAddress
+	}
 	s = stripURLParts(s)
 	if s == "" {
 		return Name{}, fmt.Errorf("domain: empty input")
+	}
+	// Catches the forms only stripURLParts can surface: a pasted URL
+	// ("https://8.8.8.8/x") and the bracketed IPv6 host form
+	// ("[2001:db8::1]").
+	if isIPAddress(s) {
+		return Name{}, ErrIPAddress
 	}
 
 	// idna.Lookup (not the bare idna.ToASCII/Punycode profile) is
@@ -70,6 +93,18 @@ func Normalize(input string) (Name, error) {
 	}
 
 	return Name{Punycode: punycode, Unicode: unicodeName, TLD: tld}, nil
+}
+
+// isIPAddress reports whether s is an IP address rather than a domain
+// name: a bare IPv4/IPv6 address, an IPv6 address in the bracketed form
+// URLs use ("[2001:db8::1]"), or a CIDR prefix ("8.8.8.0/24").
+func isIPAddress(s string) bool {
+	trimmed := strings.Trim(s, "[]")
+	if net.ParseIP(trimmed) != nil {
+		return true
+	}
+	_, _, err := net.ParseCIDR(trimmed)
+	return err == nil
 }
 
 // stripURLParts reduces a pasted URL down to its bare host, discarding any

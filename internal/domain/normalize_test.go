@@ -52,6 +52,37 @@ func TestNormalize(t *testing.T) {
 			wantErr: ErrSingleLabel,
 		},
 		{
+			name:    "bare IPv4 rejected",
+			input:   "8.8.8.8",
+			wantErr: ErrIPAddress,
+		},
+		{
+			name:    "bare IPv6 rejected",
+			input:   "2001:4860:4860::8888",
+			wantErr: ErrIPAddress,
+		},
+		{
+			name:    "bracketed IPv6 rejected",
+			input:   "[2001:db8::1]",
+			wantErr: ErrIPAddress,
+		},
+		{
+			name:    "IPv4 CIDR prefix rejected",
+			input:   "8.8.8.0/24",
+			wantErr: ErrIPAddress,
+		},
+		{
+			name:    "IPv4 pasted as a URL rejected",
+			input:   "https://8.8.8.8/whois",
+			wantErr: ErrIPAddress,
+		},
+		{
+			name:         "domain whose labels are numeric is still a domain",
+			input:        "123.com",
+			wantPunycode: "123.com",
+			wantTLD:      "com",
+		},
+		{
 			name:            "reserved TLD .local rejected",
 			input:           "printer.local",
 			wantErrContains: "reserved/private TLD",
