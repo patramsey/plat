@@ -138,8 +138,8 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var noColorFlag bool
 
 	root := &cobra.Command{
-		Use:           "plat <domain> [domain...]",
-		Short:         "Look up domain ownership via RDAP and WHOIS",
+		Use:           "plat <domain|ip> [domain|ip...]",
+		Short:         "Look up domain or IP ownership via RDAP and WHOIS",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args: func(cmd *cobra.Command, cliArgs []string) error {

@@ -85,7 +85,7 @@ func TestRun_VersionSubcommand(t *testing.T) {
 func TestRun_WhoisSubcommandRegistered(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	_ = run([]string{"whois", "--help"}, &stdout, &stderr, uiConfig{})
-	if !strings.Contains(stdout.String(), "Look up domain ownership via WHOIS") {
+	if !strings.Contains(stdout.String(), "Look up domain or IP ownership via WHOIS") {
 		t.Errorf("expected whois subcommand help text in output, got:\n%s", stdout.String())
 	}
 }
@@ -122,7 +122,7 @@ func TestRun_WhoisHiddenFromHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	_ = run([]string{"--help"}, &stdout, &stderr, uiConfig{})
 	out := stdout.String()
-	if strings.Contains(out, "whois <domain>") || strings.Contains(out, "WHOIS (debug/demo") {
+	if strings.Contains(out, "whois <domain|ip>") || strings.Contains(out, "WHOIS (debug/demo") {
 		t.Errorf("expected 'whois' subcommand to be hidden from --help output, got:\n%s", out)
 	}
 }

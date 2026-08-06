@@ -21,8 +21,8 @@ func newWhoisCommand(stdout io.Writer) *cobra.Command {
 	var timeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:    "whois <domain>",
-		Short:  "Look up domain ownership via WHOIS (debug/demo command)",
+		Use:    "whois <domain|ip>",
+		Short:  "Look up domain or IP ownership via WHOIS (debug/demo command)",
 		Hidden: true,
 		Args: func(cmd *cobra.Command, cliArgs []string) error {
 			if len(cliArgs) != 1 {

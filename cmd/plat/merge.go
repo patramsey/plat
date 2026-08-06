@@ -26,8 +26,8 @@ func newMergeCommand(stdout io.Writer) *cobra.Command {
 	var noFollow bool
 
 	cmd := &cobra.Command{
-		Use:    "merge <domain>",
-		Short:  "Look up domain ownership via merged RDAP+WHOIS sources (debug/demo command)",
+		Use:    "merge <domain|ip>",
+		Short:  "Look up domain or IP ownership via merged RDAP+WHOIS sources (debug/demo command)",
 		Hidden: true,
 		Args: func(cmd *cobra.Command, cliArgs []string) error {
 			if len(cliArgs) != 1 {
