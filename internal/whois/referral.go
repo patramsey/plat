@@ -3,6 +3,7 @@ package whois
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"time"
 
 	"github.com/patramsey/plat/internal/domain"
@@ -75,4 +76,47 @@ func (c *Client) Lookup(ctx context.Context, name domain.Name) (*Result, error) 
 		}
 	}
 	return result, fmt.Errorf("whois: all hops failed for %s", name.Punycode)
+}
+
+// LookupIP performs IANA -> RIR referral chasing for addr. There is no
+// third hop: IP allocations have no registrar, so the chain stops at the
+// RIR. Verified against live infrastructure -- whois.iana.org answers an
+// IP query with a "refer:" line pointing at the holding RIR.
+func (c *Client) LookupIP(ctx context.Context, addr netip.Addr) (*Result, error) {
+	q := addr.String()
+	result := &Result{Domain: q}
+
+	ianaHop := c.ipHop(ctx, c.ianaServer(), q)
+	result.Hops = append(result.Hops, ianaHop)
+
+	if ianaHop.Err == nil && ianaHop.Fields.Refer != "" {
+		result.Hops = append(result.Hops, c.ipHop(ctx, ianaHop.Fields.Refer, q))
+	}
+
+	for _, h := range result.Hops {
+		if h.Err == nil {
+			return result, nil
+		}
+	}
+	return result, fmt.Errorf("whois: all hops failed for %s", q)
+}
+
+// ipHop is hop's IP counterpart: it fills both Fields (so the referral
+// chain can still read "refer:") and IPFields (the actual payload).
+func (c *Client) ipHop(ctx context.Context, server, query string) Hop {
+	start := time.Now()
+	raw, err := c.query(ctx, server, query)
+	h := Hop{
+		Server:  server,
+		Query:   BuildQuery(server, query),
+		Raw:     raw,
+		Latency: time.Since(start),
+		Err:     err,
+	}
+	if err == nil {
+		h.Fields = parse.Parse(raw, "")
+		ipf := parse.ParseIP(raw)
+		h.IPFields = &ipf
+	}
+	return h
 }

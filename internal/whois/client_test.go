@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -351,5 +352,30 @@ func TestClient_ReferralChasing_RegistrarHopUsesGenericTemplateNotDomainTLD(t *t
 	}
 	if result.Hops[2].Fields.Registrar != "Example JP Registrar" {
 		t.Errorf("registrar hop Registrar = %q, want %q (this is the regression this test guards: the registrar hop must be parsed with the default kv dialect, not the domain's own .jp brackets dialect, since a registrar WHOIS server's reply format doesn't depend on the queried domain's TLD)", result.Hops[2].Fields.Registrar, "Example JP Registrar")
+	}
+}
+
+func TestLookupIP_FollowsIANAReferral(t *testing.T) {
+	rirAddr := startListener(t, func(q string) string {
+		return "NetRange:       8.8.8.0 - 8.8.8.255\nNetName:        GOGL\nOrgName:        Google LLC\n"
+	})
+	ianaAddr := startListener(t, func(q string) string {
+		return "refer:          " + rirAddr + "\n"
+	})
+
+	c := &Client{IANAServer: ianaAddr, Timeout: 5 * time.Second}
+	res, err := c.LookupIP(context.Background(), netip.MustParseAddr("8.8.8.8"))
+	if err != nil {
+		t.Fatalf("LookupIP: %v", err)
+	}
+	if len(res.Hops) != 2 {
+		t.Fatalf("hops = %d, want 2 (IANA then RIR)", len(res.Hops))
+	}
+	last := res.Hops[len(res.Hops)-1]
+	if last.IPFields == nil {
+		t.Fatal("final hop IPFields = nil, want parsed IP fields")
+	}
+	if last.IPFields.NetName != "GOGL" {
+		t.Errorf("NetName = %q, want GOGL", last.IPFields.NetName)
 	}
 }

@@ -10,12 +10,15 @@ import (
 // the raw response, the parsed view of that response, and how long it
 // took (or the error that stopped it).
 type Hop struct {
-	Server  string
-	Query   string
-	Raw     string
-	Fields  parse.Fields
-	Latency time.Duration
-	Err     error
+	Server string
+	Query  string
+	Raw    string
+	Fields parse.Fields
+	// IPFields is populated instead of Fields when the hop was an IP
+	// query. Nil for domain hops.
+	IPFields *parse.IPFields
+	Latency  time.Duration
+	Err      error
 }
 
 // Result is the standalone, package-scoped outcome of a WHOIS lookup: an
