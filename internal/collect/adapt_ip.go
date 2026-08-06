@@ -1,6 +1,8 @@
 package collect
 
 import (
+	"strings"
+
 	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/whois"
@@ -80,6 +82,22 @@ func ipRDAPPresent(sr model.IPSourceRecord) bool {
 // parse.ParseDate for Registered/Updated -- the same tolerant multi-format
 // date parser the domain WHOIS adapter uses -- so IP dates get the same
 // handling domain dates do.
+//
+// f.NetRange and f.Parent are deliberately left untouched by parse.ParseIP
+// (it stores each vocabulary's line as-is, since that's the only sense in
+// which it is a faithful WHOIS parser rather than a merge-comparability
+// layer). But model.IPSourceRecord.StartAddress/EndAddress/ParentHandle
+// are meant to hold the same shape of value RDAP's fromIPRDAP produces
+// (a bare start address, a bare end address, a bare parent handle) so
+// merge.MergeIP is comparing like with like across sources -- ARIN/RIPE's
+// combined "<start> - <end>" NetRange/inetnum line and ARIN's
+// "<name> (<handle>)" Parent line both need splitting apart here, at the
+// adapter boundary, rather than either being left raw (which would make
+// every ARIN-backed IPv4 lookup report a false startAddress/parentHandle
+// conflict against RDAP -- both sides genuinely agree, they're just
+// spelled differently) or "fixed" by loosening merge's own comparison
+// (which would blur a genuine cross-source disagreement on these same
+// fields, and merge is shared with the domain path).
 func fromIPHop(meta model.SourceResult, hop whois.Hop) model.IPSourceRecord {
 	if hop.Err != nil {
 		meta.OK = false
@@ -91,15 +109,17 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) model.IPSourceRecord {
 	}
 	meta.OK = true
 	f := hop.IPFields
+	start, end := splitNetRange(f.NetRange)
 
 	sr := model.IPSourceRecord{
 		Meta:           meta,
 		Handle:         f.Handle,
 		Name:           f.NetName,
 		Type:           f.NetType,
-		StartAddress:   f.NetRange,
+		StartAddress:   start,
+		EndAddress:     end,
 		CIDR:           f.CIDR,
-		ParentHandle:   f.Parent,
+		ParentHandle:   parentHandleFromWHOIS(f.Parent),
 		Country:        f.Country,
 		OrgID:          f.OrgID,
 		AbuseEmail:     f.AbuseEmail,
@@ -136,4 +156,46 @@ func ipHopPresent(sr model.IPSourceRecord) bool {
 		sr.Country != "" || sr.OrgName != "" || sr.OrgID != "" || sr.AbuseEmail != "" || sr.AbusePhone != "" ||
 		len(sr.Status) > 0 || sr.Registered.Raw != "" || sr.Updated.Raw != "" ||
 		len(sr.RedactedFields) > 0
+}
+
+// splitNetRange splits a WHOIS NetRange/inetnum/inet6num value of the
+// "<start> - <end>" shape ARIN, RIPE, APNIC, LACNIC, and AFRINIC all use
+// (see ipSynonyms in internal/whois/parse/ip.go, which maps all three keys
+// onto the same NetRange field) into its bare start and end addresses.
+// Any input that isn't cleanly two hyphen-separated, non-empty halves --
+// empty, no hyphen at all, or a hyphen with nothing (or only whitespace)
+// on one side -- degrades to ("", ""): an unparseable range must not
+// surface as a malformed StartAddress/EndAddress value merge.MergeIP
+// would then treat as real, disagreeing data.
+func splitNetRange(raw string) (start, end string) {
+	parts := strings.SplitN(raw, "-", 2)
+	if len(parts) != 2 {
+		return "", ""
+	}
+	start = strings.TrimSpace(parts[0])
+	end = strings.TrimSpace(parts[1])
+	if start == "" || end == "" {
+		return "", ""
+	}
+	return start, end
+}
+
+// parentHandleFromWHOIS extracts the bare handle from ARIN's
+// "<org name> (<handle>)" Parent value (e.g. "NET8 (NET-8-0-0-0-0)" ->
+// "NET-8-0-0-0-0"), so it compares equal to RDAP's parentHandle, which is
+// always just the bare handle. A value with no parenthesized part (RIPE
+// and friends report the parent inetnum's bare range/handle directly, no
+// name prefix) is returned unchanged.
+func parentHandleFromWHOIS(raw string) string {
+	raw = strings.TrimSpace(raw)
+	open := strings.LastIndex(raw, "(")
+	closeIdx := strings.LastIndex(raw, ")")
+	if open == -1 || closeIdx == -1 || closeIdx < open {
+		return raw
+	}
+	handle := strings.TrimSpace(raw[open+1 : closeIdx])
+	if handle == "" {
+		return raw
+	}
+	return handle
 }

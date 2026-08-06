@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/patramsey/plat/internal/merge"
 	"github.com/patramsey/plat/internal/model"
 )
 
@@ -26,7 +27,12 @@ const arinIPBody = `{
   "entities": [{"roles": ["registrant"], "vcardArray": ["vcard", [["fn", {}, "text", "Google LLC"]]]}]
 }`
 
-const arinIPWHOISText = "NetRange:       8.8.8.0 - 8.8.8.255\nCIDR:           8.8.8.0/24\nNetName:        GOGL\nNetHandle:      NET-8-8-8-0-2\nParent:         NET-8-0-0-0-0\nNetType:        Direct Allocation\nOrgName:        Google LLC\nOrgId:          GOGL\nCountry:        US\nRegDate:        2023-12-28\nUpdated:        2023-12-29\n"
+// arinIPWHOISText's NetRange and Parent lines are deliberately in ARIN's
+// real combined shapes ("<start> - <end>", "<name> (<handle>)") rather
+// than pre-split -- CollectIP must normalize these to compare equal
+// against arinIPBody's separate startAddress/endAddress/parentHandle
+// fields, not just pass them through. See TestCollectIP_RegistryAndWHOIS_NoFalseRangeOrParentConflict.
+const arinIPWHOISText = "NetRange:       8.8.8.0 - 8.8.8.255\nCIDR:           8.8.8.0/24\nNetName:        GOGL\nNetHandle:      NET-8-8-8-0-2\nParent:         NET8 (NET-8-0-0-0-0)\nNetType:        Direct Allocation\nOrgName:        Google LLC\nOrgId:          GOGL\nCountry:        US\nRegDate:        2023-12-28\nUpdated:        2023-12-29\n"
 
 func TestCollectIP_RegistryRDAPPlusWHOIS(t *testing.T) {
 	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -151,5 +157,61 @@ func TestCollectIP_SourceFilter(t *testing.T) {
 	}
 	if records[0].Meta.Source != model.SourceRegistryWHOIS {
 		t.Errorf("records[0].Meta.Source = %q, want %q", records[0].Meta.Source, model.SourceRegistryWHOIS)
+	}
+}
+
+// TestCollectIP_RegistryAndWHOIS_NoFalseRangeOrParentConflict is a
+// regression test for a real defect caught during live verification
+// against 8.8.8.8: RDAP reports startAddress/endAddress/parentHandle as
+// separate, bare values, while ARIN WHOIS reports the same information as
+// a combined "NetRange: <start> - <end>" line and a "Parent: <name>
+// (<handle>)" line. Feeding CollectIP's real output through merge.MergeIP
+// (not hand-built, already-matching IPSourceRecords, which is what let
+// this bug slip past the original test suite) must produce zero
+// conflicts on startAddress/endAddress/parentHandle, with both sources
+// listed as agreeing on each field.
+func TestCollectIP_RegistryAndWHOIS_NoFalseRangeOrParentConflict(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(arinIPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startWHOISListener(t, func(query string) string {
+		return arinIPWHOISText
+	})
+	ianaWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "refer:        " + rirWHOISAddr + "\n"
+	})
+
+	addr := netip.MustParseAddr("8.8.8.8")
+
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	rec := merge.MergeIP(records)
+
+	for _, c := range rec.Conflicts {
+		if c.Field == model.FieldIPStartAddress || c.Field == model.FieldIPEndAddress || c.Field == model.FieldIPParent {
+			t.Errorf("false conflict on field %q: %+v (RDAP and WHOIS describe the same value in different shapes, not a real disagreement)", c.Field, c.Values)
+		}
+	}
+
+	if rec.StartAddress.Value != "8.8.8.0" {
+		t.Errorf("StartAddress = %q, want 8.8.8.0", rec.StartAddress.Value)
+	}
+	if len(rec.StartAddress.Sources) != 2 {
+		t.Errorf("StartAddress.Sources = %v, want both registry-rdap and registry-whois agreeing", rec.StartAddress.Sources)
+	}
+	if rec.EndAddress.Value != "8.8.8.255" {
+		t.Errorf("EndAddress = %q, want 8.8.8.255", rec.EndAddress.Value)
+	}
+	if len(rec.EndAddress.Sources) != 2 {
+		t.Errorf("EndAddress.Sources = %v, want both registry-rdap and registry-whois agreeing", rec.EndAddress.Sources)
+	}
+	if rec.ParentHandle.Value != "NET-8-0-0-0-0" {
+		t.Errorf("ParentHandle = %q, want NET-8-0-0-0-0", rec.ParentHandle.Value)
+	}
+	if len(rec.ParentHandle.Sources) != 2 {
+		t.Errorf("ParentHandle.Sources = %v, want both registry-rdap and registry-whois agreeing", rec.ParentHandle.Sources)
 	}
 }

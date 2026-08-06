@@ -223,8 +223,11 @@ func TestFromIPHop_PopulatedFields(t *testing.T) {
 	if !sr.Present {
 		t.Fatal("Present = false, want true")
 	}
-	if sr.StartAddress != "8.8.8.0 - 8.8.8.255" {
-		t.Errorf("StartAddress = %q, want NetRange mapped across verbatim", sr.StartAddress)
+	if sr.StartAddress != "8.8.8.0" {
+		t.Errorf("StartAddress = %q, want 8.8.8.0 (split from NetRange, not the combined string)", sr.StartAddress)
+	}
+	if sr.EndAddress != "8.8.8.255" {
+		t.Errorf("EndAddress = %q, want 8.8.8.255 (split from NetRange)", sr.EndAddress)
 	}
 	if sr.CIDR != "8.8.8.0/24" {
 		t.Errorf("CIDR = %q, want 8.8.8.0/24", sr.CIDR)
@@ -322,5 +325,73 @@ func TestFromIPHop_RedactedOrgName(t *testing.T) {
 	}
 	if !sr.Present {
 		t.Error("Present = false, want true (Handle is populated even though OrgName is redacted)")
+	}
+}
+
+func TestFromIPHop_ARINParentNotationNormalized(t *testing.T) {
+	// ARIN's Parent line prefixes the handle with the parent network's
+	// name ("NET8 (NET-8-0-0-0-0)"), unlike RDAP's bare parentHandle. This
+	// pins that fromIPHop extracts the bare handle so it compares equal
+	// to RDAP's value in merge.MergeIP rather than producing a false
+	// conflict.
+	hop := whois.Hop{
+		IPFields: &parse.IPFields{
+			Handle: "NET-8-8-8-0-2",
+			Parent: "NET8 (NET-8-0-0-0-0)",
+		},
+	}
+
+	sr := fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS, OK: true}, hop)
+
+	if sr.ParentHandle != "NET-8-0-0-0-0" {
+		t.Errorf("ParentHandle = %q, want NET-8-0-0-0-0 (extracted from ARIN's \"name (handle)\" notation)", sr.ParentHandle)
+	}
+}
+
+func TestSplitNetRange(t *testing.T) {
+	tests := []struct {
+		name               string
+		raw                string
+		wantStart, wantEnd string
+	}{
+		{"ARIN-style with spaces", "8.8.8.0 - 8.8.8.255", "8.8.8.0", "8.8.8.255"},
+		{"RIPE-style inetnum, no spaces", "8.8.8.0-8.8.8.255", "8.8.8.0", "8.8.8.255"},
+		{"extra whitespace", "  8.8.8.0   -   8.8.8.255  ", "8.8.8.0", "8.8.8.255"},
+		{"IPv6 range", "2001:4860:: - 2001:4860:ffff:ffff:ffff:ffff:ffff:ffff", "2001:4860::", "2001:4860:ffff:ffff:ffff:ffff:ffff:ffff"},
+		{"empty", "", "", ""},
+		{"no separator", "not a range at all", "", ""},
+		{"trailing hyphen, empty end", "8.8.8.0 - ", "", ""},
+		{"leading hyphen, empty start", " - 8.8.8.255", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotStart, gotEnd := splitNetRange(tt.raw)
+			if gotStart != tt.wantStart || gotEnd != tt.wantEnd {
+				t.Errorf("splitNetRange(%q) = (%q, %q), want (%q, %q)", tt.raw, gotStart, gotEnd, tt.wantStart, tt.wantEnd)
+			}
+		})
+	}
+}
+
+func TestParentHandleFromWHOIS(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{"ARIN name-prefixed handle", "NET8 (NET-8-0-0-0-0)", "NET-8-0-0-0-0"},
+		{"bare handle, no parens", "NET-8-0-0-0-0", "NET-8-0-0-0-0"},
+		{"empty", "", ""},
+		{"empty parens", "NET8 ()", "NET8 ()"},
+		{"parens with only whitespace", "NET8 (   )", "NET8 (   )"},
+		{"handle alone in parens, no name", "(NET-1-0-0-0)", "NET-1-0-0-0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parentHandleFromWHOIS(tt.raw)
+			if got != tt.want {
+				t.Errorf("parentHandleFromWHOIS(%q) = %q, want %q", tt.raw, got, tt.want)
+			}
+		})
 	}
 }
