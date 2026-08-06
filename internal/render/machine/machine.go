@@ -83,6 +83,7 @@ type sourceView struct {
 
 type recordView struct {
 	SchemaVersion int             `json:"schemaVersion"`
+	ObjectType    string          `json:"objectType"`
 	Domain        *fieldValue     `json:"domain,omitempty"`
 	Handle        *fieldValue     `json:"handle,omitempty"`
 	Registrar     *registrarView  `json:"registrar,omitempty"`
@@ -179,6 +180,7 @@ func buildRegistrarView(r model.RegistrarInfo) *registrarView {
 func buildView(r model.Record, opts Options) recordView {
 	v := recordView{
 		SchemaVersion: SchemaVersion,
+		ObjectType:    "domain",
 		Domain:        stringFieldView(r.Domain),
 		Handle:        stringFieldView(r.Handle),
 		Registrar:     buildRegistrarView(r.Registrar),

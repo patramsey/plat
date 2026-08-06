@@ -1,14 +1,16 @@
 # plat JSON output schema
 
 `plat <domain> -o json` and `plat <domain> -o ndjson` emit the unified
-domain record as JSON. This schema is a public API: a breaking change to
-any field's shape bumps `schemaVersion`. The current version is **1**.
+domain record as JSON; `plat <ip>` does the same for an IP network lookup.
+This schema is a public API: a breaking change to any field's shape bumps
+`schemaVersion`. The current version is **1**.
 
 ## Top-level shape
 
 ```json
 {
   "schemaVersion": 1,
+  "objectType": "domain",
   "domain": { "value": "example.com", "sources": ["registry-rdap"] },
   "handle": { "value": "2336799_DOMAIN_COM-VRSN", "sources": ["registry-rdap"] },
   "registrar": {
@@ -27,6 +29,14 @@ any field's shape bumps `schemaVersion`. The current version is **1**.
   ]
 }
 ```
+
+`objectType` is `"domain" | "ip"` — always present, immediately after
+`schemaVersion`. It's the discriminator telling consumers which field set
+to expect in the rest of the record: a `"domain"` record follows the
+domain shape below (`registrar`, `nameservers`, `expires`, `dnssec`,
+`lifecycle`, ...); an `"ip"` record follows the [IP records](#ip-records)
+shape instead (`startAddress`/`endAddress`, `cidr`, `org`, ...). Adding
+`objectType` was a purely additive change — `schemaVersion` stayed **1**.
 
 ## Field shapes
 
@@ -82,6 +92,48 @@ pipelines don't need to special-case absence.
   { "source": "registry-rdap", "ok": true, "notFound": false, "latencyMs": 89, "error": "timeout" }
   ```
   `error` is omitted when empty. `source` is one of `registry-rdap`, `registrar-rdap`, `registry-whois`, `registrar-whois` — these full names are what every `sources` array uses throughout this schema, in JSON/NDJSON, always. The human/plain terminal views abbreviate them to 2-letter codes (`GR`/`RR`/`GW`/`RW`) purely for display, with a legend printed once per lookup; that abbreviation is a rendering choice, not part of this schema.
+
+## IP records
+
+`plat <ip-or-cidr>` emits an IP network record instead of a domain record
+— same envelope, `"objectType": "ip"`, a disjoint field set. An IP
+allocation is queried from the registry only (RDAP and WHOIS at the RIR
+that holds the block); there is no registrar leg, so `sources[]` only ever
+contains `registry-rdap`/`registry-whois` entries. `registrar`, `expires`,
+`nameservers`, `dnssec`, and `lifecycle` never appear on an IP record —
+those are domain-only concepts (a netblock has no registrar, no
+expiration, no nameservers, no DNSSEC, and no ICANN expired-domain
+lifecycle to interpret).
+
+```json
+{
+  "schemaVersion": 1,
+  "objectType": "ip",
+  "handle": { "value": "NET-8-8-8-0-2", "sources": ["registry-rdap"] },
+  "name": { "value": "GOGL", "sources": ["registry-rdap"] },
+  "startAddress": { "value": "8.8.8.0", "sources": ["registry-rdap"] },
+  "endAddress": { "value": "8.8.8.255", "sources": ["registry-rdap"] },
+  "cidr": { "value": "8.8.8.0/24", "sources": ["registry-rdap"] },
+  "ipVersion": { "value": "v4", "sources": ["registry-rdap"] },
+  "country": { "value": "US", "sources": ["registry-whois"] },
+  "org": {
+    "name": { "value": "Google LLC", "sources": ["registry-whois"] }
+  },
+  "status": { "value": ["active"], "sources": ["registry-rdap"] },
+  "registered": { "value": "2023-12-28T22:24:33Z", "raw": "2023-12-28T17:24:33-05:00", "parsed": true, "sources": ["registry-rdap"] },
+  "conflicts": [],
+  "redacted": [],
+  "sources": [
+    { "source": "registry-rdap", "ok": true, "notFound": false, "latencyMs": 120 }
+  ]
+}
+```
+
+- **String fields** (`handle`, `name`, `startAddress`, `endAddress`, `cidr`, `ipVersion`, `parentHandle`, `country`, `org.name`, `org.id`, `org.abuseEmail`, `org.abusePhone`): same string-field shape as the domain schema. `startAddress`/`endAddress` are the netblock's first/last address, each independently omittable — the human/plain renderers combine them into a single `start - end` row, but the JSON schema keeps them as two separate fields.
+- **List field** (`status`): same list-field shape as the domain schema — EPP-normalized where a status vocabulary applies, otherwise the source's own status strings.
+- **Time fields** (`registered`, `updated`): same time-field shape as the domain schema (`value`/`raw`/`parsed`/`sources`). There is no `expires` — IP allocations don't expire the way domain registrations do.
+- **`org`** is an object of up to 4 string fields (`name`, `id`, `abuseEmail`, `abusePhone`), each following the string-field shape above and each independently omittable — the IP-record analog of `registrar`. The whole `org` key is omitted only if every one of its sub-fields is absent.
+- **`conflicts[]`**, **`redacted[]`**, **`sources[]`** — identical shapes and semantics to the domain schema above, just scoped to IP field names (e.g. `{"field": "org.name", ...}`) and, for `sources[]`, restricted to `registry-rdap`/`registry-whois` since there's no registrar leg to query.
 
 ## `--raw`
 
