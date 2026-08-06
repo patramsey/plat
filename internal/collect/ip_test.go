@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"os"
 	"testing"
 	"time"
 
@@ -213,5 +214,68 @@ func TestCollectIP_RegistryAndWHOIS_NoFalseRangeOrParentConflict(t *testing.T) {
 	}
 	if len(rec.ParentHandle.Sources) != 2 {
 		t.Errorf("ParentHandle.Sources = %v, want both registry-rdap and registry-whois agreeing", rec.ParentHandle.Sources)
+	}
+}
+
+// ripeIPBody is RDAP-shaped like RIPE's real response for 193.0.6.139:
+// registrant vCard full name is org-name's value ("Reseaux IP Europeens
+// Network Coordination Centre (RIPE NCC)"), not descr's ("RIPE Network
+// Coordination Centre") -- see testdata/whois/ripe-193.0.6.139.txt, whose
+// inetnum block lists descr before the organisation block's org-name.
+const ripeIPBody = `{
+  "objectClassName": "ip network",
+  "startAddress": "193.0.0.0",
+  "endAddress": "193.0.7.255",
+  "ipVersion": "v4",
+  "name": "RIPE-NCC",
+  "country": "NL",
+  "status": ["ASSIGNED PA"],
+  "cidr0_cidrs": [{"v4prefix": "193.0.0.0", "length": 21}],
+  "entities": [{"roles": ["registrant"], "vcardArray": ["vcard", [["fn", {}, "text", "Reseaux IP Europeens Network Coordination Centre (RIPE NCC)"]]]}]
+}`
+
+// TestCollectIP_RIPEStyle_NoFalseOrgNameConflict is the RPSL sibling of
+// TestCollectIP_RegistryAndWHOIS_NoFalseRangeOrParentConflict: a
+// regression test for the descr-outranks-org-name bug caught during live
+// verification against RIPE, AFRINIC, and APNIC (all RPSL-vocabulary
+// RIRs). Feeding a real RIPE WHOIS golden file through CollectIP paired
+// with a matching RDAP body must produce zero conflicts, with org.name
+// crediting both sources -- confirming the fix holds at the full
+// collect-and-merge level, not just in ParseIP isolation.
+func TestCollectIP_RIPEStyle_NoFalseOrgNameConflict(t *testing.T) {
+	whoisRaw, err := os.ReadFile("../../testdata/whois/ripe-193.0.6.139.txt")
+	if err != nil {
+		t.Fatalf("reading golden: %v", err)
+	}
+
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(ripeIPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startWHOISListener(t, func(query string) string {
+		return string(whoisRaw)
+	})
+	ianaWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "refer:        " + rirWHOISAddr + "\n"
+	})
+
+	addr := netip.MustParseAddr("193.0.6.139")
+
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	rec := merge.MergeIP(records)
+
+	for _, c := range rec.Conflicts {
+		t.Errorf("false conflict on field %q: %+v (RDAP and WHOIS describe the same org, not a real disagreement)", c.Field, c.Values)
+	}
+
+	const wantOrgName = "Reseaux IP Europeens Network Coordination Centre (RIPE NCC)"
+	if rec.Org.Name.Value != wantOrgName {
+		t.Errorf("Org.Name = %q, want %q", rec.Org.Name.Value, wantOrgName)
+	}
+	if len(rec.Org.Name.Sources) != 2 {
+		t.Errorf("Org.Name.Sources = %v, want both registry-rdap and registry-whois agreeing", rec.Org.Name.Sources)
 	}
 }

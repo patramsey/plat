@@ -21,6 +21,17 @@ type IPFields struct {
 	AbuseEmail string
 	AbusePhone string
 	Statuses   []string
+
+	// descr holds RPSL's free-text `descr:` line, kept separate from
+	// OrgName rather than folded into it. In every live RPSL response the
+	// inetnum/inet6num block's `descr:` (a description of the netblock,
+	// e.g. "RIPE Network Coordination Centre") precedes the organisation
+	// block's `org-name:` (the actual org identity, e.g. "Reseaux IP
+	// Europeens Network Coordination Centre (RIPE NCC)") -- so
+	// first-occurrence-wins would let descr permanently shadow org-name.
+	// ParseIP falls back to descr for OrgName only when no org-name (or
+	// ARIN's OrgName) ever appeared, after the scan completes.
+	descr string
 }
 
 // ipSynonyms maps the lowercased WHOIS key to the IPFields member it
@@ -41,7 +52,7 @@ var ipSynonyms = map[string]func(*IPFields, string){
 	"nettype":       func(f *IPFields, v string) { f.NetType = v },
 	"orgname":       func(f *IPFields, v string) { f.OrgName = v },
 	"org-name":      func(f *IPFields, v string) { f.OrgName = v },
-	"descr":         func(f *IPFields, v string) { f.OrgName = v },
+	"descr":         func(f *IPFields, v string) { f.descr = v },
 	"orgid":         func(f *IPFields, v string) { f.OrgID = v },
 	"org":           func(f *IPFields, v string) { f.OrgID = v },
 	"country":       func(f *IPFields, v string) { f.Country = v },
@@ -68,7 +79,7 @@ var ipFieldGet = map[string]func(*IPFields) string{
 	"nettype":       func(f *IPFields) string { return f.NetType },
 	"orgname":       func(f *IPFields) string { return f.OrgName },
 	"org-name":      func(f *IPFields) string { return f.OrgName },
-	"descr":         func(f *IPFields) string { return f.OrgName },
+	"descr":         func(f *IPFields) string { return f.descr },
 	"orgid":         func(f *IPFields) string { return f.OrgID },
 	"org":           func(f *IPFields) string { return f.OrgID },
 	"country":       func(f *IPFields) string { return f.Country },
@@ -82,7 +93,11 @@ var ipFieldGet = map[string]func(*IPFields) string{
 }
 
 // ParseIP extracts IP-network fields from a raw RIR WHOIS response,
-// handling both ARIN's and the RPSL-style vocabularies in one pass.
+// handling both ARIN's and the RPSL-style vocabularies in one pass. When
+// no authoritative org identity (org-name/OrgName) was found anywhere in
+// the response, it falls back to RPSL's descr line -- see the descr field
+// doc comment on IPFields for why that can't just be folded into the
+// first-occurrence-wins scan itself.
 func ParseIP(raw string) IPFields {
 	var f IPFields
 	for _, line := range strings.Split(raw, "\n") {
@@ -107,6 +122,9 @@ func ParseIP(raw string) IPFields {
 			continue // first occurrence wins
 		}
 		set(&f, val)
+	}
+	if f.OrgName == "" {
+		f.OrgName = f.descr
 	}
 	return f
 }
