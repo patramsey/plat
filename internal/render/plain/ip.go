@@ -61,7 +61,8 @@ func writeIPField(tw *tabwriter.Writer, r model.IPRecord, fd model.FieldSpec) {
 	case model.FieldIPHandle:
 		stringField(tw, fd.Label, r.Handle, conflicted)
 	case model.FieldIPStartAddress:
-		rangeField(tw, fd.Label, r.StartAddress, r.EndAddress, conflicted)
+		rangeConflicted := hasConflict(r.Conflicts, model.FieldIPStartAddress) || hasConflict(r.Conflicts, model.FieldIPEndAddress)
+		rangeField(tw, fd.Label, r.StartAddress, r.EndAddress, rangeConflicted)
 	case model.FieldIPCIDR:
 		stringField(tw, fd.Label, r.CIDR, conflicted)
 	case model.FieldIPType:
@@ -92,19 +93,21 @@ func writeIPField(tw *tabwriter.Writer, r model.IPRecord, fd model.FieldSpec) {
 }
 
 // rangeField renders the Range row as "start - end", combining
-// StartAddress and EndAddress. Conflict provenance is judged on
-// StartAddress's sources -- the two fields are always merged from the
-// same source set in practice (see merge.MergeIP), so a single
-// conflicted flag covers the combined row. If only one of the two
-// addresses is present, that address renders alone rather than with a
-// dangling " - ".
+// StartAddress and EndAddress. merge.MergeIP merges the two through
+// independent scalar() calls keyed "startAddress"/"endAddress" -- each
+// can carry its own Sources and its own Conflict entry -- so the caller
+// passes a conflicted flag that already ORs both fields' conflict state,
+// and this function unions both fields' Sources for the row's badge
+// rather than assuming they ever agree. If only one of the two addresses
+// is present, that address (and just its own sources) renders alone
+// rather than with a dangling " - ".
 func rangeField(tw *tabwriter.Writer, label string, start, end model.Field[string], conflicted bool) {
 	var value string
 	var sources []model.SourceID
 	switch {
 	case start.Present() && end.Present():
 		value = start.Value + " - " + end.Value
-		sources = start.Sources
+		sources = unionSourceIDs(start.Sources, end.Sources)
 	case start.Present():
 		value = start.Value
 		sources = start.Sources
@@ -115,4 +118,26 @@ func rangeField(tw *tabwriter.Writer, label string, start, end model.Field[strin
 		return
 	}
 	_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", label, value, sourcesCol(sources, conflicted))
+}
+
+// unionSourceIDs returns the sources appearing in a or b, deduplicated,
+// preserving a's order and appending any of b's entries not already seen
+// -- used by the Range row, whose two underlying fields (StartAddress,
+// EndAddress) can each carry their own independently-merged Sources set.
+func unionSourceIDs(a, b []model.SourceID) []model.SourceID {
+	seen := make(map[model.SourceID]bool, len(a)+len(b))
+	out := make([]model.SourceID, 0, len(a)+len(b))
+	for _, s := range a {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	for _, s := range b {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	return out
 }

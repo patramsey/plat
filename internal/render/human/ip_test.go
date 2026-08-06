@@ -171,6 +171,105 @@ func TestRenderIP_RangeOnlyStartAddress(t *testing.T) {
 	}
 }
 
+// TestRenderIP_RangeMarkedWhenOnlyEndAddressConflicts pins a real gap
+// found by review: merge.MergeIP merges StartAddress and EndAddress
+// through two independent scalar() calls, keyed "startAddress" and
+// "endAddress" respectively, so a genuine disagreement can land on EITHER
+// field's own model.Conflict entry while the other field agrees across
+// sources. The combined Range row must still carry the ⚠ marker in that
+// case -- checking conflict state via only the startAddress key would
+// silently drop it even though the record's Conflicts (and the
+// --conflicts hint) do report it.
+func TestRenderIP_RangeMarkedWhenOnlyEndAddressConflicts(t *testing.T) {
+	rec := model.IPRecord{
+		StartAddress: model.Field[string]{Value: "8.8.8.0", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}},
+		EndAddress:   model.Field[string]{Value: "8.8.8.255", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Conflicts: []model.Conflict{
+			{
+				Field: model.FieldIPEndAddress,
+				Values: map[model.SourceID]string{
+					model.SourceRegistryRDAP:  "8.8.8.255",
+					model.SourceRegistryWHOIS: "8.8.8.254",
+				},
+			},
+		},
+	}
+	var buf bytes.Buffer
+	if err := RenderIP(&buf, rec, Options{Theme: NewTheme(false), Width: 100}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	var rangeLine string
+	for _, l := range strings.Split(out, "\n") {
+		if strings.Contains(l, "8.8.8.0") && strings.Contains(l, "8.8.8.255") {
+			rangeLine = l
+		}
+	}
+	if !strings.Contains(rangeLine, "⚠") {
+		t.Errorf("expected the Range row to carry a ⚠ marker when only EndAddress conflicts, got: %q\nfull output:\n%s", rangeLine, out)
+	}
+}
+
+// TestRenderIP_RangeMarkedWhenOnlyStartAddressConflicts is the mirror of
+// the EndAddress case above, guarding against a fix that only checks
+// EndAddress (or only StartAddress) instead of ORing both.
+func TestRenderIP_RangeMarkedWhenOnlyStartAddressConflicts(t *testing.T) {
+	rec := model.IPRecord{
+		StartAddress: model.Field[string]{Value: "8.8.8.0", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		EndAddress:   model.Field[string]{Value: "8.8.8.255", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}},
+		Conflicts: []model.Conflict{
+			{
+				Field: model.FieldIPStartAddress,
+				Values: map[model.SourceID]string{
+					model.SourceRegistryRDAP:  "8.8.8.0",
+					model.SourceRegistryWHOIS: "8.8.8.1",
+				},
+			},
+		},
+	}
+	var buf bytes.Buffer
+	if err := RenderIP(&buf, rec, Options{Theme: NewTheme(false), Width: 100}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	var rangeLine string
+	for _, l := range strings.Split(out, "\n") {
+		if strings.Contains(l, "8.8.8.0") && strings.Contains(l, "8.8.8.255") {
+			rangeLine = l
+		}
+	}
+	if !strings.Contains(rangeLine, "⚠") {
+		t.Errorf("expected the Range row to carry a ⚠ marker when only StartAddress conflicts, got: %q\nfull output:\n%s", rangeLine, out)
+	}
+}
+
+// TestRenderIP_RangeBadgeUnionsBothAddressesSources covers the same
+// underlying independent-merge behavior from the source-badge side:
+// StartAddress and EndAddress can each be agreed on by a different subset
+// of sources (e.g. StartAddress only confirmed by RDAP, EndAddress
+// confirmed by both RDAP and WHOIS). The Range row's source badge must
+// show the union of both, not just StartAddress's.
+func TestRenderIP_RangeBadgeUnionsBothAddressesSources(t *testing.T) {
+	rec := model.IPRecord{
+		StartAddress: model.Field[string]{Value: "8.8.8.0", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		EndAddress:   model.Field[string]{Value: "8.8.8.255", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}},
+	}
+	var buf bytes.Buffer
+	if err := RenderIP(&buf, rec, Options{Theme: NewTheme(false), Width: 100}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	var rangeLine string
+	for _, l := range strings.Split(out, "\n") {
+		if strings.Contains(l, "8.8.8.0") && strings.Contains(l, "8.8.8.255") {
+			rangeLine = l
+		}
+	}
+	if !strings.Contains(rangeLine, sourceCode(model.SourceRegistryRDAP)) || !strings.Contains(rangeLine, sourceCode(model.SourceRegistryWHOIS)) {
+		t.Errorf("expected the Range row's badge to include both GR and GW (union of both addresses' sources), got: %q", rangeLine)
+	}
+}
+
 func TestRenderIP_ConflictedFieldGetsMarkerByDefaultDetailHidden(t *testing.T) {
 	rec := model.IPRecord{
 		Handle: model.Field[string]{Value: "NET-8-8-8-0-2", Sources: []model.SourceID{model.SourceRegistryRDAP}},

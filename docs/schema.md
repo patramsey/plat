@@ -111,6 +111,7 @@ lifecycle to interpret).
   "objectType": "ip",
   "handle": { "value": "NET-8-8-8-0-2", "sources": ["registry-rdap"] },
   "name": { "value": "GOGL", "sources": ["registry-rdap"] },
+  "type": { "value": "DIRECT ALLOCATION", "sources": ["registry-rdap"] },
   "startAddress": { "value": "8.8.8.0", "sources": ["registry-rdap"] },
   "endAddress": { "value": "8.8.8.255", "sources": ["registry-rdap"] },
   "cidr": { "value": "8.8.8.0/24", "sources": ["registry-rdap"] },
@@ -129,7 +130,7 @@ lifecycle to interpret).
 }
 ```
 
-- **String fields** (`handle`, `name`, `startAddress`, `endAddress`, `cidr`, `ipVersion`, `parentHandle`, `country`, `org.name`, `org.id`, `org.abuseEmail`, `org.abusePhone`): same string-field shape as the domain schema. `startAddress`/`endAddress` are the netblock's first/last address, each independently omittable — the human/plain renderers combine them into a single `start - end` row, but the JSON schema keeps them as two separate fields.
+- **String fields** (`handle`, `name`, `type`, `startAddress`, `endAddress`, `cidr`, `ipVersion`, `parentHandle`, `country`, `org.name`, `org.id`, `org.abuseEmail`, `org.abusePhone`): same string-field shape as the domain schema. `type` is the RIR's allocation/assignment type (e.g. ARIN's `DIRECT ALLOCATION`) — a source-reported classification, not a plat-derived one. `startAddress`/`endAddress` are the netblock's first/last address, each independently omittable — the human/plain renderers combine them into a single `start - end` row, but the JSON schema keeps them as two separate fields.
 - **List field** (`status`): same list-field shape as the domain schema — EPP-normalized where a status vocabulary applies, otherwise the source's own status strings.
 - **Time fields** (`registered`, `updated`): same time-field shape as the domain schema (`value`/`raw`/`parsed`/`sources`). There is no `expires` — IP allocations don't expire the way domain registrations do.
 - **`org`** is an object of up to 4 string fields (`name`, `id`, `abuseEmail`, `abusePhone`), each following the string-field shape above and each independently omittable — the IP-record analog of `registrar`. The whole `org` key is omitted only if every one of its sub-fields is absent.

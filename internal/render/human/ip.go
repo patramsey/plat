@@ -94,7 +94,8 @@ func writeIPField(b *strings.Builder, th Theme, width int, r model.IPRecord, fd 
 	case model.FieldIPHandle:
 		writeStringField(b, th, width, fd.Label, r.Handle, th.Value, conflicted)
 	case model.FieldIPStartAddress:
-		writeRangeField(b, th, width, fd.Label, r.StartAddress, r.EndAddress, conflicted)
+		rangeConflicted := hasConflict(r.Conflicts, model.FieldIPStartAddress) || hasConflict(r.Conflicts, model.FieldIPEndAddress)
+		writeRangeField(b, th, width, fd.Label, r.StartAddress, r.EndAddress, rangeConflicted)
 	case model.FieldIPCIDR:
 		writeStringField(b, th, width, fd.Label, r.CIDR, th.Identity, conflicted)
 	case model.FieldIPType:
@@ -126,11 +127,13 @@ func writeIPField(b *strings.Builder, th Theme, width int, r model.IPRecord, fd 
 
 // writeRangeField renders the Range row as "start - end", combining
 // StartAddress and EndAddress via writeStyledRow so it gets the same
-// wrapping/badge treatment as any other row. Conflict provenance and the
-// source badge are judged on StartAddress's sources -- the two fields are
-// always merged from the same source set in practice (see
-// merge.MergeIP), so a single conflicted flag/badge covers the combined
-// row. If only one of the two addresses is present, that address renders
+// wrapping/badge treatment as any other row. merge.MergeIP merges the two
+// through independent scalar() calls keyed "startAddress"/"endAddress" --
+// each can carry its own Sources and its own Conflict entry -- so the
+// caller passes a conflicted flag that already ORs both fields' conflict
+// state, and this function unions both fields' Sources for the row's
+// badge rather than assuming they ever agree. If only one of the two
+// addresses is present, that address (and just its own sources) renders
 // alone rather than with a dangling " - ".
 func writeRangeField(b *strings.Builder, th Theme, width int, label string, start, end model.Field[string], conflicted bool) {
 	var value string
@@ -138,7 +141,7 @@ func writeRangeField(b *strings.Builder, th Theme, width int, label string, star
 	switch {
 	case start.Present() && end.Present():
 		value = start.Value + " - " + end.Value
-		sources = start.Sources
+		sources = unionSourceIDs(start.Sources, end.Sources)
 	case start.Present():
 		value = start.Value
 		sources = start.Sources
@@ -149,4 +152,26 @@ func writeRangeField(b *strings.Builder, th Theme, width int, label string, star
 		return
 	}
 	writeStyledRow(b, th, width, label, value, th.Value, sources, "", conflicted)
+}
+
+// unionSourceIDs returns the sources appearing in a or b, deduplicated,
+// preserving a's order and appending any of b's entries not already seen
+// -- used by the Range row, whose two underlying fields (StartAddress,
+// EndAddress) can each carry their own independently-merged Sources set.
+func unionSourceIDs(a, b []model.SourceID) []model.SourceID {
+	seen := make(map[model.SourceID]bool, len(a)+len(b))
+	out := make([]model.SourceID, 0, len(a)+len(b))
+	for _, s := range a {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	for _, s := range b {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	return out
 }
