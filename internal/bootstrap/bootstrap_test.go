@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -200,5 +201,54 @@ func TestParseResolver_ValidJSONShape(t *testing.T) {
 	}
 	if len(doc.Services) != 1 || len(doc.Services[0][0]) != 2 {
 		t.Fatalf("unexpected shape: %+v", doc)
+	}
+}
+
+func TestNewIPResolver_LongestPrefixWins(t *testing.T) {
+	// A /8 delegated to one RIR with a /24 sub-delegated elsewhere: the
+	// most specific match must win, not the first or the widest.
+	r := NewIPResolver(map[netip.Prefix]string{
+		netip.MustParsePrefix("8.0.0.0/8"):  "https://wide.example/",
+		netip.MustParsePrefix("8.8.8.0/24"): "https://narrow.example/",
+	})
+	got, ok := r.IPBaseURL(netip.MustParseAddr("8.8.8.8"))
+	if !ok {
+		t.Fatal("IPBaseURL returned ok=false, want a match")
+	}
+	if got != "https://narrow.example/" {
+		t.Errorf("IPBaseURL = %q, want the /24 (most specific), not the /8", got)
+	}
+}
+
+func TestNewIPResolver_NoMatch(t *testing.T) {
+	r := NewIPResolver(map[netip.Prefix]string{
+		netip.MustParsePrefix("8.0.0.0/8"): "https://wide.example/",
+	})
+	if got, ok := r.IPBaseURL(netip.MustParseAddr("9.9.9.9")); ok {
+		t.Errorf("IPBaseURL = %q, ok=true; want ok=false for an address in no delegated range", got)
+	}
+}
+
+func TestNewIPResolver_IPv6(t *testing.T) {
+	r := NewIPResolver(map[netip.Prefix]string{
+		netip.MustParsePrefix("2001:4860::/32"): "https://v6.example/",
+	})
+	if got, ok := r.IPBaseURL(netip.MustParseAddr("2001:4860:4860::8888")); !ok || got != "https://v6.example/" {
+		t.Errorf("IPBaseURL = %q, ok=%v; want the /32 match", got, ok)
+	}
+}
+
+func TestLoad_EmbeddedIPRegistriesParse(t *testing.T) {
+	// The embedded snapshots must parse and cover a well-known address,
+	// so an offline/first-run lookup still resolves.
+	r, err := Load(context.Background(), Options{})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, ok := r.IPBaseURL(netip.MustParseAddr("8.8.8.8")); !ok {
+		t.Error("IPBaseURL(8.8.8.8) ok=false, want a RIR match from the embedded ipv4 registry")
+	}
+	if _, ok := r.IPBaseURL(netip.MustParseAddr("2001:4860:4860::8888")); !ok {
+		t.Error("IPBaseURL(2001:4860:4860::8888) ok=false, want a RIR match from the embedded ipv6 registry")
 	}
 }
