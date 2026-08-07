@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -45,6 +46,7 @@ func (e *MalformedResponseError) Unwrap() error { return e.Err }
 // (that's a later milestone) — just enough to not lose information.
 type Result struct {
 	Domain              *DomainResponse
+	IPNetwork           *IPNetworkResponse
 	Raw                 []byte
 	StatusCode          int
 	ContentType         string
@@ -269,5 +271,95 @@ func (c *Client) domainAt(ctx context.Context, reqURL string) (*Result, error) {
 	}
 
 	result.Domain = &domain
+	return result, nil
+}
+
+// IP queries baseURL for the given address's network object. baseURL is
+// the RIR's RDAP service base, typically resolved via bootstrap's
+// IPBaseURL.
+func (c *Client) IP(ctx context.Context, baseURL string, addr netip.Addr) (*Result, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout())
+	defer cancel()
+
+	reqURL := strings.TrimRight(baseURL, "/") + "/ip/" + url.PathEscape(addr.String())
+	return c.ipAt(ctx, reqURL)
+}
+
+// ipAt is the shared fetch-and-parse core for IP queries -- a sibling of
+// domainAt with the same 429 retry, 404 handling, and malformed-response
+// tolerance, differing only in the decode target, the objectClassName
+// check, and which Result field gets populated.
+func (c *Client) ipAt(ctx context.Context, reqURL string) (*Result, error) {
+	resp, err := c.do(ctx, reqURL)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		select {
+		case <-time.After(retryAfter(resp.Header)):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		resp, err = c.do(ctx, reqURL)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	mediaType, _, _ := mime.ParseMediaType(contentType)
+	conformant := mediaType == "application/rdap+json"
+
+	result := &Result{
+		Raw:                 resp.Body,
+		StatusCode:          resp.StatusCode,
+		ContentType:         contentType,
+		MediaTypeConformant: conformant,
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return result, ErrDomainNotFound
+	}
+
+	if resp.StatusCode >= 400 {
+		var rerr rdapError
+		if json.Unmarshal(bytes.TrimSpace(resp.Body), &rerr) == nil && rerr.Title != "" {
+			return result, fmt.Errorf("rdap: %s returned %d: %s", reqURL, resp.StatusCode, rerr.Title)
+		}
+		return result, &MalformedResponseError{
+			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
+			Snippet: snippet(resp.Body),
+		}
+	}
+
+	trimmed := bytes.TrimSpace(resp.Body)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return result, &MalformedResponseError{
+			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
+			Snippet: snippet(resp.Body),
+		}
+	}
+
+	var ipNetwork IPNetworkResponse
+	if err := json.Unmarshal(trimmed, &ipNetwork); err != nil {
+		return result, &MalformedResponseError{
+			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
+			Snippet: snippet(resp.Body), Err: err,
+		}
+	}
+
+	if ipNetwork.ObjectClassName != "ip network" {
+		var rerr rdapError
+		if json.Unmarshal(trimmed, &rerr) == nil && rerr.ErrorCode != 0 {
+			return result, fmt.Errorf("rdap: %s returned errorCode %d: %s", reqURL, rerr.ErrorCode, rerr.Title)
+		}
+		return result, &MalformedResponseError{
+			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
+			Snippet: snippet(resp.Body),
+		}
+	}
+
+	result.IPNetwork = &ipNetwork
 	return result, nil
 }

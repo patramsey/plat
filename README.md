@@ -30,6 +30,7 @@ where sources disagree.
 - [Why not just `whois` or an RDAP client?](#why-not-just-whois-or-an-rdap-client)
 - [Install](#install)
 - [Usage](#usage)
+- [IP Lookups](#ip-lookups)
 - [Output & Provenance](#output--provenance)
   - [Source codes](#source-codes)
   - [Conflicts](#conflicts)
@@ -104,6 +105,11 @@ plat example.com
 # Multiple domains in one invocation
 plat example.com example.org
 
+# IP-address lookup — the netblock and its holding organization, from
+# the RIR's RDAP + WHOIS, merged the same way (see "IP Lookups" below)
+plat 8.8.8.8
+plat 2001:4860:4860::8888
+
 # Machine-readable output
 plat example.com -o json | jq .expires.value
 plat example.com example.org -o ndjson
@@ -157,6 +163,24 @@ plat completion zsh > "${fpath[1]}/_plat"
 plat completion fish > "$(dirname "$(command -v fish)")/../share/fish/vendor_completions.d/plat.fish"
 plat completion powershell > plat.ps1
 ```
+
+## IP Lookups
+
+`plat` also looks up IP addresses: `plat 8.8.8.8` or `plat
+2001:4860:4860::8888` finds the RIR (ARIN, RIPE NCC, APNIC, LACNIC, or
+AFRINIC) that holds the containing netblock and queries its RDAP and
+WHOIS, merged with the same per-field provenance as a domain lookup.
+
+There's no registrar leg — an IP allocation has no registrar — so only
+`registry-rdap`/`registry-whois` ever appear as sources, and the fields
+are a netblock's own (handle, CIDR, start/end address, parent handle,
+holding organization) rather than a domain's (registrar, nameservers,
+expiry, DNSSEC). `-o json` sets `"objectType": "ip"` to distinguish the
+shape from a domain record's `"objectType": "domain"`; see
+[`docs/schema.md`](docs/schema.md) for the full field reference.
+Reserved/private addresses (`10.0.0.1`, `127.0.0.1`, `::1`, ...) are
+rejected up front with a usage error, since no RIR allocates them to an
+organization.
 
 ## Output & Provenance
 

@@ -80,10 +80,11 @@ func TestCollect_RegistryAndRegistrarRDAPPlusWHOIS(t *testing.T) {
 		return fmt.Sprintf("refer:        %s\ndomain:       COM\n", registryWHOISAddr)
 	})
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
 
@@ -147,10 +148,11 @@ func TestCollect_NoFollowSkipsRegistrarHop(t *testing.T) {
 		return fmt.Sprintf("refer:        %s\ndomain:       COM\n", registryWHOISAddr)
 	})
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{NoFollow: true, Timeout: 2 * time.Second})
 
@@ -172,10 +174,11 @@ func TestCollect_EmptyBaseURLSkipsRDAPEntirely(t *testing.T) {
 		return fmt.Sprintf("refer:        %s\ndomain:       ZZ\n", registryAddr)
 	})
 
-	name, err := domain.Normalize("example.zz")
+	q, err := domain.Normalize("example.zz")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	sources := Collect(context.Background(), name, "", ianaAddr, Options{Timeout: 2 * time.Second})
 
@@ -197,10 +200,11 @@ func TestCollect_WHOISOnlySources(t *testing.T) {
 		return fmt.Sprintf("refer:        %s\ndomain:       COM\n", registryAddr)
 	})
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	sources := Collect(context.Background(), name, "", ianaAddr, Options{Timeout: 2 * time.Second})
 
@@ -252,10 +256,11 @@ func TestCollect_SourceFilterRDAPOnly(t *testing.T) {
 		return ""
 	})
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{
 		Timeout: 2 * time.Second,
@@ -298,10 +303,11 @@ func TestCollect_SourceFilterWHOISOnly(t *testing.T) {
 		return fmt.Sprintf("refer:        %s\ndomain:       COM\n", registryWHOISAddr)
 	})
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{
 		Timeout: 2 * time.Second,
@@ -363,10 +369,11 @@ func TestCollect_SourceFilterRegistryOnly(t *testing.T) {
 		return fmt.Sprintf("refer:        %s\ndomain:       COM\n", registryWHOISAddr)
 	})
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{
 		Timeout: 2 * time.Second,
@@ -431,10 +438,11 @@ func TestCollect_SourceFilterRegistrarOnly(t *testing.T) {
 		return fmt.Sprintf("refer:        %s\ndomain:       COM\n", registryWHOISAddr)
 	})
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{
 		Timeout: 2 * time.Second,
@@ -494,10 +502,11 @@ func TestCollect_RDAPAndWHOISRunConcurrently(t *testing.T) {
 		return fmt.Sprintf("refer:        %s\ndomain:       COM\n", registryWHOISAddr)
 	})
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	start := time.Now()
 	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{
@@ -578,10 +587,11 @@ func TestCollect_Port43FallbackWhenRegistryWHOISGivesNoReferral(t *testing.T) {
 		return fmt.Sprintf("refer:        %s\ndomain:       COM\n", registryWHOISAddr)
 	})
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
 
@@ -657,10 +667,11 @@ func TestCollect_Port43FallbackSkippedWhenReferralAlreadyFound(t *testing.T) {
 		return fmt.Sprintf("refer:        %s\ndomain:       COM\n", registryWHOISAddr)
 	})
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
 
@@ -692,10 +703,11 @@ func TestCollect_WHOISTimeoutBoundsWholeChainNotEachHop(t *testing.T) {
 		return fmt.Sprintf("refer:        %s\ndomain:       COM\n", registryAddr)
 	})
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	start := time.Now()
 	sources := Collect(context.Background(), name, "", ianaAddr, Options{Timeout: timeout})

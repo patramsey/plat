@@ -85,7 +85,7 @@ func TestRun_VersionSubcommand(t *testing.T) {
 func TestRun_WhoisSubcommandRegistered(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	_ = run([]string{"whois", "--help"}, &stdout, &stderr, uiConfig{})
-	if !strings.Contains(stdout.String(), "Look up domain ownership via WHOIS") {
+	if !strings.Contains(stdout.String(), "Look up domain or IP ownership via WHOIS") {
 		t.Errorf("expected whois subcommand help text in output, got:\n%s", stdout.String())
 	}
 }
@@ -122,7 +122,7 @@ func TestRun_WhoisHiddenFromHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	_ = run([]string{"--help"}, &stdout, &stderr, uiConfig{})
 	out := stdout.String()
-	if strings.Contains(out, "whois <domain>") || strings.Contains(out, "WHOIS (debug/demo") {
+	if strings.Contains(out, "whois <domain|ip>") || strings.Contains(out, "WHOIS (debug/demo") {
 		t.Errorf("expected 'whois' subcommand to be hidden from --help output, got:\n%s", out)
 	}
 }
@@ -291,38 +291,6 @@ func TestRun_AcceptsMultipleDomainArgs(t *testing.T) {
 	}
 }
 
-func TestRun_IPAddressInputRejected(t *testing.T) {
-	// Guards the wiring, not the parsing: internal/domain already unit-
-	// tests that Normalize rejects these, but the bug this fixes was that
-	// an IP produced exit 0 and a schema-clean record built from a WHOIS
-	// response about the "TLD" 8. Asserting the exit code here is what
-	// actually pins that shut -- a lookup path that swallowed the error
-	// would still pass every internal/domain test.
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{"bare IPv4", "8.8.8.8"},
-		{"bare IPv6", "2001:4860:4860::8888"},
-		{"CIDR prefix", "8.8.8.0/24"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var stdout, stderr bytes.Buffer
-			got := run([]string{tt.input}, &stdout, &stderr, uiConfig{})
-			if got != 2 {
-				t.Errorf("run([%s]) exit code = %d, want 2 (usage error)", tt.input, got)
-			}
-			if stdout.Len() != 0 {
-				t.Errorf("stdout = %q, want empty -- a rejected input must not emit a record", stdout.String())
-			}
-			if !strings.Contains(stderr.String(), "IP address lookups are not supported") {
-				t.Errorf("stderr = %q, want the IP-address rejection message", stderr.String())
-			}
-		})
-	}
-}
-
 func TestRun_NoArgsStillRejected(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	got := run([]string{}, &stdout, &stderr, uiConfig{})
@@ -337,6 +305,33 @@ func TestRun_NoArgsStillRejected(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Errorf("expected nothing on stderr when showing help for a bare invocation, got:\n%s", stderr.String())
+	}
+}
+
+// TestRun_ReservedIPRejectedAtExit2 is a regression test for a real
+// defect caught during live verification: reserved/private IP input
+// (10.0.0.1, ::1, etc.) used to sail past domain.Normalize, spend several
+// seconds actually querying whois.iana.org, and then exit 3 with the
+// factually wrong message "lookup failed -- no sources could be
+// reached" (IANA's WHOIS server was reached and answered; it just had no
+// "refer:" line for private-use space). domain.Normalize now rejects
+// these up front, so this exits 2 immediately -- no network involved,
+// keeping this test hermetic -- with a message that doesn't misdescribe
+// what happened.
+func TestRun_ReservedIPRejectedAtExit2(t *testing.T) {
+	tests := []string{"10.0.0.1", "127.0.0.1", "0.0.0.0", "255.255.255.255", "::1"}
+	for _, input := range tests {
+		t.Run(input, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			got := run([]string{input}, &stdout, &stderr, uiConfig{})
+			if got != 2 {
+				t.Errorf("run([%s]) exit code = %d, want 2 (usage error, not exit 3)", input, got)
+			}
+			errMsg := stderr.String()
+			if strings.Contains(errMsg, "no sources could be reached") || strings.Contains(errMsg, "unreachable") {
+				t.Errorf("run([%s]) stderr = %q, must not claim sources were unreachable (whois.iana.org answers just fine for these)", input, errMsg)
+			}
+		})
 	}
 }
 

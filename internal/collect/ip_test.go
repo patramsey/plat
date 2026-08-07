@@ -1,0 +1,346 @@
+package collect
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/netip"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/patramsey/plat/internal/merge"
+	"github.com/patramsey/plat/internal/model"
+)
+
+const arinIPBody = `{
+  "objectClassName": "ip network",
+  "handle": "NET-8-8-8-0-2",
+  "startAddress": "8.8.8.0",
+  "endAddress": "8.8.8.255",
+  "ipVersion": "v4",
+  "name": "GOGL",
+  "type": "DIRECT ALLOCATION",
+  "parentHandle": "NET-8-0-0-0-0",
+  "status": ["active"],
+  "cidr0_cidrs": [{"v4prefix": "8.8.8.0", "length": 24}],
+  "events": [{"eventAction": "registration", "eventDate": "2023-12-28T17:24:33-05:00"}],
+  "entities": [{"roles": ["registrant"], "vcardArray": ["vcard", [["fn", {}, "text", "Google LLC"]]]}]
+}`
+
+// arinIPWHOISText's NetRange and Parent lines are deliberately in ARIN's
+// real combined shapes ("<start> - <end>", "<name> (<handle>)") rather
+// than pre-split -- CollectIP must normalize these to compare equal
+// against arinIPBody's separate startAddress/endAddress/parentHandle
+// fields, not just pass them through. See TestCollectIP_RegistryAndWHOIS_NoFalseRangeOrParentConflict.
+const arinIPWHOISText = "NetRange:       8.8.8.0 - 8.8.8.255\nCIDR:           8.8.8.0/24\nNetName:        GOGL\nNetHandle:      NET-8-8-8-0-2\nParent:         NET8 (NET-8-0-0-0-0)\nNetType:        Direct Allocation\nOrgName:        Google LLC\nOrgId:          GOGL\nCountry:        US\nRegDate:        2023-12-28\nUpdated:        2023-12-29\n"
+
+func TestCollectIP_RegistryRDAPPlusWHOIS(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(arinIPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startWHOISListener(t, func(query string) string {
+		return arinIPWHOISText
+	})
+	ianaWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "refer:        " + rirWHOISAddr + "\n"
+	})
+
+	addr := netip.MustParseAddr("8.8.8.8")
+
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+
+	if len(records) != 2 {
+		t.Fatalf("len(records) = %d, want 2, got: %+v", len(records), records)
+	}
+	if records[0].Meta.Source != model.SourceRegistryRDAP {
+		t.Errorf("records[0].Meta.Source = %q, want %q (fixed order)", records[0].Meta.Source, model.SourceRegistryRDAP)
+	}
+	if !records[0].Present {
+		t.Errorf("records[0].Present = false, want true: %+v", records[0])
+	}
+	if records[1].Meta.Source != model.SourceRegistryWHOIS {
+		t.Errorf("records[1].Meta.Source = %q, want %q (fixed order)", records[1].Meta.Source, model.SourceRegistryWHOIS)
+	}
+	if !records[1].Present {
+		t.Errorf("records[1].Present = false, want true: %+v", records[1])
+	}
+	if records[0].OrgName != "Google LLC" {
+		t.Errorf("records[0].OrgName = %q, want Google LLC", records[0].OrgName)
+	}
+	if records[1].OrgName != "Google LLC" {
+		t.Errorf("records[1].OrgName = %q, want Google LLC", records[1].OrgName)
+	}
+}
+
+func TestCollectIP_EmptyBaseURLDegradesToWHOISOnly(t *testing.T) {
+	rirWHOISAddr := startWHOISListener(t, func(query string) string {
+		return arinIPWHOISText
+	})
+	ianaWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "refer:        " + rirWHOISAddr + "\n"
+	})
+
+	addr := netip.MustParseAddr("8.8.8.8")
+
+	records := CollectIP(context.Background(), addr, "", ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+
+	if len(records) != 1 {
+		t.Fatalf("len(records) = %d, want 1 (WHOIS-only), got: %+v", len(records), records)
+	}
+	if records[0].Meta.Source != model.SourceRegistryWHOIS {
+		t.Errorf("records[0].Meta.Source = %q, want %q", records[0].Meta.Source, model.SourceRegistryWHOIS)
+	}
+	if !records[0].Present {
+		t.Errorf("records[0].Present = false, want true: %+v", records[0])
+	}
+}
+
+func TestCollectIP_NotFoundBothSources(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "No match found for 8.8.8.8.\n"
+	})
+	ianaWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "refer:        " + rirWHOISAddr + "\n"
+	})
+
+	addr := netip.MustParseAddr("8.8.8.8")
+
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+
+	if len(records) != 2 {
+		t.Fatalf("len(records) = %d, want 2, got: %+v", len(records), records)
+	}
+	for _, r := range records {
+		if r.Meta.OK {
+			t.Errorf("source %s: Meta.OK = true, want false for a not-found response", r.Meta.Source)
+		}
+		if !r.Meta.NotFound {
+			t.Errorf("source %s: Meta.NotFound = false, want true", r.Meta.Source)
+		}
+		if r.Present {
+			t.Errorf("source %s: Present = true, want false for a not-found response", r.Meta.Source)
+		}
+	}
+}
+
+// TestCollectIP_RateLimitedWHOISNotReportedOK is a regression test for a
+// real defect caught during live verification: fromIPHop set Meta.OK =
+// true unconditionally, so a rate-limited or refusing RIR WHOIS server
+// reported "registry-whois: ok" under -v, and -- paired with a failed
+// RDAP source, as would happen if the RIR's RDAP endpoint were also
+// struggling -- plat's deriveOutcome (cmd/plat) would see zero OK
+// sources, zero NotFound sources, at least one hard failure, and
+// correctly land on exit 3; but the false OK=true on the rate-limited
+// source alone would have made deriveOutcome return 0 (success) with an
+// empty record instead -- precisely the silent-wrong-data failure mode
+// issue #42 was created to prevent (see fromHop's identical handling in
+// adapt_whois.go, which fromIPHop now mirrors).
+func TestCollectIP_RateLimitedWHOISNotReportedOK(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "% Query rate limit exceeded. Please wait and try again later.\n"
+	})
+	ianaWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "refer:        " + rirWHOISAddr + "\n"
+	})
+
+	addr := netip.MustParseAddr("8.8.8.8")
+
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+
+	if len(records) != 2 {
+		t.Fatalf("len(records) = %d, want 2, got: %+v", len(records), records)
+	}
+
+	hasData, hasFailed := false, false
+	for _, r := range records {
+		switch {
+		case r.Meta.OK:
+			hasData = true
+		case !r.Meta.NotFound:
+			hasFailed = true
+		}
+		if r.Meta.Source == model.SourceRegistryWHOIS {
+			if r.Meta.OK {
+				t.Error("registry-whois: Meta.OK = true, want false for a rate-limited response")
+			}
+			if r.Present {
+				t.Error("registry-whois: Present = true, want false for a rate-limited response")
+			}
+			if r.Meta.Err == "" {
+				t.Error("registry-whois: Meta.Err is empty, want a message explaining the rate-limit refusal")
+			}
+		}
+	}
+
+	// Mirrors cmd/plat's deriveOutcome: with both sources refusing/
+	// failing (RDAP 500s, WHOIS rate-limited) and neither reporting OK or
+	// a confirmed NotFound, the overall outcome must not be success.
+	if hasData {
+		t.Error("hasData = true, want false: a rate-limited WHOIS source paired with a failed RDAP source must not read as a successful lookup")
+	}
+	if !hasFailed {
+		t.Error("hasFailed = false, want true")
+	}
+}
+
+func TestCollectIP_SourceFilter(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("RDAP server should never be contacted when --source whois is set")
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startWHOISListener(t, func(query string) string {
+		return arinIPWHOISText
+	})
+	ianaWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "refer:        " + rirWHOISAddr + "\n"
+	})
+
+	addr := netip.MustParseAddr("8.8.8.8")
+
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{
+		Timeout: 2 * time.Second,
+		Sources: []model.SourceID{model.SourceRegistryWHOIS},
+	})
+
+	if len(records) != 1 {
+		t.Fatalf("len(records) = %d, want 1, got: %+v", len(records), records)
+	}
+	if records[0].Meta.Source != model.SourceRegistryWHOIS {
+		t.Errorf("records[0].Meta.Source = %q, want %q", records[0].Meta.Source, model.SourceRegistryWHOIS)
+	}
+}
+
+// TestCollectIP_RegistryAndWHOIS_NoFalseRangeOrParentConflict is a
+// regression test for a real defect caught during live verification
+// against 8.8.8.8: RDAP reports startAddress/endAddress/parentHandle as
+// separate, bare values, while ARIN WHOIS reports the same information as
+// a combined "NetRange: <start> - <end>" line and a "Parent: <name>
+// (<handle>)" line. Feeding CollectIP's real output through merge.MergeIP
+// (not hand-built, already-matching IPSourceRecords, which is what let
+// this bug slip past the original test suite) must produce zero
+// conflicts on startAddress/endAddress/parentHandle, with both sources
+// listed as agreeing on each field.
+func TestCollectIP_RegistryAndWHOIS_NoFalseRangeOrParentConflict(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(arinIPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startWHOISListener(t, func(query string) string {
+		return arinIPWHOISText
+	})
+	ianaWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "refer:        " + rirWHOISAddr + "\n"
+	})
+
+	addr := netip.MustParseAddr("8.8.8.8")
+
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	rec := merge.MergeIP(records)
+
+	for _, c := range rec.Conflicts {
+		if c.Field == model.FieldIPStartAddress || c.Field == model.FieldIPEndAddress || c.Field == model.FieldIPParent {
+			t.Errorf("false conflict on field %q: %+v (RDAP and WHOIS describe the same value in different shapes, not a real disagreement)", c.Field, c.Values)
+		}
+	}
+
+	if rec.StartAddress.Value != "8.8.8.0" {
+		t.Errorf("StartAddress = %q, want 8.8.8.0", rec.StartAddress.Value)
+	}
+	if len(rec.StartAddress.Sources) != 2 {
+		t.Errorf("StartAddress.Sources = %v, want both registry-rdap and registry-whois agreeing", rec.StartAddress.Sources)
+	}
+	if rec.EndAddress.Value != "8.8.8.255" {
+		t.Errorf("EndAddress = %q, want 8.8.8.255", rec.EndAddress.Value)
+	}
+	if len(rec.EndAddress.Sources) != 2 {
+		t.Errorf("EndAddress.Sources = %v, want both registry-rdap and registry-whois agreeing", rec.EndAddress.Sources)
+	}
+	if rec.ParentHandle.Value != "NET-8-0-0-0-0" {
+		t.Errorf("ParentHandle = %q, want NET-8-0-0-0-0", rec.ParentHandle.Value)
+	}
+	if len(rec.ParentHandle.Sources) != 2 {
+		t.Errorf("ParentHandle.Sources = %v, want both registry-rdap and registry-whois agreeing", rec.ParentHandle.Sources)
+	}
+}
+
+// ripeIPBody is RDAP-shaped like RIPE's real response for 193.0.6.139:
+// registrant vCard full name is org-name's value ("Reseaux IP Europeens
+// Network Coordination Centre (RIPE NCC)"), not descr's ("RIPE Network
+// Coordination Centre") -- see testdata/whois/ripe-193.0.6.139.txt, whose
+// inetnum block lists descr before the organisation block's org-name.
+const ripeIPBody = `{
+  "objectClassName": "ip network",
+  "startAddress": "193.0.0.0",
+  "endAddress": "193.0.7.255",
+  "ipVersion": "v4",
+  "name": "RIPE-NCC",
+  "country": "NL",
+  "status": ["ASSIGNED PA"],
+  "cidr0_cidrs": [{"v4prefix": "193.0.0.0", "length": 21}],
+  "entities": [{"roles": ["registrant"], "vcardArray": ["vcard", [["fn", {}, "text", "Reseaux IP Europeens Network Coordination Centre (RIPE NCC)"]]]}]
+}`
+
+// TestCollectIP_RIPEStyle_NoFalseOrgNameConflict is the RPSL sibling of
+// TestCollectIP_RegistryAndWHOIS_NoFalseRangeOrParentConflict: a
+// regression test for the descr-outranks-org-name bug caught during live
+// verification against RIPE, AFRINIC, and APNIC (all RPSL-vocabulary
+// RIRs). Feeding a real RIPE WHOIS golden file through CollectIP paired
+// with a matching RDAP body must produce zero conflicts, with org.name
+// crediting both sources -- confirming the fix holds at the full
+// collect-and-merge level, not just in ParseIP isolation.
+func TestCollectIP_RIPEStyle_NoFalseOrgNameConflict(t *testing.T) {
+	whoisRaw, err := os.ReadFile("../../testdata/whois/ripe-193.0.6.139.txt")
+	if err != nil {
+		t.Fatalf("reading golden: %v", err)
+	}
+
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(ripeIPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startWHOISListener(t, func(query string) string {
+		return string(whoisRaw)
+	})
+	ianaWHOISAddr := startWHOISListener(t, func(query string) string {
+		return "refer:        " + rirWHOISAddr + "\n"
+	})
+
+	addr := netip.MustParseAddr("193.0.6.139")
+
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	rec := merge.MergeIP(records)
+
+	for _, c := range rec.Conflicts {
+		t.Errorf("false conflict on field %q: %+v (RDAP and WHOIS describe the same org, not a real disagreement)", c.Field, c.Values)
+	}
+
+	const wantOrgName = "Reseaux IP Europeens Network Coordination Centre (RIPE NCC)"
+	if rec.Org.Name.Value != wantOrgName {
+		t.Errorf("Org.Name = %q, want %q", rec.Org.Name.Value, wantOrgName)
+	}
+	if len(rec.Org.Name.Sources) != 2 {
+		t.Errorf("Org.Name.Sources = %v, want both registry-rdap and registry-whois agreeing", rec.Org.Name.Sources)
+	}
+}
