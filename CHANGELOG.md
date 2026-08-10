@@ -21,6 +21,14 @@ follows [Semantic Versioning](https://semver.org/).
   to an organization, but an ordinary public address now returns real
   data instead of exiting 2 outright.
 
+### Removed
+- The hidden `plat whois` and `plat merge` debug subcommands, dev-only
+  scaffolding used to prove the WHOIS engine and merge engine end to end
+  before `--source`/`-o` existed. Both were `Hidden: true` (never in
+  `--help`) and strictly inferior to `--source whois -o plain -v`, which
+  supersedes them with full parsed output and provenance. No documented
+  interface changes. See #45.
+
 ## [0.1.5] - 2026-08-05
 
 ### Fixed

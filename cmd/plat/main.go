@@ -233,8 +233,6 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	versionCmd.Flags().BoolVar(&versionFull, "full", false, "include Go version and platform (human: extra lines; json: extra keys)")
 	root.AddCommand(versionCmd)
 
-	root.AddCommand(newWhoisCommand(stdout))
-	root.AddCommand(newMergeCommand(stdout))
 	root.AddCommand(newGendocsCommand(root))
 
 	err := root.Execute()
