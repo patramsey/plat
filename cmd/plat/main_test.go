@@ -829,6 +829,156 @@ func TestRenderRecord_QuietIgnoredForMachineFormats(t *testing.T) {
 	}
 }
 
+func TestIPQuietSummary(t *testing.T) {
+	tests := []struct {
+		name string
+		rec  model.IPRecord
+		want string
+	}{
+		{
+			name: "cidr and org both present",
+			rec: model.IPRecord{
+				CIDR: model.Field[string]{Value: "8.8.8.0/24", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+				Org: model.OrgInfo{
+					Name: model.Field[string]{Value: "Google LLC", Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+				},
+			},
+			want: "8.8.8.0/24 · Google LLC",
+		},
+		{
+			name: "cidr present, org absent",
+			rec: model.IPRecord{
+				CIDR: model.Field[string]{Value: "8.8.8.0/24", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+			},
+			want: "8.8.8.0/24",
+		},
+		{
+			name: "org present, cidr absent",
+			rec: model.IPRecord{
+				Org: model.OrgInfo{
+					Name: model.Field[string]{Value: "Google LLC", Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+				},
+			},
+			want: "Google LLC",
+		},
+		{
+			name: "neither cidr nor org, handle present",
+			rec: model.IPRecord{
+				Handle: model.Field[string]{Value: "NET-8-8-8-0-2", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+			},
+			want: "NET-8-8-8-0-2",
+		},
+		{
+			name: "fully empty record",
+			rec:  model.IPRecord{},
+			want: "no data",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ipQuietSummary(tt.rec)
+			if got != tt.want {
+				t.Errorf("ipQuietSummary() = %q, want %q", got, tt.want)
+			}
+			if strings.HasPrefix(got, "·") || strings.HasSuffix(got, "·") {
+				t.Errorf("ipQuietSummary() = %q, separator dangles with no value on one side", got)
+			}
+		})
+	}
+}
+
+func TestRenderIPRecord_DispatchesFormatHumanToStyledRenderer(t *testing.T) {
+	rec := model.IPRecord{
+		CIDR: model.Field[string]{Value: "8.8.8.0/24", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	var humanBuf, plainBuf bytes.Buffer
+	ui := uiConfig{Dark: false, Width: 80}
+
+	if err := renderIPRecord(&humanBuf, render.FormatHuman, rec, false, false, false, false, ui); err != nil {
+		t.Fatalf("unexpected error rendering FormatHuman: %v", err)
+	}
+	if err := renderIPRecord(&plainBuf, render.FormatPlain, rec, false, false, false, false, ui); err != nil {
+		t.Fatalf("unexpected error rendering FormatPlain: %v", err)
+	}
+	if humanBuf.String() == plainBuf.String() {
+		t.Error("FormatHuman and FormatPlain produced byte-identical output — expected the styled renderer's layout to differ from the plain renderer's")
+	}
+	if !strings.Contains(humanBuf.String(), "8.8.8.0/24") {
+		t.Errorf("FormatHuman output missing the CIDR value, got:\n%s", humanBuf.String())
+	}
+}
+
+func TestRenderIPRecord_DispatchesJSONAndNDJSON(t *testing.T) {
+	rec := model.IPRecord{
+		CIDR: model.Field[string]{Value: "8.8.8.0/24", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	ui := uiConfig{}
+
+	var jsonBuf bytes.Buffer
+	if err := renderIPRecord(&jsonBuf, render.FormatJSON, rec, false, false, false, false, ui); err != nil {
+		t.Fatalf("unexpected error rendering FormatJSON: %v", err)
+	}
+	if !strings.Contains(jsonBuf.String(), `"schemaVersion":1`) {
+		t.Errorf("FormatJSON output missing schemaVersion, got:\n%s", jsonBuf.String())
+	}
+	if !strings.Contains(jsonBuf.String(), `"8.8.8.0/24"`) {
+		t.Errorf("FormatJSON output missing cidr value, got:\n%s", jsonBuf.String())
+	}
+
+	var ndjsonBuf bytes.Buffer
+	if err := renderIPRecord(&ndjsonBuf, render.FormatNDJSON, rec, false, false, false, false, ui); err != nil {
+		t.Fatalf("unexpected error rendering FormatNDJSON: %v", err)
+	}
+	if !strings.Contains(ndjsonBuf.String(), `"cidr"`) {
+		t.Errorf("FormatNDJSON output missing cidr field, got:\n%s", ndjsonBuf.String())
+	}
+}
+
+func TestRenderIPRecord_Quiet(t *testing.T) {
+	rec := model.IPRecord{
+		CIDR: model.Field[string]{Value: "8.8.8.0/24", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Org: model.OrgInfo{
+			Name: model.Field[string]{Value: "Google LLC", Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+		},
+	}
+	ui := uiConfig{Dark: false, Width: 80}
+
+	tests := []struct {
+		name   string
+		format render.Format
+	}{
+		{"human", render.FormatHuman},
+		{"plain", render.FormatPlain},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := renderIPRecord(&buf, tt.format, rec, false, false, false, true, ui); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			got := strings.TrimRight(buf.String(), "\n")
+			want := "8.8.8.0/24 · Google LLC"
+			if got != want {
+				t.Errorf("renderIPRecord(quiet=true, format=%v) = %q, want %q", tt.format, got, want)
+			}
+		})
+	}
+}
+
+func TestRenderIPRecord_QuietIgnoredForMachineFormats(t *testing.T) {
+	rec := model.IPRecord{
+		CIDR: model.Field[string]{Value: "8.8.8.0/24", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	ui := uiConfig{Dark: false, Width: 80}
+	var buf bytes.Buffer
+	if err := renderIPRecord(&buf, render.FormatJSON, rec, false, false, false, true, ui); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !json.Valid(buf.Bytes()) {
+		t.Errorf("expected --quiet to be ignored for -o json (full JSON still emitted), got: %s", buf.String())
+	}
+}
+
 func TestRun_QuietFlagRegistered(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	got := run([]string{"--help"}, &stdout, &stderr, uiConfig{})
