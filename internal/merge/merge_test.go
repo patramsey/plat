@@ -1,6 +1,7 @@
 package merge
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -333,6 +334,39 @@ func TestMerge_NameserverStragglerExcludedFromSources(t *testing.T) {
 	}
 }
 
+// TestMerge_NameserversAreSortedRegardlessOfInputOrder covers issue #49:
+// upstream RDAP servers (registrar-rdap in particular) don't return
+// nameservers in a stable order between requests, and since
+// registrar-rdap is the highest-precedence source that shuffling used to
+// propagate straight into plat's output. Feeding the same three-source
+// set of nameservers in different per-source shuffles must produce byte-
+// identical, lexically sorted output every time.
+func TestMerge_NameserversAreSortedRegardlessOfInputOrder(t *testing.T) {
+	want := []string{"a.iana-servers.net", "b.iana-servers.net", "c.iana-servers.net", "ns.icann.org"}
+
+	orderings := [][]string{
+		{"a.iana-servers.net", "ns.icann.org", "c.iana-servers.net", "b.iana-servers.net"},
+		{"b.iana-servers.net", "a.iana-servers.net", "ns.icann.org", "c.iana-servers.net"},
+		{"a.iana-servers.net", "c.iana-servers.net", "ns.icann.org", "b.iana-servers.net"},
+		{"ns.icann.org", "c.iana-servers.net", "b.iana-servers.net", "a.iana-servers.net"},
+	}
+
+	for i, ns := range orderings {
+		registrarRDAP := sr(model.SourceRegistrarRDAP, true)
+		registrarRDAP.Nameservers = ns
+		registryRDAP := sr(model.SourceRegistryRDAP, true)
+		registryRDAP.Nameservers = ns
+		registrarWHOIS := sr(model.SourceRegistrarWHOIS, true)
+		registrarWHOIS.Nameservers = ns
+
+		rec := Merge([]model.SourceRecord{registrarRDAP, registryRDAP, registrarWHOIS})
+
+		if !slices.Equal(rec.Nameservers.Value, want) {
+			t.Errorf("ordering %d: Nameservers.Value = %v, want sorted %v", i, rec.Nameservers.Value, want)
+		}
+	}
+}
+
 func TestMerge_StatusUnionNoConflict(t *testing.T) {
 	a := sr(model.SourceRegistryRDAP, true)
 	a.Status = []string{"clientTransferProhibited"}
@@ -382,6 +416,34 @@ func TestMerge_StatusKeepsBareFormWhenNoPrefixedVariantExists(t *testing.T) {
 
 	if len(rec.Status.Value) != 1 || rec.Status.Value[0] != "ok" {
 		t.Errorf(`Status.Value = %v, want ["ok"] preserved (no client/server-prefixed variant exists to make it redundant)`, rec.Status.Value)
+	}
+}
+
+// TestMerge_StatusIsSortedRegardlessOfInputOrder mirrors the nameservers
+// determinism test above: status is unioned with the identical
+// append-union shape, so it shares the same latent exposure to upstream
+// reordering even though no upstream has been observed shuffling it yet
+// (issue #49).
+func TestMerge_StatusIsSortedRegardlessOfInputOrder(t *testing.T) {
+	want := []string{"clientTransferProhibited", "clientUpdateProhibited", "ok"}
+
+	orderings := [][]string{
+		{"ok", "clientTransferProhibited", "clientUpdateProhibited"},
+		{"clientUpdateProhibited", "ok", "clientTransferProhibited"},
+		{"clientTransferProhibited", "clientUpdateProhibited", "ok"},
+	}
+
+	for i, st := range orderings {
+		a := sr(model.SourceRegistryRDAP, true)
+		a.Status = st
+		b := sr(model.SourceRegistryWHOIS, true)
+		b.Status = st
+
+		rec := Merge([]model.SourceRecord{a, b})
+
+		if !slices.Equal(rec.Status.Value, want) {
+			t.Errorf("ordering %d: Status.Value = %v, want sorted %v", i, rec.Status.Value, want)
+		}
 	}
 }
 

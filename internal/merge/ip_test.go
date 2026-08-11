@@ -1,6 +1,7 @@
 package merge
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -67,6 +68,32 @@ func TestMergeIP_RDAPWinsOnConflict(t *testing.T) {
 	}
 	if !found {
 		t.Error("no Conflict recorded for the disagreeing name")
+	}
+}
+
+// TestMergeIP_StatusIsSortedRegardlessOfInputOrder covers issue #49's
+// deterministic-ordering fix for ipStatus's union, which shares the
+// identical append-union shape as domain nameservers/status.
+func TestMergeIP_StatusIsSortedRegardlessOfInputOrder(t *testing.T) {
+	want := []string{"active", "allocated", "reassigned"}
+
+	orderings := [][]string{
+		{"reassigned", "active", "allocated"},
+		{"allocated", "reassigned", "active"},
+		{"active", "allocated", "reassigned"},
+	}
+
+	for i, st := range orderings {
+		a := ipsr(model.SourceRegistryRDAP, true)
+		a.Status = st
+		b := ipsr(model.SourceRegistryWHOIS, true)
+		b.Status = st
+
+		rec := MergeIP([]model.IPSourceRecord{a, b})
+
+		if !slices.Equal(rec.Status.Value, want) {
+			t.Errorf("ordering %d: Status.Value = %v, want sorted %v", i, rec.Status.Value, want)
+		}
 	}
 }
 
