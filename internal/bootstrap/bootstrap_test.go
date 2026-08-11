@@ -307,3 +307,92 @@ func TestLoad_EmbeddedASNRegistryParses(t *testing.T) {
 		t.Error("ASNBaseURL(15169) ok=false, want a RIR match from the embedded asn registry")
 	}
 }
+
+// TestParseASNSpan exercises parseASNSpan's defensive parsing directly --
+// it exists specifically to survive malformed IANA asn.json entries without
+// wrapping or silently mis-parsing a span, so its non-numeric, reversed,
+// empty, whitespace, and overflow branches need direct coverage rather than
+// only being reached incidentally through parseASNRanges/Load.
+func TestParseASNSpan(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		entry     string
+		wantStart uint32
+		wantEnd   uint32
+		wantOK    bool
+	}{
+		{"bare single number", "15169", 15169, 15169, true},
+		{"valid range", "36864-37887", 36864, 37887, true},
+		{"non-numeric start", "abc-100", 0, 0, false},
+		{"non-numeric end", "100-xyz", 0, 0, false},
+		{"reversed range", "500-100", 0, 0, false},
+		{"empty string", "", 0, 0, false},
+		{"whitespace-padded range", " 100 - 200 ", 100, 200, true},
+		{"whitespace-only", "   ", 0, 0, false},
+		{"start exceeds uint32 must not wrap", "4294967296", 0, 0, false},
+		{"end exceeds uint32 must not wrap", "1-4294967296", 0, 0, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			start, end, ok := parseASNSpan(tt.entry)
+			if ok != tt.wantOK || start != tt.wantStart || end != tt.wantEnd {
+				t.Errorf("parseASNSpan(%q) = %d, %d, %v; want %d, %d, %v",
+					tt.entry, start, end, ok, tt.wantStart, tt.wantEnd, tt.wantOK)
+			}
+		})
+	}
+}
+
+// TestParseASNRanges covers parseASNRanges' document-level defensive
+// branches: invalid top-level JSON, a malformed services entry, and --
+// the important case -- one unparseable span inside a service alongside a
+// valid one, proving a single bad delegation doesn't cost every other
+// entry in that service.
+func TestParseASNRanges(t *testing.T) {
+	t.Run("malformed JSON returns an error", func(t *testing.T) {
+		into := map[[2]uint32]string{}
+		err := parseASNRanges([]byte("{not valid json"), into)
+		if err == nil {
+			t.Fatal("parseASNRanges with malformed JSON: got nil error, want non-nil")
+		}
+		if len(into) != 0 {
+			t.Errorf("into = %v, want empty on parse error", into)
+		}
+	})
+
+	t.Run("service entry with fewer than 2 elements is skipped", func(t *testing.T) {
+		doc := `{"services": [ [["100-200"]] ]}`
+		into := map[[2]uint32]string{}
+		if err := parseASNRanges([]byte(doc), into); err != nil {
+			t.Fatalf("parseASNRanges: %v", err)
+		}
+		if len(into) != 0 {
+			t.Errorf("into = %v, want empty when a service has no URL element", into)
+		}
+	})
+
+	t.Run("service entry with empty URL list is skipped", func(t *testing.T) {
+		doc := `{"services": [ [["100-200"], []] ]}`
+		into := map[[2]uint32]string{}
+		if err := parseASNRanges([]byte(doc), into); err != nil {
+			t.Fatalf("parseASNRanges: %v", err)
+		}
+		if len(into) != 0 {
+			t.Errorf("into = %v, want empty when a service's URL list is empty", into)
+		}
+	})
+
+	t.Run("one unparseable span does not cost the rest of the service", func(t *testing.T) {
+		doc := `{"services": [ [["abc-def", "200-300"], ["https://rir.example/"]] ]}`
+		into := map[[2]uint32]string{}
+		if err := parseASNRanges([]byte(doc), into); err != nil {
+			t.Fatalf("parseASNRanges: %v", err)
+		}
+		if len(into) != 1 {
+			t.Fatalf("into has %d entries, want exactly 1 (the malformed span skipped, the valid one kept): %v", len(into), into)
+		}
+		url, ok := into[[2]uint32{200, 300}]
+		if !ok || url != "https://rir.example/" {
+			t.Errorf("into[{200,300}] = %q, %v; want %q, true", url, ok, "https://rir.example/")
+		}
+	})
+}
