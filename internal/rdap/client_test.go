@@ -467,6 +467,271 @@ func TestClient_IP_WrongObjectClassName(t *testing.T) {
 	}
 }
 
+func TestClient_ASN(t *testing.T) {
+	const body = `{
+	  "objectClassName": "autnum",
+	  "handle": "AS15169",
+	  "startAutnum": 15169,
+	  "endAutnum": 15169,
+	  "name": "GOOGLE",
+	  "status": ["active"],
+	  "events": [{"eventAction": "registration", "eventDate": "2000-03-30T00:00:00-05:00"}],
+	  "port43": "whois.arin.net"
+	}`
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.ASN(context.Background(), srv.URL, 15169)
+	if err != nil {
+		t.Fatalf("ASN: %v", err)
+	}
+	if gotPath != "/autnum/15169" {
+		t.Errorf("request path = %q, want /autnum/15169", gotPath)
+	}
+	if res.ASN == nil {
+		t.Fatal("Result.ASN = nil, want the parsed object")
+	}
+	if res.ASN.Handle != "AS15169" || res.ASN.StartAutnum != 15169 || res.ASN.Name != "GOOGLE" {
+		t.Errorf("parsed = %+v, want handle AS15169 / startAutnum 15169 / name GOOGLE", res.ASN)
+	}
+}
+
+// TestClient_ASN_RealARINGolden decodes a real RDAP autnum document
+// (captured live from https://rdap.arin.net/registry/autnum/15169) rather
+// than the hand-written inline JSON every other ASN client test in this
+// file uses. Every other ASN-path test -- here and in
+// internal/collect/adapt_asn_test.go -- either hand-writes a minimal JSON
+// body or constructs rdap.ASNResponse/Entity/VCardArray structs directly,
+// so nothing before this test hermetically proved a real RIR's autnum
+// document actually decodes the way the entity/vCard extraction code
+// assumes; that was validated only by live runs against actual RIRs. The
+// domain path already has this coverage via testdata/rdap/*.json; this is
+// the ASN path's counterpart.
+func TestClient_ASN_RealARINGolden(t *testing.T) {
+	body, err := os.ReadFile("../../testdata/rdap/arin-as15169.json")
+	if err != nil {
+		t.Fatalf("reading golden: %v", err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.ASN(context.Background(), srv.URL, 15169)
+	if err != nil {
+		t.Fatalf("ASN: %v", err)
+	}
+	if res.ASN == nil {
+		t.Fatal("Result.ASN = nil, want the parsed object")
+	}
+	a := res.ASN
+
+	if a.Handle != "AS15169" {
+		t.Errorf("Handle = %q, want AS15169", a.Handle)
+	}
+	if a.Name != "GOOGLE" {
+		t.Errorf("Name = %q, want GOOGLE", a.Name)
+	}
+	if a.StartAutnum != 15169 || a.EndAutnum != 15169 {
+		t.Errorf("StartAutnum/EndAutnum = %d/%d, want 15169/15169", a.StartAutnum, a.EndAutnum)
+	}
+	if len(a.Status) != 1 || a.Status[0] != "active" {
+		t.Errorf("Status = %v, want [active]", a.Status)
+	}
+
+	reg, ok := a.RegistrantEntity()
+	if !ok {
+		t.Fatal("RegistrantEntity() ok = false, want true")
+	}
+	if reg.VCardArray.FullName != "Google LLC" {
+		t.Errorf("RegistrantEntity().VCardArray.FullName = %q, want Google LLC", reg.VCardArray.FullName)
+	}
+
+	// ARIN nests its abuse-role entity inside the top-level registrant
+	// entity's own "entities" array rather than listing it at the top
+	// level -- unlike the abuse-role entity in the collect package's
+	// hand-built arinLikeASN test fixture, which (like every other ASN
+	// adapter test) places it at the top level for convenience.
+	// AbuseEntity's entityByRole deliberately only scans top-level
+	// entities (mirrors DomainResponse's M3-era "nested traversal is a
+	// later milestone" scope), so it must NOT find ARIN's real, nested
+	// abuse entity here. This golden is what proves that gap is real on
+	// live data, not just a theoretical corner the hand-built fixtures
+	// never exercised.
+	if _, ok := a.AbuseEntity(); ok {
+		t.Error("AbuseEntity() ok = true, want false (ARIN's abuse entity is nested under registrant, not top-level)")
+	}
+
+	registered, ok := a.Registered()
+	if !ok || !registered.Parsed {
+		t.Fatalf("Registered() = %+v, %v, want a parsed event", registered, ok)
+	}
+	if registered.Raw != "2000-03-30T00:00:00-05:00" {
+		t.Errorf("Registered().Raw = %q, want 2000-03-30T00:00:00-05:00", registered.Raw)
+	}
+
+	updated, ok := a.Updated()
+	if !ok || !updated.Parsed {
+		t.Fatalf("Updated() = %+v, %v, want a parsed event", updated, ok)
+	}
+	if updated.Raw != "2012-02-24T09:44:34-05:00" {
+		t.Errorf("Updated().Raw = %q, want 2012-02-24T09:44:34-05:00", updated.Raw)
+	}
+}
+
+func TestClient_ASN_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	_, err := c.ASN(context.Background(), srv.URL, 15169)
+	if !errors.Is(err, ErrDomainNotFound) {
+		t.Errorf("err = %v, want ErrDomainNotFound", err)
+	}
+}
+
+func TestClient_ASN_RetriesOn429(t *testing.T) {
+	const body = `{
+	  "objectClassName": "autnum",
+	  "handle": "AS15169",
+	  "startAutnum": 15169,
+	  "endAutnum": 15169,
+	  "name": "GOOGLE"
+	}`
+	var requestCount int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount == 1 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.ASN(context.Background(), srv.URL, 15169)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if requestCount != 2 {
+		t.Fatalf("requestCount = %d, want 2 (one 429, one successful retry)", requestCount)
+	}
+	if res.ASN == nil {
+		t.Fatal("ASN is nil")
+	}
+	if res.ASN.Handle != "AS15169" {
+		t.Errorf("Handle = %q, want AS15169", res.ASN.Handle)
+	}
+}
+
+func TestClient_ASN_ErrorStatusSurfacesTitle(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"errorCode":500,"title":"Internal Server Error"}`))
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.ASN(context.Background(), srv.URL, 15169)
+	if err == nil {
+		t.Fatal("expected an error for a 500 status")
+	}
+	if !strings.Contains(err.Error(), "Internal Server Error") {
+		t.Errorf("err = %q, want it to contain the server's title", err.Error())
+	}
+	var malformed *MalformedResponseError
+	if errors.As(err, &malformed) {
+		t.Errorf("err = %v, want a plain error surfacing the title, not *MalformedResponseError", err)
+	}
+	if res == nil || res.StatusCode != http.StatusInternalServerError {
+		t.Errorf("Result.StatusCode not populated as 500: %+v", res)
+	}
+}
+
+func TestClient_ASN_MalformedBody(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+		wantErrSet  bool // whether MalformedResponseError.Err should be non-nil
+	}{
+		{
+			name:        "non-JSON body",
+			contentType: "text/html",
+			body:        "<html><body>upstream error</body></html>",
+		},
+		{
+			name:        "malformed JSON structure",
+			contentType: "application/rdap+json",
+			body:        `{"objectClassName":"autnum","startAutnum":"not-a-number"}`,
+			wantErrSet:  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", tt.contentType)
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			defer srv.Close()
+
+			c := &Client{}
+			res, err := c.ASN(context.Background(), srv.URL, 15169)
+			var malformed *MalformedResponseError
+			if !errors.As(err, &malformed) {
+				t.Fatalf("error = %v (%T), want *MalformedResponseError", err, err)
+			}
+			if malformed.URL == "" || malformed.StatusCode == 0 || malformed.Snippet == "" {
+				t.Errorf("MalformedResponseError fields not populated: %+v", malformed)
+			}
+			if tt.wantErrSet && malformed.Err == nil {
+				t.Errorf("Err = nil, want the underlying json.Unmarshal error to be wrapped")
+			}
+			if res == nil || res.ASN != nil {
+				t.Errorf("ASN should remain nil on malformed body, got %+v", res)
+			}
+		})
+	}
+}
+
+func TestClient_ASN_WrongObjectClassName(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write([]byte(`{"objectClassName":"ip network","handle":"NET-1"}`))
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.ASN(context.Background(), srv.URL, 15169)
+	var malformed *MalformedResponseError
+	if !errors.As(err, &malformed) {
+		t.Fatalf("error = %v (%T), want *MalformedResponseError", err, err)
+	}
+	if res == nil {
+		t.Fatal("Result should still be returned when objectClassName mismatches")
+	}
+	if res.ASN != nil {
+		t.Errorf("ASN = %+v, want nil when objectClassName is not \"autnum\"", res.ASN)
+	}
+}
+
 func TestRetryAfter(t *testing.T) {
 	tests := []struct {
 		name   string

@@ -31,6 +31,7 @@ where sources disagree.
 - [Install](#install)
 - [Usage](#usage)
 - [IP Lookups](#ip-lookups)
+- [ASN Lookups](#asn-lookups)
 - [Output & Provenance](#output--provenance)
   - [Source codes](#source-codes)
   - [Conflicts](#conflicts)
@@ -110,6 +111,10 @@ plat example.com example.org
 plat 8.8.8.8
 plat 2001:4860:4860::8888
 
+# ASN lookup — the autonomous system and its holding organization (see
+# "ASN Lookups" below)
+plat AS15169
+
 # Machine-readable output
 plat example.com -o json | jq .expires.value
 plat example.com example.org -o ndjson
@@ -181,6 +186,23 @@ shape from a domain record's `"objectType": "domain"`; see
 Reserved/private addresses (`10.0.0.1`, `127.0.0.1`, `::1`, ...) are
 rejected up front with a usage error, since no RIR allocates them to an
 organization.
+
+## ASN Lookups
+
+`plat` also looks up autonomous system numbers: `plat AS15169` finds the
+RIR that holds the ASN and queries its RDAP and WHOIS, merged with the
+same per-field provenance as a domain or IP lookup. The `AS` prefix is
+required (case-insensitive) — a bare number like `plat 15169` is treated
+as a (invalid, single-label) domain rather than an ASN, since it's likelier
+a typo than an intentional ASN lookup.
+
+Like an IP lookup, there's no registrar leg, so only
+`registry-rdap`/`registry-whois` ever appear as sources. The fields are an
+autonomous system's own (handle, AS name, start/end autnum range, holding
+organization) rather than a domain's or netblock's. `-o json` sets
+`"objectType": "asn"` to distinguish the shape from a domain or IP
+record's; see [`docs/schema.md`](docs/schema.md) for the full field
+reference.
 
 ## Output & Provenance
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"strconv"
 	"time"
 
 	"github.com/patramsey/plat/internal/domain"
@@ -117,6 +118,53 @@ func (c *Client) ipHop(ctx context.Context, server, query string) Hop {
 		h.Fields = parse.Parse(raw, "")
 		ipf := parse.ParseIP(raw)
 		h.IPFields = &ipf
+	}
+	return h
+}
+
+// LookupASN performs IANA -> RIR referral chasing for asn. Like
+// LookupIP, there is no third hop: an autonomous system has no
+// registrar, so the chain stops at the RIR. The query string sent at
+// both hops is the bare number with its "AS" prefix (e.g. "AS15169") --
+// verified live against both whois.iana.org and whois.arin.net, which
+// each answer that form directly (ARIN's plain numeric form without the
+// prefix, e.g. "15169", returns no match at all).
+func (c *Client) LookupASN(ctx context.Context, asn uint32) (*Result, error) {
+	q := "AS" + strconv.FormatUint(uint64(asn), 10)
+	result := &Result{Domain: q}
+
+	ianaHop := c.asnHop(ctx, c.ianaServer(), q)
+	result.Hops = append(result.Hops, ianaHop)
+
+	if ianaHop.Err == nil && ianaHop.Fields.Refer != "" {
+		result.Hops = append(result.Hops, c.asnHop(ctx, ianaHop.Fields.Refer, q))
+	}
+
+	for _, h := range result.Hops {
+		if h.Err == nil {
+			return result, nil
+		}
+	}
+	return result, fmt.Errorf("whois: all hops failed for %s", q)
+}
+
+// asnHop is hop's ASN counterpart: it fills both Fields (so the referral
+// chain can still read "refer:"/"whois:") and ASNFields (the actual
+// payload), mirroring ipHop.
+func (c *Client) asnHop(ctx context.Context, server, query string) Hop {
+	start := time.Now()
+	raw, err := c.query(ctx, server, query)
+	h := Hop{
+		Server:  server,
+		Query:   BuildQuery(server, query),
+		Raw:     raw,
+		Latency: time.Since(start),
+		Err:     err,
+	}
+	if err == nil {
+		h.Fields = parse.Parse(raw, "")
+		asnf := parse.ParseASN(raw)
+		h.ASNFields = &asnf
 	}
 	return h
 }

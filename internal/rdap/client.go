@@ -47,6 +47,7 @@ func (e *MalformedResponseError) Unwrap() error { return e.Err }
 type Result struct {
 	Domain              *DomainResponse
 	IPNetwork           *IPNetworkResponse
+	ASN                 *ASNResponse
 	Raw                 []byte
 	StatusCode          int
 	ContentType         string
@@ -361,5 +362,95 @@ func (c *Client) ipAt(ctx context.Context, reqURL string) (*Result, error) {
 	}
 
 	result.IPNetwork = &ipNetwork
+	return result, nil
+}
+
+// ASN queries baseURL for the given autonomous system number's autnum
+// object. baseURL is the RIR's RDAP service base, typically resolved via
+// bootstrap's ASNBaseURL.
+func (c *Client) ASN(ctx context.Context, baseURL string, asn uint32) (*Result, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout())
+	defer cancel()
+
+	reqURL := strings.TrimRight(baseURL, "/") + "/autnum/" + strconv.FormatUint(uint64(asn), 10)
+	return c.asnAt(ctx, reqURL)
+}
+
+// asnAt is the shared fetch-and-parse core for ASN queries -- a sibling of
+// domainAt and ipAt with the same 429 retry, 404 handling, and
+// malformed-response tolerance, differing only in the decode target, the
+// objectClassName check, and which Result field gets populated.
+func (c *Client) asnAt(ctx context.Context, reqURL string) (*Result, error) {
+	resp, err := c.do(ctx, reqURL)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		select {
+		case <-time.After(retryAfter(resp.Header)):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		resp, err = c.do(ctx, reqURL)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	mediaType, _, _ := mime.ParseMediaType(contentType)
+	conformant := mediaType == "application/rdap+json"
+
+	result := &Result{
+		Raw:                 resp.Body,
+		StatusCode:          resp.StatusCode,
+		ContentType:         contentType,
+		MediaTypeConformant: conformant,
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return result, ErrDomainNotFound
+	}
+
+	if resp.StatusCode >= 400 {
+		var rerr rdapError
+		if json.Unmarshal(bytes.TrimSpace(resp.Body), &rerr) == nil && rerr.Title != "" {
+			return result, fmt.Errorf("rdap: %s returned %d: %s", reqURL, resp.StatusCode, rerr.Title)
+		}
+		return result, &MalformedResponseError{
+			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
+			Snippet: snippet(resp.Body),
+		}
+	}
+
+	trimmed := bytes.TrimSpace(resp.Body)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return result, &MalformedResponseError{
+			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
+			Snippet: snippet(resp.Body),
+		}
+	}
+
+	var asnResp ASNResponse
+	if err := json.Unmarshal(trimmed, &asnResp); err != nil {
+		return result, &MalformedResponseError{
+			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
+			Snippet: snippet(resp.Body), Err: err,
+		}
+	}
+
+	if asnResp.ObjectClassName != "autnum" {
+		var rerr rdapError
+		if json.Unmarshal(trimmed, &rerr) == nil && rerr.ErrorCode != 0 {
+			return result, fmt.Errorf("rdap: %s returned errorCode %d: %s", reqURL, rerr.ErrorCode, rerr.Title)
+		}
+		return result, &MalformedResponseError{
+			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
+			Snippet: snippet(resp.Body),
+		}
+	}
+
+	result.ASN = &asnResp
 	return result, nil
 }

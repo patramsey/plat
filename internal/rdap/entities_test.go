@@ -101,6 +101,24 @@ func TestRedactionRemarks(t *testing.T) {
 	}
 }
 
+// TestASNRedactionRemarks mirrors TestRedactionRemarks -- ASNResponse's
+// RedactionRemarks was added alongside DomainResponse's so the ASN
+// adapters (internal/collect/adapt_asn.go) have a working signal to
+// populate ASNSourceRecord.Redactions from, the same way the domain
+// adapter already does.
+func TestASNRedactionRemarks(t *testing.T) {
+	a := ASNResponse{
+		Remarks: RemarkList{
+			{Title: "Terms of Use", Type: "", Description: []string{"Service subject to Terms of Use."}},
+			{Title: "REDACTED FOR PRIVACY", Type: "object redacted due to authorization", Description: []string{"Some data has been removed."}},
+		},
+	}
+	got := a.RedactionRemarks()
+	if len(got) != 1 || got[0].Title != "REDACTED FOR PRIVACY" {
+		t.Errorf("RedactionRemarks() = %+v, want exactly the redaction-titled remark", got)
+	}
+}
+
 func TestEntityListToleratesMalformed(t *testing.T) {
 	tests := []struct {
 		name string

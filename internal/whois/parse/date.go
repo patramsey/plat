@@ -23,6 +23,12 @@ var dateLayouts = []string{
 	"2006-01-02 15:04:05Z07:00",
 	"2006-01-02 15:04:05",
 	"2006-01-02",
+	// "20060102" is LACNIC's compact, unpunctuated aut-num created/changed
+	// form (e.g. "20031127") -- confirmed live against AS28573. Listed
+	// after "2006-01-02" rather than before it since it's the less common
+	// shape; ordering only matters for ambiguous inputs, and an 8-digit
+	// run has no punctuation for any earlier layout to partially match.
+	"20060102",
 	"02-Jan-2006 15:04:05",
 	"02-Jan-2006",
 	"2006/01/02",

@@ -1,0 +1,117 @@
+% [whois.apnic.net]
+% Whois data copyright terms    http://www.apnic.net/db/dbcopyright.html
+
+% Information related to 'AS4608 - AS4865'
+
+as-block:       AS4608 - AS4865
+descr:          APNIC ASN block
+remarks:        These AS numbers are further assigned by APNIC
+remarks:        to APNIC members and end-users in the APNIC region
+admin-c:        HM20-AP
+tech-c:         HM20-AP
+mnt-by:         APNIC-HM
+mnt-lower:      APNIC-HM
+last-modified:  2019-05-20T03:52:26Z
+source:         APNIC
+
+role:           APNIC Hostmaster
+address:        6 Cordelia Street
+address:        South Brisbane
+address:        QLD 4101
+country:        AU
+phone:          +61 7 3858 3100
+fax-no:         +61 7 3858 3199
+e-mail:         helpdesk@apnic.net
+admin-c:        AMS11-AP
+tech-c:         AH256-AP
+nic-hdl:        HM20-AP
+remarks:        Administrator for APNIC
+notify:         hostmaster@apnic.net
+mnt-by:         MAINT-APNIC-AP
+last-modified:  2013-10-23T04:06:51Z
+source:         APNIC
+
+% Information related to 'AS4608'
+
+% Abuse contact for 'AS4608' is 'abuse@apnic.net'
+
+aut-num:        AS4608
+as-name:        APNIC-SERVICES
+descr:          Asia Pacific Network Information Centre
+descr:          Regional Internet Registry for the Asia-Pacific Region
+descr:          6 Cordelia Street
+descr:          PO Box 3646
+descr:          South Brisbane, QLD 4101
+descr:          Australia
+country:        AU
+import:         from AS-4608 accept AS-4608
+org:            ORG-APNI1-AP
+admin-c:        AIC1-AP
+tech-c:         AIC1-AP
+abuse-c:        AA1589-AP
+notify:         noc@apnic.net
+mnt-lower:      MAINT-APNIC-IS-AP
+mnt-routes:     MAINT-APNIC-IS-AP
+mnt-by:         APNIC-HM
+mnt-irt:        IRT-APNIC-IS-AP
+last-modified:  2020-06-16T00:18:58Z
+source:         APNIC
+
+irt:            IRT-APNIC-IS-AP
+address:        South Brisbane, Australia
+e-mail:         helpdesk@apnic.net
+abuse-mailbox:  abuse@apnic.net
+admin-c:        AIC1-AP
+tech-c:         AIC1-AP
+auth:           # Filtered
+remarks:        APNIC Infrastructure Services
+remarks:        helpdesk@apnic.net was validated on 2023-02-21
+mnt-by:         MAINT-APNIC-IS-AP
+last-modified:  2025-11-18T00:27:08Z
+source:         APNIC
+
+organisation:   ORG-APNI1-AP
+org-name:       Asia Pacific Network Information Centre
+org-type:       LIR
+country:        AU
+address:        6 Cordelia Street
+phone:          +61-7-3858-3100
+fax-no:         +61-7-3858-3199
+e-mail:         noc@apnic.net
+mnt-ref:        APNIC-HM
+mnt-by:         APNIC-HM
+last-modified:  2023-12-01T12:58:38Z
+source:         APNIC
+
+role:           ABUSE APNICISAP
+remarks:        APNIC Network Abuse
+address:        South Brisbane, Australia
+country:        AU
+phone:          +61 7 3858 3100
+e-mail:         abuse@apnic.net
+admin-c:        AIC1-AP
+tech-c:         AIC1-AP
+nic-hdl:        AA1589-AP
+abuse-mailbox:  abuse@apnic.net
+mnt-by:         APNIC-ABUSE
+last-modified:  2023-12-01T03:18:23Z
+source:         APNIC
+
+role:           APNIC Infrastructure Contact
+address:        6 Cordelia Street
+address:        South Brisbane
+address:        QLD 4101
+country:        AU
+phone:          +61 7 3858 3100
+fax-no:         +61 7 3858 3199
+e-mail:         helpdesk@apnic.net
+admin-c:        HM20-AP
+tech-c:         NO4-AP
+nic-hdl:        AIC1-AP
+mnt-by:         MAINT-APNIC-IS-AP
+last-modified:  2023-11-29T22:52:40Z
+source:         APNIC
+
+% This query was served by the APNIC Whois Service version 1.88.48 (WHOIS-US2)
+
+

@@ -1,0 +1,100 @@
+% IP Client: 75.166.204.25
+ % Copyright (c) Nic.br - Use of this data is governed by the Use and
+% Privacy Policy at https://registro.br/upp . Distribution,
+% commercialization, reproduction, and use for advertising or similar
+% purposes are expressly prohibited.
+% 2026-08-11T04:27:57-03:00 - 75.166.204.25
+
+aut-num:     AS28573
+owner:       Claro NXT Telecomunicacoes Ltda
+responsible: Suporte Redes
+owner-c:     GRSVI
+routing-c:   CADSA1060
+abuse-c:     GRSVI
+created:     20031127
+changed:     20230105
+inetnum:     200.189.80.0/20
+inetnum:     200.160.96.0/20
+inetnum:     201.6.0.0/16
+inetnum:     201.17.0.0/16
+inetnum:     201.21.0.0/16
+inetnum:     201.37.0.0/16
+inetnum:     201.52.0.0/15
+inetnum:     201.46.240.0/20
+inetnum:     201.55.224.0/20
+inetnum:     201.62.96.0/19
+inetnum:     201.74.0.0/16
+inetnum:     201.76.16.0/20
+inetnum:     201.80.0.0/14
+inetnum:     201.76.64.0/19
+inetnum:     201.77.64.0/20
+inetnum:     201.94.160.0/19
+inetnum:     201.75.0.0/16
+inetnum:     189.4.0.0/14
+inetnum:     189.29.0.0/16
+inetnum:     189.32.0.0/14
+inetnum:     189.39.144.0/20
+inetnum:     189.54.0.0/15
+inetnum:     189.60.0.0/14
+inetnum:     189.100.0.0/14
+inetnum:     189.120.0.0/14
+inetnum:     189.126.16.0/20
+inetnum:     187.2.0.0/15
+inetnum:     187.20.0.0/14
+inetnum:     187.36.0.0/14
+inetnum:     187.64.0.0/14
+inetnum:     187.104.0.0/14
+inetnum:     186.204.0.0/14
+inetnum:     186.220.0.0/14
+inetnum:     177.32.0.0/14
+inetnum:     177.80.0.0/14
+inetnum:     2804:14c::/31
+inetnum:     177.140.0.0/14
+inetnum:     177.180.0.0/14
+inetnum:     177.192.0.0/14
+inetnum:     179.232.0.0/14
+inetnum:     179.208.0.0/14
+inetnum:     179.212.0.0/14
+inetnum:     179.216.0.0/14
+inetnum:     179.220.0.0/14
+inetnum:     179.152.0.0/14
+inetnum:     179.156.0.0/14
+inetnum:     191.176.0.0/14
+inetnum:     191.180.0.0/14
+inetnum:     191.184.0.0/14
+inetnum:     191.188.0.0/14
+inetnum:     181.216.0.0/13
+inetnum:     187.180.0.0/14
+inetnum:     177.235.0.0/16
+inetnum:     179.105.0.0/16
+inetnum:     181.213.0.0/16
+inetnum:     187.255.0.0/16
+inetnum:     177.64.0.0/15
+inetnum:     187.122.0.0/15
+inetnum:     2804:698::/32
+inetnum:     177.100.0.0/16
+inetnum:     177.127.0.0/16
+inetnum:     186.218.0.0/16
+inetnum:     189.14.128.0/18
+inetnum:     200.170.0.0/18
+inetnum:     200.218.32.0/19
+inetnum:     200.155.192.0/18
+inetnum:     179.136.0.0/14
+inetnum:     179.140.0.0/15
+inetnum:     179.142.0.0/15
+
+nic-hdl-br:  GRSVI
+person:      Grupo de Seguran�a V�rtua
+created:     20080512
+changed:     20230704
+
+nic-hdl-br:  CADSA1060
+person:      Carlos Alberto dos Santos
+created:     20190207
+changed:     20191217
+
+% Security and mail abuse issues should also be addressed to cert.br,
+% respectivelly to cert@cert.br and mail-abuse@cert.br
+%
+% whois.registro.br only accepts exact match queries for domains,
+% registrants, contacts, tickets, providers, IPs, and ASNs.

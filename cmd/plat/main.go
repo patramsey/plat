@@ -138,8 +138,8 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var noColorFlag bool
 
 	root := &cobra.Command{
-		Use:           "plat <domain|ip> [domain|ip...]",
-		Short:         "Look up domain or IP ownership via RDAP and WHOIS",
+		Use:           "plat <domain|ip|asn> [domain|ip|asn...]",
+		Short:         "Look up domain, IP, or ASN ownership via RDAP and WHOIS",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args: func(cmd *cobra.Command, cliArgs []string) error {
@@ -323,6 +323,8 @@ func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstra
 	switch q.Kind {
 	case domain.KindIPv4, domain.KindIPv6:
 		return lookupOneIP(ctx, stdout, stderr, resolver, q, opts, sources, format, ui)
+	case domain.KindASN:
+		return lookupOneASN(ctx, stdout, stderr, resolver, q, opts, sources, format, ui)
 	default:
 		return lookupOneDomain(ctx, stdout, stderr, resolver, q, opts, sources, format, ui)
 	}
@@ -385,6 +387,41 @@ func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, resolver *bootst
 	code := deriveOutcome(record.Sources)
 	if code == 0 {
 		if err := renderIPRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
+			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+			return 3
+		}
+		return 0
+	}
+	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
+	return code
+}
+
+// lookupOneASN is lookupOne's KindASN branch: the ASN counterpart of
+// lookupOneIP, sharing the same collect -> merge -> render-or-report shape,
+// but fanning out via collect.CollectASN/merge.MergeASN (two sources, no
+// registrar hop) instead of Collect/Merge. deriveOutcome/lookupOutcomeError
+// operate on []model.SourceResult, which model.ASNRecord carries just like
+// model.Record and model.IPRecord, so both are reused unchanged -- exit
+// codes stay consistent across the domain, IP, and ASN paths.
+func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
+	baseURL, _ := resolver.ASNBaseURL(q.ASN) // "" is fine -- CollectASN degrades to WHOIS-only
+	collectOpts := collect.Options{Timeout: opts.Timeout, Sources: sources}
+
+	var records []model.ASNSourceRecord
+	work := func() {
+		records = collect.CollectASN(ctx, q.ASN, baseURL, opts.whoisIANAServer, collectOpts)
+	}
+	if ui.StderrTTY && format == render.FormatHuman {
+		spinner.Run(stderr, "looking up "+q.Input+"...", work)
+	} else {
+		work()
+	}
+
+	record := merge.MergeASN(records)
+
+	code := deriveOutcome(record.Sources)
+	if code == 0 {
+		if err := renderASNRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
 			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
 			return 3
 		}
@@ -487,6 +524,48 @@ func ipQuietSummary(rec model.IPRecord) string {
 		return org
 	case rec.Handle.Value != "":
 		return rec.Handle.Value
+	default:
+		return "no data"
+	}
+}
+
+// renderASNRecord is renderRecord's ASN counterpart, mirroring
+// renderIPRecord's shape. -q's one-line summary has no lock/expiry/
+// lifecycle verdict to report (an autonomous system allocation has none of
+// those either), so it degrades the same way ipQuietSummary does.
+func renderASNRecord(w io.Writer, format render.Format, rec model.ASNRecord, raw, verbose, showConflicts, quiet bool, ui uiConfig) error {
+	if quiet && !render.IsMachine(format) {
+		_, err := fmt.Fprintln(w, asnQuietSummary(rec))
+		return err
+	}
+	switch format {
+	case render.FormatJSON:
+		return machine.EncodeASN(w, rec, machine.Options{Raw: raw})
+	case render.FormatNDJSON:
+		return machine.EncodeASNNDJSON(w, rec, machine.Options{Raw: raw})
+	case render.FormatHuman:
+		return human.RenderASN(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts})
+	default: // FormatPlain
+		return plain.RenderASN(w, rec, plain.Options{Verbose: verbose, ShowConflicts: showConflicts})
+	}
+}
+
+// asnQuietSummary builds -q's one-line "<handle> · <org name>" summary for
+// an ASN lookup, degrading gracefully when either half is absent: just the
+// other half alone, or the name if neither handle nor org name came back
+// from any source -- mirroring ipQuietSummary's identical reasoning.
+func asnQuietSummary(rec model.ASNRecord) string {
+	handle := rec.Handle.Value
+	org := rec.Org.Name.Value
+	switch {
+	case handle != "" && org != "":
+		return handle + " · " + org
+	case handle != "":
+		return handle
+	case org != "":
+		return org
+	case rec.Name.Value != "":
+		return rec.Name.Value
 	default:
 		return "no data"
 	}

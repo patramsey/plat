@@ -293,6 +293,46 @@ func TestNormalize_RejectsReservedIPs(t *testing.T) {
 // reserved-IP rejection being too broad: real, publicly-allocated
 // addresses across all five RIRs (used throughout this branch's live
 // verification) must still classify normally.
+func TestNormalize_ClassifiesASNInput(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		input string
+		want  uint32
+	}{
+		{"uppercase prefix", "AS15169", 15169},
+		{"lowercase prefix", "as15169", 15169},
+		{"mixed case prefix", "As15169", 15169},
+		{"low autnum", "AS1", 1},
+		{"32-bit autnum", "AS4294967294", 4294967294},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			q, err := Normalize(tt.input)
+			if err != nil {
+				t.Fatalf("Normalize(%q): %v", tt.input, err)
+			}
+			if q.Kind != KindASN {
+				t.Errorf("Kind = %v, want KindASN", q.Kind)
+			}
+			if q.ASN != tt.want {
+				t.Errorf("ASN = %d, want %d", q.ASN, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalize_RejectsBareNumericAndMalformedASN(t *testing.T) {
+	// A bare number is likelier a typo'd domain than an intentional ASN,
+	// and must not silently become an ASN lookup.
+	for _, input := range []string{"15169", "AS", "ASfoo", "AS-1", "AS4294967296"} {
+		t.Run(input, func(t *testing.T) {
+			q, err := Normalize(input)
+			if err == nil && q.Kind == KindASN {
+				t.Errorf("Normalize(%q) classified as ASN %d; want rejection or non-ASN", input, q.ASN)
+			}
+		})
+	}
+}
+
 func TestNormalize_OrdinaryPublicIPsStillAccepted(t *testing.T) {
 	tests := []string{
 		"8.8.8.8",              // ARIN

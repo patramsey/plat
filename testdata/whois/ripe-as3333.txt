@@ -1,0 +1,1819 @@
+% This is the RIPE Database query service.
+% The objects are in RPSL format.
+%
+% The RIPE Database is subject to Terms and Conditions.
+% See https://docs.db.ripe.net/terms-conditions.html
+
+% Note: this output has been filtered.
+%       To receive output for a database update, use the "-B" flag.
+
+% Information related to 'AS3209 - AS3353'
+
+as-block:       AS3209 - AS3353
+descr:          RIPE NCC ASN block
+remarks:        These AS Numbers are assigned to network operators in the RIPE NCC service region.
+mnt-by:         RIPE-NCC-HM-MNT
+created:        2018-11-22T15:27:19Z
+last-modified:  2018-11-22T15:27:19Z
+source:         RIPE
+
+% Information related to 'AS3333'
+
+% Abuse contact for 'AS3333' is 'abuse@ripe.net'
+
+aut-num:        AS3333
+as-name:        RIPE-NCC-AS
+descr:          Reseaux IP Europeens Network Coordination Centre (RIPE NCC)
+org:            ORG-RIEN1-RIPE
+remarks:
+remarks:
+remarks:        ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AS3333 RIPE-NCC-AS |
+remarks:        | RIPE NCC (Network Coordination Centre) |
+remarks:        ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | |
+remarks:        | RIPE NCC (AS3333) operates an open peering policy: |
+remarks:        | |
+remarks:        | We advertise only routes from AS-RIPENCC |
+remarks:        | |
+remarks:        | We will accept any routes offered including TRANSIT! |
+remarks:        | |
+remarks:        | We will update our aut-num object in the RIPE Whois |
+remarks:        | Database and kindly request you to update yours |
+remarks:        | |
+remarks:        | We would prefer not to enter into a peering contract |
+remarks:        | |
+remarks:        | In the event of problems due to leaked advertisements |
+remarks:        | it is our policy to shut down peerings and ask |
+remarks:        | questions later. |
+remarks:        | |
+remarks:        | We may tag our announcements with the NO_EXPORT or |
+remarks:        | other communities, please honour these if set. |
+remarks:        | |
+remarks:        ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | |
+remarks:        | * AMS-IX - IPv4 * |
+remarks:        | |
+remarks:        | 80.249.208.68 - Equinix AM3 |
+remarks:        | 80.249.208.71 - Telecity AMS5 |
+remarks:        | |
+remarks:        | * AMS-IX - IPv6 * |
+remarks:        | |
+remarks:        | 2001:7F8:1::A500:3333:1 - Equinix AM3 |
+remarks:        | 2001:7F8:1::A500:3333:2 - Telecity AMS5 |
+remarks:        | |
+remarks:        ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | |
+remarks:        | Telephone: +31 20 535 4444 |
+remarks:        | Fax: +31 20 535 4445 |
+remarks:        | Abuse: abuse@ripe.net |
+remarks:        | Peering: peering@ripe.net |
+remarks:        | Operations/NOC: ops@ripe.net |
+remarks:        | Info: https://www.ripe.net/ |
+remarks:        | |
+remarks:        ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | PRIVATE-TRANSIT-V4 |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Private transit peering |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | TeliaSonera |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS1299 62.115.12.201 at 62.115.12.202 action pref=100; accept ANY
+export:         to AS1299 62.115.12.201 at 62.115.12.202 announce AS-RIPENCC
+import:         from AS1299 62.115.12.205 at 62.115.12.206 action pref=100; accept ANY
+export:         to AS1299 62.115.12.205 at 62.115.12.206 announce AS-RIPENCC
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AMS-IX-TRANSIT |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | SURFnet |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS1103 80.249.208.34 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS1103 80.249.208.34 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS1103 80.249.208.50 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS1103 80.249.208.50 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | KPN Wholesale Service & Op. (AS1136) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS1136 80.249.208.89 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS1136 80.249.208.89 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS1136 80.249.208.144 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS1136 80.249.208.144 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Tele2 Sverige AB |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS1257 80.249.209.139 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS1257 80.249.209.139 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS1257 80.249.209.139 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS1257 80.249.209.139 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Cable & Wireless Netherlands B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS1273 80.249.209.144 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS1273 80.249.209.144 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS1273 80.249.209.144 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS1273 80.249.209.144 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | BIT |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12859 80.249.208.35 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12859 80.249.208.35 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12859 80.249.208.200 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12859 80.249.208.200 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | KPN Wholesale Service & Op. (AS286) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS286 80.249.210.108 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS286 80.249.210.108 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS286 80.249.210.108 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS286 80.249.210.108 at 80.249.208.71 announce AS-RIPENCC
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AMS-IX-LARGE |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AMS-IX BGP4 Peers with a LARGE number of prefixes |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Tiscali |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS3257 80.249.208.85 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS3257 80.249.208.85 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS3257 80.249.208.85 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS3257 80.249.208.85 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Deutsche Telekom AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS3320 80.249.209.211 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS3320 80.249.209.211 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS3320 80.249.209.211 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS3320 80.249.209.211 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Telecom Italia Sparkle |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS6762 80.249.211.42 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS6762 80.249.211.42 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS6762 80.249.211.42 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS6762 80.249.211.42 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Hurricane Electric |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS6939 80.249.209.150 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS6939 80.249.209.150 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS6939 80.249.209.150 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS6939 80.249.209.150 at 80.249.208.71 announce AS-RIPENCC
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AMS-IX-MEDIUM |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Verizon Business, NIKHEF, peering@verizonbusiness.com |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | iNES Group |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12310 80.249.210.5 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12310 80.249.210.5 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12310 80.249.210.5 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12310 80.249.210.5 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Highwinds Network Group Inc. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12989 80.249.208.94 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12989 80.249.208.94 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12989 80.249.209.70 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12989 80.249.209.70 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12989 80.249.208.94 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12989 80.249.208.94 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS12989 80.249.209.70 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12989 80.249.209.70 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Lambdanet Communications Deutschland AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS13237 80.249.208.212 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS13237 80.249.208.212 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS13237 80.249.208.212 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS13237 80.249.208.212 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Open Peering |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS20562 80.249.208.189 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS20562 80.249.208.189 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS20562 80.249.208.189 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS20562 80.249.208.189 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | PJSC Datagroup |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS21219 80.249.208.80 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS21219 80.249.208.80 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS21219 80.249.208.80 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS21219 80.249.208.80 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | ISPRIME B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS23393 80.249.209.223 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS23393 80.249.209.223 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS23393 80.249.209.223 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS23393 80.249.209.223 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | NORDUnet A/S |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS2603 80.249.209.203 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS2603 80.249.209.203 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS2603 80.249.209.203 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS2603 80.249.209.203 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Arcor AG & Co |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS3209 80.249.208.123 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS3209 80.249.208.123 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS3209 80.249.209.123 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS3209 80.249.209.123 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS3209 80.249.208.123 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS3209 80.249.208.123 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS3209 80.249.209.123 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS3209 80.249.209.123 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | State Institute of Information Technologies and Telecommunications |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS3267 80.249.209.75 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS3267 80.249.209.75 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS3267 80.249.209.75 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS3267 80.249.209.75 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | TDC A/S |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS3292 80.249.208.104 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS3292 80.249.208.104 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS3292 80.249.208.104 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS3292 80.249.208.104 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Swisscom AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS3303 80.249.208.100 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS3303 80.249.208.100 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS3303 80.249.208.100 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS3303 80.249.208.100 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Neterra Ltd. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS34224 80.249.209.26 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS34224 80.249.209.26 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS34224 80.249.209.26 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS34224 80.249.209.26 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Anders Business Group Ltd. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS39792 80.249.208.119 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS39792 80.249.208.119 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS39792 80.249.208.119 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS39792 80.249.208.119 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | IPTP Networks |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS41095 80.249.209.196 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS41095 80.249.209.196 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS41095 80.249.209.196 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS41095 80.249.209.196 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | W-IX |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS50384 80.249.209.237 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS50384 80.249.209.237 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS50384 80.249.209.237 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS50384 80.249.209.237 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | BT |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS5400 80.249.208.108 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS5400 80.249.208.108 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Atrato IP Networks |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS5580 80.249.208.229 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS5580 80.249.208.229 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS5580 80.249.209.229 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS5580 80.249.209.229 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS5580 80.249.208.229 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS5580 80.249.208.229 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS5580 80.249.209.229 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS5580 80.249.209.229 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Belgacom International Carrier Services SA |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS6774 80.249.208.87 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS6774 80.249.208.87 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS6774 80.249.208.87 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS6774 80.249.208.87 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | UPC Broadband Operations |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS6830 80.249.208.106 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS6830 80.249.208.106 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS6830 80.249.208.174 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS6830 80.249.208.174 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS6830 80.249.208.106 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS6830 80.249.208.106 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS6830 80.249.208.174 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS6830 80.249.208.174 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Verizon Business |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS702 80.249.208.98 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS702 80.249.208.98 at 80.249.208.68 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Colt Telecom Group |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS8220 80.249.208.236 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS8220 80.249.208.236 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | COMSTAR-Direct CJSC |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS8359 80.249.209.188 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS8359 80.249.209.188 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS8359 80.249.209.188 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS8359 80.249.209.188 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | RETN Ltd. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS9002 80.249.209.216 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS9002 80.249.209.216 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS9002 80.249.209.216 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS9002 80.249.209.216 at 80.249.208.71 announce AS-RIPENCC
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AMS-IX-SMALL |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Alsatis, AMS-IX, peering@alsatis.com |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | RIPE NCC (AS112 Project) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS112 80.249.208.39 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS112 80.249.208.39 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS112 80.249.208.39 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS112 80.249.208.39 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | SARA |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS1126 80.249.208.252 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS1126 80.249.208.252 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS1126 80.249.208.252 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS1126 80.249.208.252 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | SIDN Stichting Internet Domeinregistratie NL |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS1140 80.249.208.49 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS1140 80.249.208.49 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS1140 80.249.208.49 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS1140 80.249.208.49 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Amsterdam Internet Exchange (rtr-eun-01) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS1200 80.249.208.1 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS1200 80.249.208.1 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS1200 80.249.209.1 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS1200 80.249.209.1 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS1200 80.249.208.1 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS1200 80.249.208.1 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS1200 80.249.209.1 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS1200 80.249.209.1 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Plus.line AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12306 80.249.208.161 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12306 80.249.208.161 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12306 80.249.208.161 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12306 80.249.208.161 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | ScanPlus GmbH |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12399 80.249.209.99 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12399 80.249.209.99 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12399 80.249.209.99 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12399 80.249.209.99 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Solcon Internetdiensten B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12414 80.249.208.165 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12414 80.249.208.165 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12414 80.249.209.165 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12414 80.249.209.165 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12414 80.249.208.165 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12414 80.249.208.165 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS12414 80.249.209.165 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12414 80.249.209.165 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | IDnet (IDnet) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12496 80.249.208.141 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12496 80.249.208.141 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12496 80.249.208.141 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12496 80.249.208.141 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | SOCO Network Solutions GmbH |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12759 80.249.209.59 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12759 80.249.209.59 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12759 80.249.209.59 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12759 80.249.209.59 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | ITGate |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12779 80.249.209.17 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12779 80.249.209.17 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12779 80.249.209.17 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12779 80.249.209.17 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Concepts ICT Holding B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12871 80.249.208.32 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12871 80.249.208.32 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12871 80.249.208.64 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12871 80.249.208.64 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12871 80.249.208.32 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12871 80.249.208.32 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS12871 80.249.208.64 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12871 80.249.208.64 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Luna.nl |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12902 80.249.208.223 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS12902 80.249.208.223 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS12902 80.249.208.223 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS12902 80.249.208.223 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | TNG - The Net Generation AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS13101 80.249.209.119 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS13101 80.249.209.119 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS13101 80.249.209.119 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS13101 80.249.209.119 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Tele2 Nederland B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS13127 80.249.208.211 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS13127 80.249.208.211 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS13127 80.249.208.47 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS13127 80.249.208.47 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS13127 80.249.208.211 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS13127 80.249.208.211 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS13127 80.249.208.47 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS13127 80.249.208.47 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | EdgeCast Network |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS15133 80.249.209.162 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS15133 80.249.209.162 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS15133 80.249.209.162 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS15133 80.249.209.162 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | NedLook internet solutions |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS15426 80.249.208.173 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS15426 80.249.208.173 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS15426 80.249.208.173 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS15426 80.249.208.173 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | CAIW Netwerken BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS15435 80.249.208.149 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS15435 80.249.208.149 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS15435 80.249.208.149 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS15435 80.249.208.149 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | ZeelandNet BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS15542 80.249.209.125 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS15542 80.249.209.125 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS15542 80.249.209.125 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS15542 80.249.209.125 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Virtu Secure Webservices BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS16243 80.249.209.222 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS16243 80.249.209.222 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS16243 80.249.208.245 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS16243 80.249.208.245 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Leaseweb |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS16265 80.249.208.215 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS16265 80.249.208.215 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS16265 80.249.208.215 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS16265 80.249.208.215 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | OVH |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS16276 80.249.209.231 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS16276 80.249.209.231 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS16276 80.249.209.231 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS16276 80.249.209.231 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | InterBox Internet |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS16298 80.249.208.183 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS16298 80.249.208.183 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS16298 80.249.208.183 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS16298 80.249.208.183 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Amazon.com |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS16509 80.249.210.100 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS16509 80.249.210.100 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS16509 80.249.210.100 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS16509 80.249.210.100 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Green.ch AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS1836 80.249.208.192 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS1836 80.249.208.192 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS1836 80.249.208.192 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS1836 80.249.208.192 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | RIPE NCC Auth DNS Cluster |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS197000 80.249.209.132 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS197000 80.249.209.132 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS197000 80.249.209.132 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS197000 80.249.209.132 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | We Dare B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS20495 80.249.208.107 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS20495 80.249.208.107 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS20495 80.249.208.107 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS20495 80.249.208.107 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Titan Networks GmbH |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS20640 80.249.208.221 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS20640 80.249.208.221 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS20640 80.249.208.221 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS20640 80.249.208.221 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Previder B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS20847 80.249.208.197 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS20847 80.249.208.197 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS20847 80.249.208.222 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS20847 80.249.208.222 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS20847 80.249.208.197 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS20847 80.249.208.197 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS20847 80.249.208.222 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS20847 80.249.208.222 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Blatzheim Networks Telecom GmbH |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS20886 80.249.210.203 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS20886 80.249.210.203 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS20886 80.249.210.203 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS20886 80.249.210.203 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | SIG/IP- MAN |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS20932 80.249.208.234 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS20932 80.249.208.234 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS20932 80.249.208.234 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS20932 80.249.208.234 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Akamai International B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS20940 80.249.208.168 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS20940 80.249.208.168 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS20940 80.249.209.208 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS20940 80.249.209.208 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS20940 80.249.208.168 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS20940 80.249.208.168 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS20940 80.249.209.208 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS20940 80.249.209.208 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Info.nl |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS20953 80.249.208.203 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS20953 80.249.208.203 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS20953 80.249.208.203 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS20953 80.249.208.203 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Telenor |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS2119 80.249.209.192 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS2119 80.249.209.192 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS2119 80.249.209.192 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS2119 80.249.209.192 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | InfoPact Netwerkdiensten B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS21221 80.249.208.102 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS21221 80.249.208.102 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS21221 80.249.208.102 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS21221 80.249.208.102 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Plex Elektronische Informatie BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS21478 80.249.208.216 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS21478 80.249.208.216 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS21478 80.249.208.216 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS21478 80.249.208.216 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Limelight Networks |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS22822 80.249.209.133 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS22822 80.249.209.133 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS22822 80.249.209.133 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS22822 80.249.209.133 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | ASGCNet (Academia Sinica Grid Computing Network Taiwan) (ASNet) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS24167 80.249.208.184 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS24167 80.249.208.184 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS24167 80.249.208.184 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS24167 80.249.208.184 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Intermax BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS24586 80.249.209.41 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS24586 80.249.209.41 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS24586 80.249.209.41 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS24586 80.249.209.41 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Caveo Internet B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS24642 80.249.208.248 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS24642 80.249.208.248 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS24642 80.249.208.248 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS24642 80.249.208.248 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | ISP Services |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS24875 80.249.208.126 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS24875 80.249.208.126 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS24875 80.249.208.126 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS24875 80.249.208.126 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Hetzner Online AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS24940 80.249.209.55 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS24940 80.249.209.55 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS24940 80.249.209.55 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS24940 80.249.209.55 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | INET-People Provider Services |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS25074 80.249.208.155 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS25074 80.249.208.155 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS25074 80.249.208.155 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS25074 80.249.208.155 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Basefarm |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS25148 80.249.209.42 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS25148 80.249.209.42 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS25148 80.249.209.42 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS25148 80.249.209.42 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Cyso Managed Hosting |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS25151 80.249.209.155 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS25151 80.249.209.155 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS25151 80.249.209.155 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS25151 80.249.209.155 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | RIPE NCC (K-root server) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS25152 80.249.208.240 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS25152 80.249.208.240 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS25152 80.249.208.240 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS25152 80.249.208.240 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Denit Internet Services |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS25542 80.249.209.64 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS25542 80.249.209.64 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS25542 80.249.209.64 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS25542 80.249.209.64 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | BELNET |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS2611 80.249.208.43 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS2611 80.249.208.43 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS2611 80.249.208.43 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS2611 80.249.208.43 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AT&T Global Network Services |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS2686 80.249.208.194 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS2686 80.249.208.194 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS2686 80.249.208.37 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS2686 80.249.208.37 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS2686 80.249.208.194 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS2686 80.249.208.194 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS2686 80.249.208.37 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS2686 80.249.208.37 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Unilogic Networks B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS28788 80.249.208.237 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS28788 80.249.208.237 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS28788 80.249.208.237 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS28788 80.249.208.237 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Aire Networks |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS29119 80.249.211.91 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS29119 80.249.211.91 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS29119 80.249.211.91 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS29119 80.249.211.91 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Dial Telecom a.s. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS29208 80.249.208.172 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS29208 80.249.208.172 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS29208 80.249.208.172 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS29208 80.249.208.172 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Gemeente Den Haag |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS29263 80.249.208.129 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS29263 80.249.208.129 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS29263 80.249.209.172 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS29263 80.249.209.172 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS29263 80.249.208.129 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS29263 80.249.208.129 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS29263 80.249.209.172 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS29263 80.249.209.172 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | UNET BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS29396 80.249.209.166 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS29396 80.249.209.166 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS29396 80.249.209.166 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS29396 80.249.209.166 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Momax S.r.l. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS29438 80.249.209.199 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS29438 80.249.209.199 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS29438 80.249.209.199 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS29438 80.249.209.199 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Internet Systems Consortium (F-Root) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS30132 80.249.208.111 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS30132 80.249.208.111 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS30132 80.249.208.140 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS30132 80.249.208.140 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS30132 80.249.208.111 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS30132 80.249.208.111 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS30132 80.249.208.140 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS30132 80.249.208.140 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Exa Networks |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS30740 80.249.209.182 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS30740 80.249.209.182 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS30740 80.249.209.182 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS30740 80.249.209.182 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Waycom |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS30889 80.249.208.202 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS30889 80.249.208.202 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS30889 80.249.208.202 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS30889 80.249.208.202 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | SpeedXS |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS30925 80.249.209.79 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS30925 80.249.209.79 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS30925 80.249.209.79 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS30925 80.249.209.79 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Serbia BroadBand |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS31042 80.249.210.89 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS31042 80.249.210.89 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS31042 80.249.210.89 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS31042 80.249.210.89 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | BSO Communication |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS31216 80.249.209.124 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS31216 80.249.209.124 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS31216 80.249.209.124 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS31216 80.249.209.124 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Duocast |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS31477 80.249.209.98 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS31477 80.249.209.98 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS31477 80.249.209.98 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS31477 80.249.209.98 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Sarenet |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS3262 80.249.208.120 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS3262 80.249.208.120 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS3262 80.249.208.120 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS3262 80.249.208.120 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | XS4ALL Internet |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS3265 80.249.208.166 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS3265 80.249.208.166 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS3265 80.249.208.48 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS3265 80.249.208.48 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS3265 80.249.208.166 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS3265 80.249.208.166 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS3265 80.249.208.48 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS3265 80.249.208.48 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Kantonsschule Zug |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS34288 80.249.209.29 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS34288 80.249.209.29 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS34288 80.249.209.29 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS34288 80.249.209.29 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Base IP BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS34305 80.249.209.174 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS34305 80.249.209.174 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS34305 80.249.209.174 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS34305 80.249.209.174 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Lottomatica SpA |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS35574 80.249.210.171 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS35574 80.249.210.171 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS35574 80.249.210.171 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS35574 80.249.210.171 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Packet Clearing House |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS3856 80.249.209.250 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS3856 80.249.209.250 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS3856 80.249.209.250 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS3856 80.249.209.250 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Convergenze S.p.a. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS39120 80.249.210.28 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS39120 80.249.210.28 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS39120 80.249.210.28 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS39120 80.249.210.28 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | OpenCarrier e.G. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS41692 80.249.209.221 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS41692 80.249.209.221 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS41692 80.249.209.221 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS41692 80.249.209.221 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Jansen Systemberatung GmbH |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS42184 80.249.209.210 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS42184 80.249.209.210 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS42184 80.249.209.210 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS42184 80.249.209.210 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | GlobalConnect |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS42525 80.249.208.96 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS42525 80.249.208.96 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS42525 80.249.208.96 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS42525 80.249.208.96 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Wikimedia Foundation Inc. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS43821 80.249.209.176 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS43821 80.249.209.176 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS43821 80.249.209.176 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS43821 80.249.209.176 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Easynet Limited |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS4589 80.249.208.38 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS4589 80.249.208.38 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS4589 80.249.208.38 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS4589 80.249.208.38 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Motto VoIP |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS49405 80.249.210.57 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS49405 80.249.210.57 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS49405 80.249.210.69 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS49405 80.249.210.69 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS49405 80.249.210.57 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS49405 80.249.210.57 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS49405 80.249.210.69 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS49405 80.249.210.69 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | I3D |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS49544 80.249.208.162 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS49544 80.249.208.162 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS49544 80.249.208.162 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS49544 80.249.208.162 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Online Breedband BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS5390 80.249.208.55 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS5390 80.249.208.55 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS5390 80.249.208.70 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS5390 80.249.208.70 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS5390 80.249.208.55 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS5390 80.249.208.55 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS5390 80.249.208.70 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS5390 80.249.208.70 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Vialtus Solutions |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS5413 80.249.208.95 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS5413 80.249.208.95 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS5413 80.249.208.95 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS5413 80.249.208.95 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Breedband Nederland B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS5524 80.249.209.104 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS5524 80.249.209.104 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS5524 80.249.209.104 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS5524 80.249.209.104 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | ANO Russian Institute for Public Networks (RIPN) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS5568 80.249.209.212 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS5568 80.249.209.212 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS5568 80.249.209.212 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS5568 80.249.209.212 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Orange Business Services |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS5583 80.249.208.66 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS5583 80.249.208.66 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS5583 80.249.208.66 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS5583 80.249.208.66 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Green ISP B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS5615 80.249.208.115 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS5615 80.249.208.115 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS5615 80.249.208.78 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS5615 80.249.208.78 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS5615 80.249.208.115 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS5615 80.249.208.115 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS5615 80.249.208.78 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS5615 80.249.208.78 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | EUnet Finland (Saunalahti Group Oyj) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS6667 80.249.208.127 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS6667 80.249.208.127 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS6667 80.249.208.127 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS6667 80.249.208.127 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | www.strato.de |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS6724 80.249.210.180 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS6724 80.249.210.180 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS6724 80.249.210.180 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS6724 80.249.210.180 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | TDC Switzerland AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS6730 80.249.208.116 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS6730 80.249.208.116 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS6730 80.249.208.116 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS6730 80.249.208.116 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Telefonica Deutschland GmbH |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS6805 80.249.208.91 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS6805 80.249.208.91 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS6805 80.249.208.91 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS6805 80.249.208.91 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Verisign |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS7342 80.249.209.232 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS7342 80.249.209.232 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS7342 80.249.209.232 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS7342 80.249.209.232 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | MANDA |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS8365 80.249.209.217 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS8365 80.249.209.217 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS8365 80.249.209.217 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS8365 80.249.209.217 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Claranet Benelux |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS8426 80.249.208.82 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS8426 80.249.208.82 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS8426 80.249.209.228 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS8426 80.249.209.228 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS8426 80.249.208.82 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS8426 80.249.208.82 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS8426 80.249.209.228 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS8426 80.249.209.228 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Telekom Austria |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS8447 80.249.209.207 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS8447 80.249.209.207 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS8447 80.249.209.207 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS8447 80.249.209.207 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | 1&1 Internet AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS8560 80.249.208.220 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS8560 80.249.208.220 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS8560 80.249.208.220 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS8560 80.249.208.220 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | XB Networks |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS8608 80.249.208.90 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS8608 80.249.208.90 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS8608 80.249.209.90 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS8608 80.249.209.90 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Coolwave Communications BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS8918 80.249.208.58 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS8918 80.249.208.58 at 80.249.208.68 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Ziggo bv |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS9143 80.249.208.103 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS9143 80.249.208.103 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS9143 80.249.208.181 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS9143 80.249.208.181 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS9143 80.249.208.103 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS9143 80.249.208.103 at 80.249.208.71 announce AS-RIPENCC
+import:         from AS9143 80.249.208.181 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS9143 80.249.208.181 at 80.249.208.71 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | InterConnect Services B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS9150 80.249.208.139 at 80.249.208.68 action pref=100; accept ANY
+export:         to AS9150 80.249.208.139 at 80.249.208.68 announce AS-RIPENCC
+import:         from AS9150 80.249.208.139 at 80.249.208.71 action pref=100; accept ANY
+export:         to AS9150 80.249.208.139 at 80.249.208.71 announce AS-RIPENCC
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AMS-IX-V6-TRANSIT |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AMS-IX BGP6 Peers who pass us a FULL routing table |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | SURFnet |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS1103 2001:7F8:1::A500:1103:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS1103 2001:7F8:1::A500:1103:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS1103 2001:7F8:1::A500:1103:2 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS1103 2001:7F8:1::A500:1103:2 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS1103 2001:7F8:1::A500:1103:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS1103 2001:7F8:1::A500:1103:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+mp-import:      from AS1103 2001:7F8:1::A500:1103:2 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS1103 2001:7F8:1::A500:1103:2 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | BIT |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS12859 2001:7F8:1::A501:2859:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS12859 2001:7F8:1::A501:2859:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS12859 2001:7F8:1::A501:2859:2 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS12859 2001:7F8:1::A501:2859:2 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS12859 2001:7F8:1::A501:2859:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS12859 2001:7F8:1::A501:2859:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+mp-import:      from AS12859 2001:7F8:1::A501:2859:2 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS12859 2001:7F8:1::A501:2859:2 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | TeliaSonera |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS1299 2001:2000:3080:6E1::1 at 2001:2000:3080:6E1::2 action pref=100; accept ANY
+mp-export:      to AS1299 2001:2000:3080:6E1::1 at 2001:2000:3080:6E1::2 announce AS-RIPENCC
+mp-import:      from AS1299 2001:2000:3080:6E2::1 at 2001:2000:3080:6E2::2 action pref=100; accept ANY
+mp-export:      to AS1299 2001:2000:3080:6E2::1 at 2001:2000:3080:6E2::2 announce AS-RIPENCC
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AMS-IX-V6 |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Alsatis, AMS-IX, peering@alsatis.com |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | RIPE NCC (AS112 Project) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS112 2001:7F8:1::A500:112:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS112 2001:7F8:1::A500:112:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS112 2001:7F8:1::A500:112:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS112 2001:7F8:1::A500:112:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | SARA |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS1126 2001:7F8:1::A500:1126:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS1126 2001:7F8:1::A500:1126:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS1126 2001:7F8:1::A500:1126:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS1126 2001:7F8:1::A500:1126:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | KPN Wholesale Service & Op. (AS1136) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS1136 2001:7F8:1::A500:1136:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS1136 2001:7F8:1::A500:1136:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS1136 2001:7F8:1::A500:1136:2 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS1136 2001:7F8:1::A500:1136:2 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS1136 2001:7F8:1::A500:1136:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS1136 2001:7F8:1::A500:1136:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+mp-import:      from AS1136 2001:7F8:1::A500:1136:2 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS1136 2001:7F8:1::A500:1136:2 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | SIDN Stichting Internet Domeinregistratie NL |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS1140 2001:7F8:1::A500:1140:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS1140 2001:7F8:1::A500:1140:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS1140 2001:7F8:1::A500:1140:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS1140 2001:7F8:1::A500:1140:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Amsterdam Internet Exchange (rtr-eun-01) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS1200 2001:7F8:1::A500:1200:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS1200 2001:7F8:1::A500:1200:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS1200 2001:7F8:1::A500:1200:2 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS1200 2001:7F8:1::A500:1200:2 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS1200 2001:7F8:1::A500:1200:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS1200 2001:7F8:1::A500:1200:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+mp-import:      from AS1200 2001:7F8:1::A500:1200:2 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS1200 2001:7F8:1::A500:1200:2 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Plus.line AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS12306 2001:7F8:1::A501:2306:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS12306 2001:7F8:1::A501:2306:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS12306 2001:7F8:1::A501:2306:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS12306 2001:7F8:1::A501:2306:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | iNES Group |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS12310 2001:7F8:1::A501:2310:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS12310 2001:7F8:1::A501:2310:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS12310 2001:7F8:1::A501:2310:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS12310 2001:7F8:1::A501:2310:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | FreeSAS |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS12322 2001:7F8:1::A501:2322:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS12322 2001:7F8:1::A501:2322:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS12322 2001:7F8:1::A501:2322:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS12322 2001:7F8:1::A501:2322:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Cable & Wireless Netherlands B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS1273 2001:7F8:1::A500:1273:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS1273 2001:7F8:1::A500:1273:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS1273 2001:7F8:1::A500:1273:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS1273 2001:7F8:1::A500:1273:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | ITGate |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS12779 2001:7F8:1::A501:2779:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS12779 2001:7F8:1::A501:2779:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS12779 2001:7F8:1::A501:2779:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS12779 2001:7F8:1::A501:2779:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Concepts ICT Holding B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS12871 2001:7F8:1::A501:2871:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS12871 2001:7F8:1::A501:2871:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS12871 2001:7F8:1::A501:2871:2 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS12871 2001:7F8:1::A501:2871:2 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS12871 2001:7F8:1::A501:2871:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS12871 2001:7F8:1::A501:2871:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+mp-import:      from AS12871 2001:7F8:1::A501:2871:2 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS12871 2001:7F8:1::A501:2871:2 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Luna.nl |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS12902 2001:7F8:1::A501:2902:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS12902 2001:7F8:1::A501:2902:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS12902 2001:7F8:1::A501:2902:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS12902 2001:7F8:1::A501:2902:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Lambdanet Communications Deutschland AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS13237 2001:7F8:1::A501:3237:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS13237 2001:7F8:1::A501:3237:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS13237 2001:7F8:1::A501:3237:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS13237 2001:7F8:1::A501:3237:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Google |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS15169 2001:7F8:1::A501:5169:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS15169 2001:7F8:1::A501:5169:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS15169 2001:7F8:1::A501:5169:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS15169 2001:7F8:1::A501:5169:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Virtu Secure Webservices BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS16243 2001:7F8:1::A501:6243:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS16243 2001:7F8:1::A501:6243:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS16243 2001:7F8:1::A501:6243:2 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS16243 2001:7F8:1::A501:6243:2 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Leaseweb |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS16265 2001:7F8:1::A501:6265:2 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS16265 2001:7F8:1::A501:6265:2 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS16265 2001:7F8:1::A501:6265:2 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS16265 2001:7F8:1::A501:6265:2 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Green.ch AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS1836 2001:7F8:1::A500:1836:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS1836 2001:7F8:1::A500:1836:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS1836 2001:7F8:1::A500:1836:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS1836 2001:7F8:1::A500:1836:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | RIPE NCC Auth DNS Cluster |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS197000 2001:7F8:1::A500:19:7000:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS197000 2001:7F8:1::A500:19:7000:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS197000 2001:7F8:1::A500:19:7000:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS197000 2001:7F8:1::A500:19:7000:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | We Dare B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS20495 2001:7F8:1::A502:495:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS20495 2001:7F8:1::A502:495:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS20495 2001:7F8:1::A502:495:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS20495 2001:7F8:1::A502:495:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Titan Networks GmbH |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS20640 2001:7F8:1::A502:640:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS20640 2001:7F8:1::A502:640:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS20640 2001:7F8:1::A502:640:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS20640 2001:7F8:1::A502:640:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | IntroWeb Nederland B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS20847 2001:7F8:1::A502:847:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS20847 2001:7F8:1::A502:847:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS20847 2001:7F8:1::A502:847:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS20847 2001:7F8:1::A502:847:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Blatzheim Networks Telecom GmbH |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS20886 2001:7F8:1::A502:886:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS20886 2001:7F8:1::A502:886:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS20886 2001:7F8:1::A502:886:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS20886 2001:7F8:1::A502:886:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | info.nl |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS20953 2001:7F8:1::A502:953:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS20953 2001:7F8:1::A502:953:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS20953 2001:7F8:1::A502:953:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS20953 2001:7F8:1::A502:953:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Telenor |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS2119 2001:7F8:1::A500:2119:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS2119 2001:7F8:1::A500:2119:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS2119 2001:7F8:1::A500:2119:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS2119 2001:7F8:1::A500:2119:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | PJSC Datagroup |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS21219 2001:7F8:1::A502:1219:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS21219 2001:7F8:1::A502:1219:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS21219 2001:7F8:1::A502:1219:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS21219 2001:7F8:1::A502:1219:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Intermax BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS24586 2001:7F8:1::A502:4586:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS24586 2001:7F8:1::A502:4586:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS24586 2001:7F8:1::A502:4586:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS24586 2001:7F8:1::A502:4586:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | ISP Services |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS24875 2001:7F8:1::A502:4875:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS24875 2001:7F8:1::A502:4875:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS24875 2001:7F8:1::A502:4875:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS24875 2001:7F8:1::A502:4875:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Hetzner Online AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS24940 2001:7F8:1::A502:4940:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS24940 2001:7F8:1::A502:4940:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS24940 2001:7F8:1::A502:4940:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS24940 2001:7F8:1::A502:4940:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Basefarm |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS25148 2001:7F8:1::A502:5148:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS25148 2001:7F8:1::A502:5148:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS25148 2001:7F8:1::A502:5148:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS25148 2001:7F8:1::A502:5148:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | RIPE NCC (K-root server) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS25152 2001:7F8:1::A502:5152:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS25152 2001:7F8:1::A502:5152:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS25152 2001:7F8:1::A502:5152:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS25152 2001:7F8:1::A502:5152:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | NORDUnet A/S |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS2603 2001:7F8:1::A500:2603:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS2603 2001:7F8:1::A500:2603:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS2603 2001:7F8:1::A500:2603:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS2603 2001:7F8:1::A500:2603:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | xo.com |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS2828 2001:7F8:1::A500:2828:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS2828 2001:7F8:1::A500:2828:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS2828 2001:7F8:1::A500:2828:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS2828 2001:7F8:1::A500:2828:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | KPN Wholesale Service & Op. (AS286) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS286 2001:7F8:1::A500:286:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS286 2001:7F8:1::A500:286:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS286 2001:7F8:1::A500:286:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS286 2001:7F8:1::A500:286:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Aire Networks |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS29119 2001:7F8:1::A502:9119:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS29119 2001:7F8:1::A502:9119:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS29119 2001:7F8:1::A502:9119:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS29119 2001:7F8:1::A502:9119:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | NTT Communications Global IP Network |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS2914 2001:7F8:1::A500:2914:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS2914 2001:7F8:1::A500:2914:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS2914 2001:7F8:1::A500:2914:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS2914 2001:7F8:1::A500:2914:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Dial Telecom a.s. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS29208 2001:7F8:1::A502:9208:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS29208 2001:7F8:1::A502:9208:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS29208 2001:7F8:1::A502:9208:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS29208 2001:7F8:1::A502:9208:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Internet Systems Consortium (F-Root) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS30132 2001:7F8:1::A503:132:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS30132 2001:7F8:1::A503:132:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS30132 2001:7F8:1::A503:132:2 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS30132 2001:7F8:1::A503:132:2 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS30132 2001:7F8:1::A503:132:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS30132 2001:7F8:1::A503:132:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+mp-import:      from AS30132 2001:7F8:1::A503:132:2 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS30132 2001:7F8:1::A503:132:2 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | SpeedXS |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS30925 2001:7F8:1::A503:925:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS30925 2001:7F8:1::A503:925:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS30925 2001:7F8:1::A503:925:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS30925 2001:7F8:1::A503:925:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Serbia BroadBand |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS31042 2001:7F8:1::A503:1042:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS31042 2001:7F8:1::A503:1042:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS31042 2001:7F8:1::A503:1042:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS31042 2001:7F8:1::A503:1042:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Computel Standby BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS31383 2001:7F8:1::A503:1383:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS31383 2001:7F8:1::A503:1383:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS31383 2001:7F8:1::A503:1383:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS31383 2001:7F8:1::A503:1383:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Tiscali |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS3257 2001:7F8:1::A500:3257:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS3257 2001:7F8:1::A500:3257:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | XS4ALL Internet |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS3265 2001:7F8:1::A500:3265:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS3265 2001:7F8:1::A500:3265:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS3265 2001:7F8:1::A500:3265:2 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS3265 2001:7F8:1::A500:3265:2 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS3265 2001:7F8:1::A500:3265:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS3265 2001:7F8:1::A500:3265:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+mp-import:      from AS3265 2001:7F8:1::A500:3265:2 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS3265 2001:7F8:1::A500:3265:2 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | tele.dk |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS3292 2001:7F8:1::A500:3292:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS3292 2001:7F8:1::A500:3292:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS3292 2001:7F8:1::A500:3292:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS3292 2001:7F8:1::A500:3292:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Swisscom AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS3303 2001:7F8:1::A500:3303:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS3303 2001:7F8:1::A500:3303:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS3303 2001:7F8:1::A500:3303:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS3303 2001:7F8:1::A500:3303:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Kantonsschule Zug |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS34288 2001:7F8:1::A503:4288:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS34288 2001:7F8:1::A503:4288:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS34288 2001:7F8:1::A503:4288:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS34288 2001:7F8:1::A503:4288:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Base IP BV |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS34305 2001:7F8:1::A503:4305:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS34305 2001:7F8:1::A503:4305:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS34305 2001:7F8:1::A503:4305:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS34305 2001:7F8:1::A503:4305:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Lottomatica SpA |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS35574 2001:7F8:1::A503:5574:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS35574 2001:7F8:1::A503:5574:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS35574 2001:7F8:1::A503:5574:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS35574 2001:7F8:1::A503:5574:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Convergenze S.p.a. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS39120 2001:7F8:1::A503:9120:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS39120 2001:7F8:1::A503:9120:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS39120 2001:7F8:1::A503:9120:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS39120 2001:7F8:1::A503:9120:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Anders Business Group Ltd. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS39792 2001:7F8:1::A503:9792:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS39792 2001:7F8:1::A503:9792:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS39792 2001:7F8:1::A503:9792:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS39792 2001:7F8:1::A503:9792:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | OpenCarrier e.G. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS41692 2001:7F8:1::A504:1692:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS41692 2001:7F8:1::A504:1692:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS41692 2001:7F8:1::A504:1692:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS41692 2001:7F8:1::A504:1692:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Wikimedia Foundation Inc. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS43821 2001:7F8:1::A504:3821:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS43821 2001:7F8:1::A504:3821:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS43821 2001:7F8:1::A504:3821:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS43821 2001:7F8:1::A504:3821:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | I3D |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS49544 2001:7F8:1::A504:9544:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS49544 2001:7F8:1::A504:9544:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS49544 2001:7F8:1::A504:9544:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS49544 2001:7F8:1::A504:9544:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | W-IX |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS50384 2001:7F8:1::A505:384:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS50384 2001:7F8:1::A505:384:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS50384 2001:7F8:1::A505:384:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS50384 2001:7F8:1::A505:384:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | BT |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS5400 2001:7F8:1::A500:5400:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS5400 2001:7F8:1::A500:5400:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Vialtus Solutions |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS5413 2001:7F8:1::A500:5413:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS5413 2001:7F8:1::A500:5413:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS5413 2001:7F8:1::A500:5413:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS5413 2001:7F8:1::A500:5413:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Breedband Nederland B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS5524 2001:7F8:1::A500:5524:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS5524 2001:7F8:1::A500:5524:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS5524 2001:7F8:1::A500:5524:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS5524 2001:7F8:1::A500:5524:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Atrato IP Networks |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS5580 2001:7F8:1::A500:5580:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS5580 2001:7F8:1::A500:5580:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS5580 2001:7F8:1::A500:5580:2 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS5580 2001:7F8:1::A500:5580:2 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS5580 2001:7F8:1::A500:5580:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS5580 2001:7F8:1::A500:5580:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+mp-import:      from AS5580 2001:7F8:1::A500:5580:2 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS5580 2001:7F8:1::A500:5580:2 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Orange Business Services |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS5583 2001:7F8:1::A500:5583:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS5583 2001:7F8:1::A500:5583:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS5583 2001:7F8:1::A500:5583:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS5583 2001:7F8:1::A500:5583:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | EUnet Finland (Saunalahti Group Oyj) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS6667 2001:7F8:1::A500:6667:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS6667 2001:7F8:1::A500:6667:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS6667 2001:7F8:1::A500:6667:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS6667 2001:7F8:1::A500:6667:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | www.strato.de |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS6724 2001:7F8:1::A500:6724:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS6724 2001:7F8:1::A500:6724:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS6724 2001:7F8:1::A500:6724:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS6724 2001:7F8:1::A500:6724:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Seabone.net |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS6762 2001:7F8:1::A500:6762:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS6762 2001:7F8:1::A500:6762:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS6762 2001:7F8:1::A500:6762:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS6762 2001:7F8:1::A500:6762:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | UPC Broadband Operations |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS6830 2001:7F8:1::A500:6830:2 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS6830 2001:7F8:1::A500:6830:2 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS6830 2001:7F8:1::A500:6830:3 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS6830 2001:7F8:1::A500:6830:3 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS6830 2001:7F8:1::A500:6830:2 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS6830 2001:7F8:1::A500:6830:2 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+mp-import:      from AS6830 2001:7F8:1::A500:6830:3 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS6830 2001:7F8:1::A500:6830:3 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Hurricane Electric |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS6939 2001:7F8:1::A500:6939:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS6939 2001:7F8:1::A500:6939:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS6939 2001:7F8:1::A500:6939:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS6939 2001:7F8:1::A500:6939:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Verisign |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS7342 2001:7F8:1::A500:7342:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS7342 2001:7F8:1::A500:7342:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS7342 2001:7F8:1::A500:7342:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS7342 2001:7F8:1::A500:7342:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | COMSTAR-Direct CJSC |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS8359 2001:7F8:1::A500:8359:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS8359 2001:7F8:1::A500:8359:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS8359 2001:7F8:1::A500:8359:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS8359 2001:7F8:1::A500:8359:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | MANDA |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS8365 2001:7F8:1::A500:8365:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS8365 2001:7F8:1::A500:8365:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS8365 2001:7F8:1::A500:8365:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS8365 2001:7F8:1::A500:8365:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Claranet Benelux |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS8426 2001:7F8:1::A500:8426:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS8426 2001:7F8:1::A500:8426:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS8426 2001:7F8:1::A500:8426:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS8426 2001:7F8:1::A500:8426:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | 1&1 Internet AG |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS8560 2001:7F8:1::A500:8560:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS8560 2001:7F8:1::A500:8560:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS8560 2001:7F8:1::A500:8560:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS8560 2001:7F8:1::A500:8560:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | EspritXB B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS8608 2001:7F8:1::A500:8608:2 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS8608 2001:7F8:1::A500:8608:2 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS8608 2001:7F8:1::A500:8608:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS8608 2001:7F8:1::A500:8608:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Portugal Telecom Comunicacoes SA (IPv6) |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS8657 2001:7F8:1::A500:8657:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS8657 2001:7F8:1::A500:8657:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS8657 2001:7F8:1::A500:8657:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS8657 2001:7F8:1::A500:8657:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | RETN Ltd. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS9002 2001:7F8:1::A500:9002:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS9002 2001:7F8:1::A500:9002:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS9002 2001:7F8:1::A500:9002:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS9002 2001:7F8:1::A500:9002:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | InterConnect Services B.V. |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+mp-import:      from AS9150 2001:7F8:1::A500:9150:1 at 2001:7F8:1::A500:3333:1 action pref=100; accept ANY
+mp-export:      to AS9150 2001:7F8:1::A500:9150:1 at 2001:7F8:1::A500:3333:1 announce AS-RIPENCC
+mp-import:      from AS9150 2001:7F8:1::A500:9150:1 at 2001:7F8:1::A500:3333:2 action pref=100; accept ANY
+mp-export:      to AS9150 2001:7F8:1::A500:9150:1 at 2001:7F8:1::A500:3333:2 announce AS-RIPENCC
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AMS-IX-COLLECTORS |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AMS-IX Route Collectors - Give all, get nothing |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Renesys Corp |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS64597 80.249.208.230 at 80.249.208.68 accept RS-NONE
+export:         to AS64597 80.249.208.230 at 80.249.208.68 announce ANY
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | COLLECTORS |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Route Collectors - Give all, get nothing |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | RIS Project |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12654 193.0.4.28 at 193.0.0.56 accept RS-NONE
+export:         to AS12654 193.0.4.28 at 193.0.0.56 announce ANY
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | <Oregon Exchange BGP Router Viewer |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS6447 128.223.51.103 at 193.0.0.56 accept RS-NONE
+export:         to AS6447 128.223.51.103 at 193.0.0.56 announce ANY
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | ISOLARIO - Istituto Italiano di Telematica CNR Pisa |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS65517 146.48.78.15 at 193.0.0.56 accept RS-NONE
+export:         to AS65517 146.48.78.15 at 193.0.0.56 announce ANY
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | COLLECTORS-V6 |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | Route Collectors (IPv6) - Give all, get nothing |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:
+mp-import:      from AS65517 2A00:1620:C0:4E:146:48:78:15 at 2001:67C:2E8:FFFF::56 accept RS-NONE
+mp-export:      to AS65517 2A00:1620:C0:4E:146:48:78:15 at 2001:67C:2E8:FFFF::56 announce ANY
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AMS-IX Route Servers |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS6777 accept ANY
+export:         to AS6777 announce AS-RIPENCC
+mp-import:      from AS6777 accept ANY
+mp-export:      to AS6777 announce AS-RIPENCC
+remarks:
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | RIS Transit |
+remarks:        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import:         from AS12654 accept ANY
+export:         to AS12654 announce RS-NONE
+remarks:
+remarks:        ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | AS3333 RIPE-NCC-AS |
+remarks:        | RIPE NCC (Network Coordination Centre) |
+remarks:        ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | |
+remarks:        | RIPE NCC (AS3333) operates an open peering policy: |
+remarks:        | |
+remarks:        | We advertise only routes from AS-RIPENCC |
+remarks:        | |
+remarks:        | We will accept any routes offered including TRANSIT! |
+remarks:        | |
+remarks:        | We will update our aut-num object in the RIPE Whois |
+remarks:        | Database and kindly request you to update yours |
+remarks:        | |
+remarks:        | We would prefer not to enter into a peering contract |
+remarks:        | |
+remarks:        | In the event of problems due to leaked advertisements |
+remarks:        | it is our policy to shut down peerings and ask |
+remarks:        | questions later. |
+remarks:        | |
+remarks:        | We may tag our announcements with the NO_EXPORT or |
+remarks:        | other communities, please honour these if set. |
+remarks:        | |
+remarks:        ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | |
+remarks:        | * AMS-IX - IPv4 * |
+remarks:        | |
+remarks:        | 80.249.208.68 - Equinix AM3 |
+remarks:        | 80.249.208.71 - Telecity AMS5 |
+remarks:        | |
+remarks:        | * AMS-IX - IPv6 * |
+remarks:        | |
+remarks:        | 2001:7F8:1::A500:3333:1 - Equinix AM3 |
+remarks:        | 2001:7F8:1::A500:3333:2 - Telecity AMS5 |
+remarks:        | |
+remarks:        ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:        | |
+remarks:        | Telephone: +31 20 535 4444 |
+remarks:        | Fax: +31 20 535 4445 |
+remarks:        | Abuse: abuse@ripe.net |
+remarks:        | Peering: peering@ripe.net |
+remarks:        | Operations/NOC: ops@ripe.net |
+remarks:        | Info: https://www.ripe.net/ |
+remarks:        | |
+remarks:        ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+remarks:
+remarks:
+admin-c:        MDIR-RIPE
+tech-c:         OPS4-RIPE
+status:         ASSIGNED
+mnt-by:         RIPE-NCC-END-MNT
+mnt-by:         RIPE-NCC-MNT
+created:        2002-08-13T12:58:13Z
+last-modified:  2026-03-19T09:33:32Z
+source:         RIPE
+
+organisation:   ORG-RIEN1-RIPE
+org-name:       Reseaux IP Europeens Network Coordination Centre (RIPE NCC)
+country:        NL
+reg-nr:         40539632
+org-type:       LIR
+descr:          RIPE NCC Operations
+address:        P.O. Box 10096
+address:        1001 EB
+address:        Amsterdam
+address:        NETHERLANDS
+phone:          +31205354444
+fax-no:         +31205354445
+admin-c:        MENN1-RIPE
+admin-c:        MDIR-RIPE
+abuse-c:        ops4-ripe
+mnt-ref:        RIPE-NCC-HM-MNT
+mnt-ref:        RIPE-NCC-MNT
+mnt-by:         RIPE-NCC-HM-MNT
+mnt-by:         RIPE-NCC-MNT
+created:        2012-03-09T13:21:52Z
+last-modified:  2026-05-13T07:34:07Z
+source:         RIPE # Filtered
+
+role:           Managing Director
+address:        RIPE Network Coordination Centre
+address:        P.O. Box 10096
+address:        1001 EB Amsterdam
+address:        the Netherlands
+phone:          +31 20 535 4444
+org:            ORG-NCC1-RIPE
+nic-hdl:        MDIR-RIPE
+admin-c:        HPH2
+mnt-by:         RIPE-NCC-HM-MNT
+created:        2020-01-20T14:51:21Z
+last-modified:  2026-07-10T09:46:08Z
+source:         RIPE # Filtered
+
+role:           RIPE NCC Operations
+address:        Stationsplein 11
+address:        1012 AB Amsterdam
+address:        The Netherlands
+phone:          +31 20 535 4444
+fax-no:         +31 20 535 4445
+abuse-mailbox:  abuse@ripe.net
+admin-c:        MDIR-RIPE
+tech-c:         MENN1-RIPE
+tech-c:         RCO-RIPE
+tech-c:         CNAG-RIPE
+tech-c:         SO2011-RIPE
+tech-c:         TOL666-RIPE
+tech-c:         ADM6699-RIPE
+tech-c:         TIB-RIPE
+tech-c:         SG16480-RIPE
+tech-c:         RDM397-RIPE
+nic-hdl:        OPS4-RIPE
+mnt-by:         RIPE-NCC-MNT
+mnt-ref:        RIPE-NCC-MNT
+created:        2002-09-16T10:35:19Z
+last-modified:  2026-03-19T09:41:10Z
+source:         RIPE # Filtered
+
+% This query was served by the RIPE Database Query Service version 1.123 (BUSA)
+
+

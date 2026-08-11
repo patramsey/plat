@@ -1,9 +1,10 @@
 # plat JSON output schema
 
 `plat <domain> -o json` and `plat <domain> -o ndjson` emit the unified
-domain record as JSON; `plat <ip>` does the same for an IP network lookup.
-This schema is a public API: a breaking change to any field's shape bumps
-`schemaVersion`. The current version is **1**.
+domain record as JSON; `plat <ip>` does the same for an IP network lookup,
+and `plat <asn>` for an autonomous-system lookup. This schema is a public
+API: a breaking change to any field's shape bumps `schemaVersion`. The
+current version is **1**.
 
 ## Top-level shape
 
@@ -30,13 +31,16 @@ This schema is a public API: a breaking change to any field's shape bumps
 }
 ```
 
-`objectType` is `"domain" | "ip"` — always present, immediately after
-`schemaVersion`. It's the discriminator telling consumers which field set
-to expect in the rest of the record: a `"domain"` record follows the
-domain shape below (`registrar`, `nameservers`, `expires`, `dnssec`,
+`objectType` is `"domain" | "ip" | "asn"` — always present, immediately
+after `schemaVersion`. It's the discriminator telling consumers which
+field set to expect in the rest of the record: a `"domain"` record follows
+the domain shape below (`registrar`, `nameservers`, `expires`, `dnssec`,
 `lifecycle`, ...); an `"ip"` record follows the [IP records](#ip-records)
-shape instead (`startAddress`/`endAddress`, `cidr`, `org`, ...). Adding
-`objectType` was a purely additive change — `schemaVersion` stayed **1**.
+shape instead (`startAddress`/`endAddress`, `cidr`, `org`, ...); an
+`"asn"` record follows the [ASN records](#asn-records) shape
+(`startAutnum`/`endAutnum`, `org`, ...). Adding `objectType` and later
+adding the `"asn"` value were both purely additive changes —
+`schemaVersion` stayed **1**.
 
 ## Field shapes
 
@@ -135,6 +139,57 @@ lifecycle to interpret).
 - **Time fields** (`registered`, `updated`): same time-field shape as the domain schema (`value`/`raw`/`parsed`/`sources`). There is no `expires` — IP allocations don't expire the way domain registrations do.
 - **`org`** is an object of up to 4 string fields (`name`, `id`, `abuseEmail`, `abusePhone`), each following the string-field shape above and each independently omittable — the IP-record analog of `registrar`. The whole `org` key is omitted only if every one of its sub-fields is absent.
 - **`conflicts[]`**, **`redacted[]`**, **`sources[]`** — identical shapes and semantics to the domain schema above, just scoped to IP field names (e.g. `{"field": "org.name", ...}`) and, for `sources[]`, restricted to `registry-rdap`/`registry-whois` since there's no registrar leg to query.
+
+## ASN records
+
+`plat <asn>` (e.g. `plat AS15169`) emits an autonomous-system record
+instead of a domain or IP record — same envelope, `"objectType": "asn"`,
+a field set that's a sibling of the IP shape rather than a variant of it:
+an ASN has a start/end autnum range instead of an address range or CIDR,
+and has no IP version or parent handle. Like an IP allocation, an ASN is
+queried from the registry (RIR) only — there is no registrar leg, so
+`sources[]` only ever contains `registry-rdap`/`registry-whois` entries.
+`registrar`, `expires`, `nameservers`, `dnssec`, and `lifecycle` never
+appear on an ASN record, for the same reason they never appear on an IP
+record.
+
+```json
+{
+  "schemaVersion": 1,
+  "objectType": "asn",
+  "handle": { "value": "AS15169", "sources": ["registry-rdap"] },
+  "name": { "value": "GOOGLE", "sources": ["registry-rdap"] },
+  "type": { "value": "DIRECT ALLOCATION", "sources": ["registry-rdap"] },
+  "startAutnum": { "value": "15169", "sources": ["registry-rdap"] },
+  "endAutnum": { "value": "15169", "sources": ["registry-rdap"] },
+  "country": { "value": "US", "sources": ["registry-whois"] },
+  "org": {
+    "name": { "value": "Google LLC", "sources": ["registry-whois"] },
+    "id": { "value": "GOGL", "sources": ["registry-rdap"] },
+    "abuseEmail": { "value": "network-abuse@google.com", "sources": ["registry-rdap"] },
+    "abusePhone": { "value": "+1-650-253-0000", "sources": ["registry-rdap"] }
+  },
+  "status": { "value": ["active"], "sources": ["registry-rdap"] },
+  "registered": { "value": "2000-03-30T00:00:00Z", "raw": "2000-03-30T00:00:00Z", "parsed": true, "sources": ["registry-rdap"] },
+  "updated": { "value": "2024-03-15T18:02:11Z", "raw": "2024-03-15T18:02:11Z", "parsed": true, "sources": ["registry-rdap"] },
+  "conflicts": [
+    { "field": "org.abuseEmail", "values": { "registry-rdap": "network-abuse@google.com", "registry-whois": "abuse@google.com" } }
+  ],
+  "redacted": [
+    { "field": "org.name", "source": "registry-rdap", "reason": "redacted" }
+  ],
+  "sources": [
+    { "source": "registry-rdap", "ok": true, "notFound": false, "latencyMs": 120 },
+    { "source": "registry-whois", "ok": true, "notFound": false, "latencyMs": 45 }
+  ]
+}
+```
+
+- **String fields** (`handle`, `name`, `type`, `startAutnum`, `endAutnum`, `country`, `org.name`, `org.id`, `org.abuseEmail`, `org.abusePhone`): same string-field shape as the domain schema. `type` is the RIR's allocation/assignment type — a source-reported classification, not a plat-derived one. LACNIC's RDAP autnum response populates it (e.g. `"DIRECT ALLOCATION"`, confirmed live against AS28573); WHOIS never does, since no RPSL or ARIN-style key maps to it, so `type` is present when a RIR's RDAP service reports one and absent otherwise. `startAutnum`/`endAutnum` are the AS number range's first/last autnum, each independently omittable — the human/plain renderers combine them into a single `start - end` row, but the JSON schema keeps them as two separate fields. Despite being numeric, both are encoded as JSON strings (matching `startAddress`/`endAddress` on IP records), not numbers.
+- **List field** (`status`): same list-field shape as the domain schema — the RIR's own status vocabulary, passed through unchanged (there is no EPP-equivalent standard for autnum status).
+- **Time fields** (`registered`, `updated`): same time-field shape as the domain schema (`value`/`raw`/`parsed`/`sources`). There is no `expires` — AS number assignments don't expire the way domain registrations do.
+- **`org`** is an object of up to 4 string fields (`name`, `id`, `abuseEmail`, `abusePhone`), each following the string-field shape above and each independently omittable — identical in shape to an IP record's `org`. The whole `org` key is omitted only if every one of its sub-fields is absent.
+- **`conflicts[]`**, **`redacted[]`**, **`sources[]`** — identical shapes and semantics to the domain schema above, just scoped to ASN field names (e.g. `{"field": "org.name", ...}`) and, for `sources[]`, restricted to `registry-rdap`/`registry-whois` since there's no registrar leg to query.
 
 ## `--raw`
 

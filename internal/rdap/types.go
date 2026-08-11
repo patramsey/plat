@@ -452,3 +452,84 @@ func (n *IPNetworkResponse) Registered() (RDAPTime, bool) { return n.eventBySlot
 // Updated returns the last-changed event's date, if present. Mirrors
 // DomainResponse.Updated.
 func (n *IPNetworkResponse) Updated() (RDAPTime, bool) { return n.eventBySlot(slotUpdated) }
+
+// ASNResponse is a trimmed RFC 9083 "autnum" object view. Like
+// IPNetworkResponse, it has no expiry, registrar, nameservers, or DNSSEC.
+type ASNResponse struct {
+	ObjectClassName string     `json:"objectClassName"`
+	Handle          string     `json:"handle"`
+	StartAutnum     uint32     `json:"startAutnum"`
+	EndAutnum       uint32     `json:"endAutnum"`
+	Name            string     `json:"name"`
+	Type            string     `json:"type"`
+	Country         string     `json:"country"`
+	Status          StatusList `json:"status"`
+	Events          []Event    `json:"events"`
+	Entities        EntityList `json:"entities"`
+	Remarks         RemarkList `json:"remarks"`
+	Port43          string     `json:"port43"`
+}
+
+// entityByRole mirrors DomainResponse.entityByRole -- kept as a separate
+// method rather than refactored into a shared free function alongside it,
+// since the domain and IP paths must stay untouched (see the
+// domainAt/ipAt precedent from the bootstrap package).
+func (a *ASNResponse) entityByRole(role string) (Entity, bool) {
+	for _, e := range a.Entities {
+		for _, r := range e.Roles {
+			if strings.EqualFold(r, role) {
+				return e, true
+			}
+		}
+	}
+	return Entity{}, false
+}
+
+// RegistrantEntity returns the first entity whose Roles includes
+// "registrant" (case-insensitive), if any. Mirrors
+// IPNetworkResponse.RegistrantEntity.
+func (a *ASNResponse) RegistrantEntity() (Entity, bool) {
+	return a.entityByRole("registrant")
+}
+
+// AbuseEntity returns the first entity whose Roles includes "abuse", if
+// any. Mirrors DomainResponse.AbuseEntity.
+func (a *ASNResponse) AbuseEntity() (Entity, bool) {
+	return a.entityByRole("abuse")
+}
+
+// eventBySlot mirrors DomainResponse.eventBySlot.
+func (a *ASNResponse) eventBySlot(slot eventSlot) (RDAPTime, bool) {
+	for _, e := range a.Events {
+		if normalizeEventAction(e.Action) == slot {
+			return e.Date, true
+		}
+	}
+	return RDAPTime{}, false
+}
+
+// Registered returns the registration event's date, if present. Mirrors
+// IPNetworkResponse.Registered -- named Registered rather than Created
+// since an ASN is "registered" with a RIR, not "created" the way a domain
+// is.
+func (a *ASNResponse) Registered() (RDAPTime, bool) { return a.eventBySlot(slotCreated) }
+
+// Updated returns the last-changed event's date, if present. Mirrors
+// DomainResponse.Updated.
+func (a *ASNResponse) Updated() (RDAPTime, bool) { return a.eventBySlot(slotUpdated) }
+
+// RedactionRemarks returns remarks whose title or type suggests redacted
+// data. Mirrors DomainResponse.RedactionRemarks -- same shallow,
+// informational signal, not a full RFC 9537 evaluation.
+func (a *ASNResponse) RedactionRemarks() []Remark {
+	var out []Remark
+	for _, r := range a.Remarks {
+		lt := strings.ToLower(r.Title)
+		ly := strings.ToLower(r.Type)
+		if strings.Contains(lt, "redact") || strings.Contains(lt, "privacy") ||
+			strings.Contains(ly, "redact") || strings.Contains(ly, "privacy") {
+			out = append(out, r)
+		}
+	}
+	return out
+}

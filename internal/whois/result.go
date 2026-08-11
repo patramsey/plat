@@ -17,8 +17,15 @@ type Hop struct {
 	// IPFields is populated instead of Fields when the hop was an IP
 	// query. Nil for domain hops.
 	IPFields *parse.IPFields
-	Latency  time.Duration
-	Err      error
+	// ASNFields is populated in addition to Fields (not instead of it) when
+	// the hop was an ASN query -- asnHop (referral.go) fills both, since
+	// Fields is where parse.Parse's "refer:"/NotFound/RateLimited/
+	// Unsupported signals land, and internal/collect's ASN adapters
+	// load-bearingly depend on reading hop.Fields.NotFound alongside
+	// ASNFields. Nil for domain and IP hops.
+	ASNFields *parse.ASNFields
+	Latency   time.Duration
+	Err       error
 }
 
 // Result is the standalone, package-scoped outcome of a WHOIS lookup: an

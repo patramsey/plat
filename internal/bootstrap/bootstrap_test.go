@@ -25,17 +25,17 @@ func withIsolatedCacheDir(t *testing.T) {
 // network.
 const unreachableURL = "http://127.0.0.1:1/unreachable"
 
-// redirectRegistries points all three bootstrap registry URLs (dns, ipv4,
-// ipv6) at the given URLs for the duration of the test, restoring the
-// originals on cleanup. Load always fetches all three, so a test that only
-// cares about one registry's behavior must still redirect the other two —
+// redirectRegistries points all four bootstrap registry URLs (dns, ipv4,
+// ipv6, asn) at the given URLs for the duration of the test, restoring the
+// originals on cleanup. Load always fetches all four, so a test that only
+// cares about one registry's behavior must still redirect the other three —
 // typically to unreachableURL — or it would silently depend on the real
 // network.
-func redirectRegistries(t *testing.T, dns, ipv4, ipv6 string) {
+func redirectRegistries(t *testing.T, dns, ipv4, ipv6, asn string) {
 	t.Helper()
-	origDNS, origV4, origV6 := bootstrapURL, ipv4URL, ipv6URL
-	bootstrapURL, ipv4URL, ipv6URL = dns, ipv4, ipv6
-	t.Cleanup(func() { bootstrapURL, ipv4URL, ipv6URL = origDNS, origV4, origV6 })
+	origDNS, origV4, origV6, origASN := bootstrapURL, ipv4URL, ipv6URL, asnURL
+	bootstrapURL, ipv4URL, ipv6URL, asnURL = dns, ipv4, ipv6, asn
+	t.Cleanup(func() { bootstrapURL, ipv4URL, ipv6URL, asnURL = origDNS, origV4, origV6, origASN })
 }
 
 func TestEmbeddedSnapshotParses(t *testing.T) {
@@ -78,7 +78,7 @@ func TestLoad_UsesFreshCache(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL)
+	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL, unreachableURL)
 
 	r, err := Load(context.Background(), Options{})
 	if err != nil {
@@ -108,7 +108,7 @@ func TestLoad_StaleCacheTriggersFetchFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL) // fetch will fail
+	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL, unreachableURL) // fetch will fail
 
 	r, err := Load(context.Background(), Options{})
 	if err != nil {
@@ -122,7 +122,7 @@ func TestLoad_StaleCacheTriggersFetchFallback(t *testing.T) {
 func TestLoad_RefreshFailsFallsBackToEmbedded(t *testing.T) {
 	withIsolatedCacheDir(t)
 
-	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL)
+	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL, unreachableURL)
 
 	r, err := Load(context.Background(), Options{Refresh: true, Timeout: 500 * time.Millisecond})
 	if err != nil {
@@ -143,7 +143,7 @@ func TestLoad_FetchSuccessWritesCache(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	redirectRegistries(t, srv.URL, unreachableURL, unreachableURL)
+	redirectRegistries(t, srv.URL, unreachableURL, unreachableURL, unreachableURL)
 
 	r, err := Load(context.Background(), Options{})
 	if err != nil {
@@ -250,13 +250,13 @@ func TestNewIPResolver_IPv6(t *testing.T) {
 
 func TestLoad_EmbeddedIPRegistriesParse(t *testing.T) {
 	// The embedded snapshots must parse and cover a well-known address,
-	// so an offline/first-run lookup still resolves. Redirect all three
+	// so an offline/first-run lookup still resolves. Redirect all four
 	// registries to an unreachable address (and use an isolated, empty
 	// cache dir) so this genuinely exercises the no-network, no-cache,
 	// embedded-only path rather than incidentally succeeding via a real
 	// fetch or a leftover cache file.
 	withIsolatedCacheDir(t)
-	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL)
+	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL, unreachableURL)
 
 	r, err := Load(context.Background(), Options{})
 	if err != nil {
@@ -268,4 +268,131 @@ func TestLoad_EmbeddedIPRegistriesParse(t *testing.T) {
 	if _, ok := r.IPBaseURL(netip.MustParseAddr("2001:4860:4860::8888")); !ok {
 		t.Error("IPBaseURL(2001:4860:4860::8888) ok=false, want a RIR match from the embedded ipv6 registry")
 	}
+}
+
+func TestNewASNResolver_RangeContainment(t *testing.T) {
+	r := NewASNResolver(map[[2]uint32]string{
+		{36864, 37887}: "https://afrinic.example/",
+		{15169, 15169}: "https://arin.example/",
+	})
+	for _, tt := range []struct {
+		name string
+		asn  uint32
+		want string
+		ok   bool
+	}{
+		{"single-value range", 15169, "https://arin.example/", true},
+		{"first autnum in range", 36864, "https://afrinic.example/", true},
+		{"last autnum in range", 37887, "https://afrinic.example/", true},
+		{"just below range", 36863, "", false},
+		{"just above range", 37888, "", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := r.ASNBaseURL(tt.asn)
+			if ok != tt.ok || got != tt.want {
+				t.Errorf("ASNBaseURL(%d) = %q,%v; want %q,%v", tt.asn, got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
+
+func TestLoad_EmbeddedASNRegistryParses(t *testing.T) {
+	withIsolatedCacheDir(t)
+	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL, unreachableURL)
+	r, err := Load(context.Background(), Options{})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, ok := r.ASNBaseURL(15169); !ok {
+		t.Error("ASNBaseURL(15169) ok=false, want a RIR match from the embedded asn registry")
+	}
+}
+
+// TestParseASNSpan exercises parseASNSpan's defensive parsing directly --
+// it exists specifically to survive malformed IANA asn.json entries without
+// wrapping or silently mis-parsing a span, so its non-numeric, reversed,
+// empty, whitespace, and overflow branches need direct coverage rather than
+// only being reached incidentally through parseASNRanges/Load.
+func TestParseASNSpan(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		entry     string
+		wantStart uint32
+		wantEnd   uint32
+		wantOK    bool
+	}{
+		{"bare single number", "15169", 15169, 15169, true},
+		{"valid range", "36864-37887", 36864, 37887, true},
+		{"non-numeric start", "abc-100", 0, 0, false},
+		{"non-numeric end", "100-xyz", 0, 0, false},
+		{"reversed range", "500-100", 0, 0, false},
+		{"empty string", "", 0, 0, false},
+		{"whitespace-padded range", " 100 - 200 ", 100, 200, true},
+		{"whitespace-only", "   ", 0, 0, false},
+		{"start exceeds uint32 must not wrap", "4294967296", 0, 0, false},
+		{"end exceeds uint32 must not wrap", "1-4294967296", 0, 0, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			start, end, ok := parseASNSpan(tt.entry)
+			if ok != tt.wantOK || start != tt.wantStart || end != tt.wantEnd {
+				t.Errorf("parseASNSpan(%q) = %d, %d, %v; want %d, %d, %v",
+					tt.entry, start, end, ok, tt.wantStart, tt.wantEnd, tt.wantOK)
+			}
+		})
+	}
+}
+
+// TestParseASNRanges covers parseASNRanges' document-level defensive
+// branches: invalid top-level JSON, a malformed services entry, and --
+// the important case -- one unparseable span inside a service alongside a
+// valid one, proving a single bad delegation doesn't cost every other
+// entry in that service.
+func TestParseASNRanges(t *testing.T) {
+	t.Run("malformed JSON returns an error", func(t *testing.T) {
+		into := map[[2]uint32]string{}
+		err := parseASNRanges([]byte("{not valid json"), into)
+		if err == nil {
+			t.Fatal("parseASNRanges with malformed JSON: got nil error, want non-nil")
+		}
+		if len(into) != 0 {
+			t.Errorf("into = %v, want empty on parse error", into)
+		}
+	})
+
+	t.Run("service entry with fewer than 2 elements is skipped", func(t *testing.T) {
+		doc := `{"services": [ [["100-200"]] ]}`
+		into := map[[2]uint32]string{}
+		if err := parseASNRanges([]byte(doc), into); err != nil {
+			t.Fatalf("parseASNRanges: %v", err)
+		}
+		if len(into) != 0 {
+			t.Errorf("into = %v, want empty when a service has no URL element", into)
+		}
+	})
+
+	t.Run("service entry with empty URL list is skipped", func(t *testing.T) {
+		doc := `{"services": [ [["100-200"], []] ]}`
+		into := map[[2]uint32]string{}
+		if err := parseASNRanges([]byte(doc), into); err != nil {
+			t.Fatalf("parseASNRanges: %v", err)
+		}
+		if len(into) != 0 {
+			t.Errorf("into = %v, want empty when a service's URL list is empty", into)
+		}
+	})
+
+	t.Run("one unparseable span does not cost the rest of the service", func(t *testing.T) {
+		doc := `{"services": [ [["abc-def", "200-300"], ["https://rir.example/"]] ]}`
+		into := map[[2]uint32]string{}
+		if err := parseASNRanges([]byte(doc), into); err != nil {
+			t.Fatalf("parseASNRanges: %v", err)
+		}
+		if len(into) != 1 {
+			t.Fatalf("into has %d entries, want exactly 1 (the malformed span skipped, the valid one kept): %v", len(into), into)
+		}
+		url, ok := into[[2]uint32{200, 300}]
+		if !ok || url != "https://rir.example/" {
+			t.Errorf("into[{200,300}] = %q, %v; want %q, true", url, ok, "https://rir.example/")
+		}
+	})
 }
