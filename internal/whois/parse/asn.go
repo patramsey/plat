@@ -40,6 +40,14 @@ type ASNFields struct {
 // the first occurrence wins -- see ParseASN's doc comment for why the
 // as-block object (which RIPE places before the aut-num object in the
 // same response) must never reach this table at all.
+//
+// "status" is deliberately NOT listed here even though it's part of the
+// RPSL vocabulary this table otherwise covers: it's append-valued (every
+// "status:" line accumulates, unlike every other key's overwrite-once
+// scalar), and ParseASN handles it on its own dedicated path for that
+// reason -- see the comment there. Adding a "status" entry to this table
+// would just be dead code, since ParseASN's main loop intercepts and
+// `continue`s on that key before ever consulting this map.
 var asnSynonyms = map[string]func(*ASNFields, string){
 	"asnumber": func(f *ASNFields, v string) { f.Number = v },
 	"aut-num": func(f *ASNFields, v string) {
@@ -61,7 +69,6 @@ var asnSynonyms = map[string]func(*ASNFields, string){
 	"orgabuseemail": func(f *ASNFields, v string) { f.AbuseEmail = v },
 	"abuse-mailbox": func(f *ASNFields, v string) { f.AbuseEmail = v },
 	"orgabusephone": func(f *ASNFields, v string) { f.AbusePhone = v },
-	"status":        func(f *ASNFields, v string) { f.Statuses = append(f.Statuses, v) },
 }
 
 // asnFieldGet reports whether the member a key maps to is already
@@ -172,6 +179,36 @@ func ParseASN(raw string) ASNFields {
 		if val == "" {
 			continue
 		}
+
+		// "status" is append-valued (asnSynonyms accumulates every
+		// occurrence into f.Statuses, unlike every other key here, which
+		// overwrites a single scalar) and deliberately absent from
+		// asnFieldGet as a result -- there's no single "current value" to
+		// ask "is this already populated?" about. The fromAutNum[key]
+		// short-circuit below exists to enforce first-occurrence-wins for
+		// *scalar* fields inside aut-num; applied to status it instead
+		// silently drops every status line after the first one a given
+		// aut-num object carries (APNIC and RIPE both routinely report
+		// more than one, e.g. "ASSIGNED" and a routing-policy status
+		// together). And outside aut-num, status has no asnFieldGet entry
+		// to gate it at all, so a stray "status:" line from an unrelated
+		// preceding or following RPSL object (a role/person/organisation
+		// contact object; APNIC is known to place one between as-block
+		// and aut-num, see ParseASN's doc comment) leaks straight into
+		// f.Statuses -- the exact inverse of the intended precedence:
+		// legitimate aut-num statuses truncated, illegitimate foreign
+		// ones accumulated. So status is handled on its own path here,
+		// which accumulates every "status:" line while inAutNum is true
+		// (no first-occurrence gating -- that's the whole point of an
+		// append field) and ignores the key entirely everywhere else,
+		// aut-num or not.
+		if key == "status" {
+			if inAutNum {
+				f.Statuses = append(f.Statuses, val)
+			}
+			continue
+		}
+
 		set, known := asnSynonyms[key]
 		if !known {
 			continue

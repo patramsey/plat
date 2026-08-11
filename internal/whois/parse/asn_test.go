@@ -138,3 +138,47 @@ func TestParseASN_EmptyInput(t *testing.T) {
 		t.Errorf("ParseASN(\"\") = %+v, want the zero value", got)
 	}
 }
+
+// TestParseASN_MultipleStatusLinesWithinAutNumAllAccumulate is a
+// regression test for the Task-6 fromAutNum fix inverting status
+// precedence: the fromAutNum[key] first-occurrence-wins short-circuit was
+// applied uniformly to every synonym key, including "status", even
+// though status is append-valued. A real aut-num object with two
+// "status:" lines was silently truncated to just the first.
+func TestParseASN_MultipleStatusLinesWithinAutNumAllAccumulate(t *testing.T) {
+	raw := `aut-num:     AS64512
+status:      ASSIGNED
+status:      ROUTED
+source:      TEST
+`
+	f := ParseASN(raw)
+	if want := []string{"ASSIGNED", "ROUTED"}; !reflect.DeepEqual(f.Statuses, want) {
+		t.Errorf("Statuses = %v, want %v (both status lines within aut-num must accumulate)", f.Statuses, want)
+	}
+}
+
+// TestParseASN_StatusFromNonAutNumObjectIsSuppressed is the inverse
+// regression: a "status:" line belonging to some other RPSL object (a
+// role/person/organisation contact object) must never leak into
+// f.Statuses, whether that object precedes or follows the aut-num
+// object. Before the fix, "status" had no asnFieldGet entry, so it
+// bypassed the aut-num-always-wins gate entirely and any object's status
+// line was appended unconditionally.
+func TestParseASN_StatusFromNonAutNumObjectIsSuppressed(t *testing.T) {
+	raw := `role:        Some Contact
+status:      BOGUS
+source:      TEST
+
+aut-num:     AS64512
+status:      ASSIGNED
+source:      TEST
+
+role:        Another Contact
+status:      ALSO-BOGUS
+source:      TEST
+`
+	f := ParseASN(raw)
+	if want := []string{"ASSIGNED"}; !reflect.DeepEqual(f.Statuses, want) {
+		t.Errorf("Statuses = %v, want %v (only the aut-num object's own status, none of the surrounding role objects')", f.Statuses, want)
+	}
+}
