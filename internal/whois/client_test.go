@@ -379,3 +379,41 @@ func TestLookupIP_FollowsIANAReferral(t *testing.T) {
 		t.Errorf("NetName = %q, want GOGL", last.IPFields.NetName)
 	}
 }
+
+func TestLookupASN_FollowsIANAReferral(t *testing.T) {
+	var rirReceived string
+	rirAddr := startListener(t, func(q string) string {
+		rirReceived = q
+		return "ASNumber:       15169\nASName:         GOOGLE\nOrgName:        Google LLC\n"
+	})
+	var ianaReceived string
+	ianaAddr := startListener(t, func(q string) string {
+		ianaReceived = q
+		return "whois:          " + rirAddr + "\n"
+	})
+
+	c := &Client{IANAServer: ianaAddr, Timeout: 5 * time.Second}
+	res, err := c.LookupASN(context.Background(), 15169)
+	if err != nil {
+		t.Fatalf("LookupASN: %v", err)
+	}
+	if len(res.Hops) != 2 {
+		t.Fatalf("hops = %d, want 2 (IANA then RIR)", len(res.Hops))
+	}
+	if ianaReceived != "AS15169" {
+		t.Errorf("IANA query = %q, want %q (bare number with AS prefix, verified live against whois.iana.org)", ianaReceived, "AS15169")
+	}
+	if rirReceived != "AS15169" {
+		t.Errorf("RIR query = %q, want %q (same query string reused at the RIR hop, verified live against whois.arin.net)", rirReceived, "AS15169")
+	}
+	last := res.Hops[len(res.Hops)-1]
+	if last.ASNFields == nil {
+		t.Fatal("final hop ASNFields = nil, want parsed ASN fields")
+	}
+	if last.ASNFields.Name != "GOOGLE" {
+		t.Errorf("Name = %q, want GOOGLE", last.ASNFields.Name)
+	}
+	if last.IPFields != nil {
+		t.Error("IPFields should stay nil on an ASN hop")
+	}
+}

@@ -17,8 +17,11 @@ type Hop struct {
 	// IPFields is populated instead of Fields when the hop was an IP
 	// query. Nil for domain hops.
 	IPFields *parse.IPFields
-	Latency  time.Duration
-	Err      error
+	// ASNFields is populated instead of Fields/IPFields when the hop was
+	// an ASN query. Nil for domain and IP hops.
+	ASNFields *parse.ASNFields
+	Latency   time.Duration
+	Err       error
 }
 
 // Result is the standalone, package-scoped outcome of a WHOIS lookup: an
