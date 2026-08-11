@@ -54,10 +54,10 @@ var asnSynonyms = map[string]func(*ASNFields, string){
 		f.Handle = v
 		f.Number = strings.TrimPrefix(strings.ToUpper(v), "AS")
 	},
-	"asname":        func(f *ASNFields, v string) { f.Name = v },
-	"as-name":       func(f *ASNFields, v string) { f.Name = v },
-	"ashandle":      func(f *ASNFields, v string) { f.Handle = v },
-	"orgname":       func(f *ASNFields, v string) { f.OrgName = v },
+	"asname":   func(f *ASNFields, v string) { f.Name = v },
+	"as-name":  func(f *ASNFields, v string) { f.Name = v },
+	"ashandle": func(f *ASNFields, v string) { f.Handle = v },
+	"orgname":  func(f *ASNFields, v string) { f.OrgName = v },
 	// "org-name" is AFRINIC's own vocabulary (its aut-num's "org:" line
 	// points at a separate "organisation:" object, which carries
 	// "org-name:" for the actual identity string) -- already present in
