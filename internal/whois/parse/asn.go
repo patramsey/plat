@@ -58,6 +58,19 @@ var asnSynonyms = map[string]func(*ASNFields, string){
 	"as-name":       func(f *ASNFields, v string) { f.Name = v },
 	"ashandle":      func(f *ASNFields, v string) { f.Handle = v },
 	"orgname":       func(f *ASNFields, v string) { f.OrgName = v },
+	// "org-name" is AFRINIC's own vocabulary (its aut-num's "org:" line
+	// points at a separate "organisation:" object, which carries
+	// "org-name:" for the actual identity string) -- already present in
+	// ipSynonyms for the identical inetnum/organisation-object shape, but
+	// missing here until now. Without it, AFRINIC's org.name only ever
+	// came from "descr", which happens to agree with org-name for most
+	// AFRINIC records today but isn't guaranteed to.
+	"org-name": func(f *ASNFields, v string) { f.OrgName = v },
+	// "owner" is LACNIC's RPSL vocabulary for the aut-num holder's name --
+	// LACNIC does not use "orgname"/"org-name"/"descr" for this at all, so
+	// without this entry LACNIC WHOIS contributed no org identity
+	// whatsoever (confirmed live against AS28573).
+	"owner":         func(f *ASNFields, v string) { f.OrgName = v },
 	"descr":         func(f *ASNFields, v string) { f.descr = v },
 	"orgid":         func(f *ASNFields, v string) { f.OrgID = v },
 	"org":           func(f *ASNFields, v string) { f.OrgID = v },
@@ -66,6 +79,10 @@ var asnSynonyms = map[string]func(*ASNFields, string){
 	"created":       func(f *ASNFields, v string) { f.Registered = v },
 	"updated":       func(f *ASNFields, v string) { f.Updated = v },
 	"last-modified": func(f *ASNFields, v string) { f.Updated = v },
+	// "changed" is LACNIC's RPSL vocabulary for last-modified -- distinct
+	// from "updated"/"last-modified", which LACNIC's aut-num response
+	// never emits (confirmed live against AS28573).
+	"changed":       func(f *ASNFields, v string) { f.Updated = v },
 	"orgabuseemail": func(f *ASNFields, v string) { f.AbuseEmail = v },
 	"abuse-mailbox": func(f *ASNFields, v string) { f.AbuseEmail = v },
 	"orgabusephone": func(f *ASNFields, v string) { f.AbusePhone = v },
@@ -80,6 +97,8 @@ var asnFieldGet = map[string]func(*ASNFields) string{
 	"as-name":       func(f *ASNFields) string { return f.Name },
 	"ashandle":      func(f *ASNFields) string { return f.Handle },
 	"orgname":       func(f *ASNFields) string { return f.OrgName },
+	"org-name":      func(f *ASNFields) string { return f.OrgName },
+	"owner":         func(f *ASNFields) string { return f.OrgName },
 	"descr":         func(f *ASNFields) string { return f.descr },
 	"orgid":         func(f *ASNFields) string { return f.OrgID },
 	"org":           func(f *ASNFields) string { return f.OrgID },
@@ -88,6 +107,7 @@ var asnFieldGet = map[string]func(*ASNFields) string{
 	"created":       func(f *ASNFields) string { return f.Registered },
 	"updated":       func(f *ASNFields) string { return f.Updated },
 	"last-modified": func(f *ASNFields) string { return f.Updated },
+	"changed":       func(f *ASNFields) string { return f.Updated },
 	"orgabuseemail": func(f *ASNFields) string { return f.AbuseEmail },
 	"abuse-mailbox": func(f *ASNFields) string { return f.AbuseEmail },
 	"orgabusephone": func(f *ASNFields) string { return f.AbusePhone },

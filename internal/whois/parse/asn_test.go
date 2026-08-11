@@ -133,6 +133,69 @@ func TestParseASN_APNIC_FirstDescrWithinAutNumWins(t *testing.T) {
 	}
 }
 
+// TestParseASN_LACNIC is a regression test for a live-probed gap: LACNIC's
+// RPSL vocabulary uses "owner" (not "orgname"/"org-name"/"descr") for the
+// aut-num holder's name and "changed" (not "updated"/"last-modified") for
+// last-modified, and reports both created/changed as compact unpunctuated
+// "20031127"-style dates. None of those three were recognized before this
+// fix, so LACNIC's registry-whois source contributed nothing but the
+// handle and an unparsed date -- a RIR silently reduced to near-zero
+// signal, not a RIR that happened to agree with RDAP.
+func TestParseASN_LACNIC(t *testing.T) {
+	raw, err := os.ReadFile("../../../testdata/whois/lacnic-as28573.txt")
+	if err != nil {
+		t.Fatalf("reading golden: %v", err)
+	}
+	f := ParseASN(string(raw))
+
+	if f.Handle != "AS28573" {
+		t.Errorf("Handle = %q, want AS28573", f.Handle)
+	}
+	if f.OrgName != "Claro NXT Telecomunicacoes Ltda" {
+		t.Errorf("OrgName = %q, want Claro NXT Telecomunicacoes Ltda (from LACNIC's \"owner:\" line)", f.OrgName)
+	}
+	if !ParseDate(f.Registered).Parsed {
+		t.Errorf("Registered = %q did not parse", f.Registered)
+	}
+	if ParseDate(f.Registered).Time.Format("2006-01-02") != "2003-11-27" {
+		t.Errorf("Registered = %q, want to parse to 2003-11-27", f.Registered)
+	}
+	if !ParseDate(f.Updated).Parsed {
+		t.Errorf("Updated = %q did not parse", f.Updated)
+	}
+	if ParseDate(f.Updated).Time.Format("2006-01-02") != "2023-01-05" {
+		t.Errorf("Updated = %q, want to parse to 2023-01-05", f.Updated)
+	}
+}
+
+// TestParseASN_AFRINIC_OrgNameFromOrganisationObject is a golden-file
+// regression test for the org-name/AFRINIC asymmetry noted alongside the
+// LACNIC fix: "org-name" was present in ipSynonyms but missing from
+// asnSynonyms, even though AFRINIC's aut-num response follows the exact
+// same shape (a bare "org:" handle pointing at a trailing "organisation:"
+// object whose "org-name:" carries the real identity) for ASNs as it does
+// for IP networks.
+func TestParseASN_AFRINIC_OrgNameFromOrganisationObject(t *testing.T) {
+	raw, err := os.ReadFile("../../../testdata/whois/afrinic-as36936.txt")
+	if err != nil {
+		t.Fatalf("reading golden: %v", err)
+	}
+	f := ParseASN(string(raw))
+
+	if f.Handle != "AS36936" {
+		t.Errorf("Handle = %q, want AS36936", f.Handle)
+	}
+	if f.OrgName != "Banco Angolano de Investimentos" {
+		t.Errorf("OrgName = %q, want Banco Angolano de Investimentos (from the organisation object's org-name)", f.OrgName)
+	}
+	if f.OrgID != "ORG-BAdI1-AFRINIC" {
+		t.Errorf("OrgID = %q, want ORG-BAdI1-AFRINIC", f.OrgID)
+	}
+	if f.Country != "AO" {
+		t.Errorf("Country = %q, want AO", f.Country)
+	}
+}
+
 func TestParseASN_EmptyInput(t *testing.T) {
 	if got := ParseASN(""); !reflect.DeepEqual(got, ASNFields{}) {
 		t.Errorf("ParseASN(\"\") = %+v, want the zero value", got)

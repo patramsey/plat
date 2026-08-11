@@ -1,0 +1,115 @@
+% This is the AfriNIC Whois server.
+% The AFRINIC whois database is subject to  the following terms of Use. See https://afrinic.net/whois/terms
+
+% Note: this output has been filtered.
+%       To receive output for a database update, use the "-B" flag.
+
+% Information related to 'AS36936'
+
+% No abuse contact registered for AS36936
+
+aut-num:        AS36936
+as-name:        BancoBai
+descr:          Banco Angolano de Investimentos
+status:         ASSIGNED
+admin-c:        PC28-AFRINIC
+admin-c:        WS34-AFRINIC
+admin-c:        LM60-AFRINIC
+admin-c:        RR44-AFRINIC
+tech-c:         WS34-AFRINIC
+tech-c:         LM60-AFRINIC
+tech-c:         MG69-AFRINIC
+tech-c:         HM22-AFRINIC
+org:            ORG-BAdI1-AFRINIC
+mnt-by:         AFRINIC-HM-MNT
+mnt-lower:      BancoBai-MNT
+mnt-routes:     BancoBai-MNT
+source:         AFRINIC # Filtered
+
+organisation:   ORG-BAdI1-AFRINIC
+org-name:       Banco Angolano de Investimentos
+org-type:       EU-PI
+country:        AO
+address:        Travessa Ho Chi Min, Edifício Garden Towers, Torre A
+address:        Luanda
+phone:          tel:+244-925-776-590
+phone:          tel:+244-926-309-008
+phone:          tel:+244-942-072-422
+phone:          tel:+244-931-445-310
+phone:          tel:+244-924-100-100
+phone:          tel:+244-923-546-787
+admin-c:        LM60-AFRINIC
+admin-c:        WS34-AFRINIC
+admin-c:        PC28-AFRINIC
+admin-c:        RR44-AFRINIC
+tech-c:         LM60-AFRINIC
+tech-c:         WS34-AFRINIC
+tech-c:         MG69-AFRINIC
+tech-c:         HM22-AFRINIC
+mnt-ref:        AFRINIC-HM-MNT
+mnt-ref:        BANCOBAI-MNT
+mnt-by:         AFRINIC-HM-MNT
+source:         AFRINIC # Filtered
+
+person:         Helder Martins
+address:        Travessa Ho Chi Min, Edifício Garden Towers, Torre A
+address:        Luanda
+address:        AO
+address:        Luanda
+address:        Angola
+phone:          tel:+244-925-776-590
+nic-hdl:        HM22-AFRINIC
+mnt-by:         GENERATED-IRKU0N4SIYTF2QZWMCEEAJXFF6YEMLHC-MNT
+source:         AFRINIC # Filtered
+
+person:         Luis Martins
+address:        Complexo Garden Towers, Torre BAI, Travessa address: Ho Chi Minh, Distrito Urbano da Maianga
+address:        Luanda
+address:        Angola
+phone:          tel:+244-923-353-885
+nic-hdl:        LM60-AFRINIC
+source:         AFRINIC # Filtered
+mnt-by:         GENERATED-N9VR9O1YPOEKLDLSPHMTBTXP32BVWKG7-MNT
+
+person:         Marcos Gomes
+address:        Complexo Garden Towers,
+address:        Torre BAI, Travessa Ho Chi Minh,
+address:        Distrito Urbano da Maianga
+address:        Luanda
+address:        Luanda
+address:        Angola
+phone:          tel:+244-937-816-863
+phone:          tel:+244-222-693-800
+nic-hdl:        MG69-AFRINIC
+source:         AFRINIC # Filtered
+mnt-by:         GENERATED-PTSWHVUXQ5IF1JKQ9BPDXUC1A0LROIAN-MNT
+
+person:         Paulo Cruz
+address:        Travessa Ho Chi Min, Edifício Garden Towers, Torre A
+address:        Luanda
+address:        Angola
+phone:          tel:+244-923-546-787
+nic-hdl:        PC28-AFRINIC
+source:         AFRINIC # Filtered
+mnt-by:         GENERATED-VMZBLXJP12YCDFHETTF8XIEIEDZYWYJH-MNT
+
+person:         Ricardo Ramos
+address:        Banco BAI
+address:        Luanda
+address:        Angola
+phone:          tel:+244-941-563-828
+nic-hdl:        RR44-AFRINIC
+source:         AFRINIC # Filtered
+mnt-by:         GENERATED-UVR5KBE0TF4REPHPNNSH2JWXIUU6VOCJ-MNT
+
+person:         Wagner Sousa
+address:        Complexo Garden Towers, Torre BAI, Travessa Ho Chi Minh, Distrito Urbano da Maianga
+address:        Luanda
+address:        Angola
+phone:          tel:+244-923-609-383
+nic-hdl:        WS34-AFRINIC
+source:         AFRINIC # Filtered
+mnt-by:         GENERATED-AS5PEQC6T8CTJTM6SRMAKS2RWLKY3FZP-MNT
+
+
+

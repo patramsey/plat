@@ -24,6 +24,7 @@ func TestParseDate(t *testing.T) {
 		{"slash form (.jp)", "2026/07/12", true, "2026-07-12T00:00:00Z"},
 		{"dot form", "2026.07.12", true, "2026-07-12T00:00:00Z"},
 		{"day.month.year dot form", "12.07.2026", true, "2026-07-12T00:00:00Z"},
+		{"LACNIC compact unpunctuated form", "20031127", true, "2003-11-27T00:00:00Z"},
 		{"verbose month name", "August 14, 1995", true, "1995-08-14T00:00:00Z"},
 		{"verbose month name lowercase", "august 14, 1995", true, "1995-08-14T00:00:00Z"},
 		{"weekday month day year", "Wed Aug 14 2025", true, "2025-08-14T00:00:00Z"},
