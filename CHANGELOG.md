@@ -7,6 +7,14 @@ follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- LACNIC-held IP lookups (`plat 200.3.12.1`, etc.) no longer silently
+  drop registry-WHOIS data. `internal/whois/parse/ip.go` was missing
+  LACNIC's RPSL vocabulary for org name (`owner`), org ID (`ownerid`),
+  and last-modified (`changed`) -- the identical gap already fixed for
+  ASN lookups in `internal/whois/parse/asn.go`, but never ported to the
+  IP parser. Organization and Updated now correctly show both
+  `registry-rdap` and `registry-whois` provenance instead of appearing
+  RDAP-only with no conflict to reveal the missing source.
 - `-o json` and `-o ndjson` are now byte-reproducible across runs. The
   `nameservers` and `status` arrays are sorted, so repeated lookups of an
   unchanged domain, IP, or ASN produce identical output. Previously the

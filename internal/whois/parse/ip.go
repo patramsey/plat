@@ -37,29 +37,52 @@ type IPFields struct {
 // ipSynonyms maps the lowercased WHOIS key to the IPFields member it
 // populates. Both major vocabularies are covered in one table: ARIN's
 // CamelCase keys (NetRange, OrgName) and the RPSL-style keys RIPE, APNIC,
-// LACNIC and AFRINIC share (inetnum, netname, descr). A key already set
-// is never overwritten, so the first occurrence wins -- this matters for
-// ARIN, whose responses repeat RegDate/Updated for both the network and
-// the org, and whose network block comes first.
+// LACNIC and AFRINIC share (inetnum, netname, descr), plus LACNIC's own
+// RPSL variants (owner, ownerid, changed) that the other RPSL registries
+// don't use. A key already set is never overwritten, so the first
+// occurrence wins -- this matters for ARIN, whose responses repeat
+// RegDate/Updated for both the network and the org, and whose network
+// block comes first.
 var ipSynonyms = map[string]func(*IPFields, string){
-	"netrange":      func(f *IPFields, v string) { f.NetRange = v },
-	"inetnum":       func(f *IPFields, v string) { f.NetRange = v },
-	"inet6num":      func(f *IPFields, v string) { f.NetRange = v },
-	"cidr":          func(f *IPFields, v string) { f.CIDR = v },
-	"netname":       func(f *IPFields, v string) { f.NetName = v },
-	"nethandle":     func(f *IPFields, v string) { f.Handle = v },
-	"parent":        func(f *IPFields, v string) { f.Parent = v },
-	"nettype":       func(f *IPFields, v string) { f.NetType = v },
-	"orgname":       func(f *IPFields, v string) { f.OrgName = v },
-	"org-name":      func(f *IPFields, v string) { f.OrgName = v },
-	"descr":         func(f *IPFields, v string) { f.descr = v },
-	"orgid":         func(f *IPFields, v string) { f.OrgID = v },
-	"org":           func(f *IPFields, v string) { f.OrgID = v },
+	"netrange":  func(f *IPFields, v string) { f.NetRange = v },
+	"inetnum":   func(f *IPFields, v string) { f.NetRange = v },
+	"inet6num":  func(f *IPFields, v string) { f.NetRange = v },
+	"cidr":      func(f *IPFields, v string) { f.CIDR = v },
+	"netname":   func(f *IPFields, v string) { f.NetName = v },
+	"nethandle": func(f *IPFields, v string) { f.Handle = v },
+	"parent":    func(f *IPFields, v string) { f.Parent = v },
+	"nettype":   func(f *IPFields, v string) { f.NetType = v },
+	"orgname":   func(f *IPFields, v string) { f.OrgName = v },
+	"org-name":  func(f *IPFields, v string) { f.OrgName = v },
+	// "owner" is LACNIC's RPSL vocabulary for the inetnum holder's name --
+	// LACNIC does not use "orgname"/"org-name"/"descr" for this at all, so
+	// without this entry LACNIC WHOIS contributed no org identity
+	// whatsoever (confirmed live against 200.3.12.1). Ranked alongside
+	// orgname/org-name (a direct, first-occurrence-wins assignment to
+	// OrgName) rather than routed through the descr fallback below: descr
+	// is only ever consulted after the full scan, when OrgName is still
+	// empty, so owner inherently outranks it exactly as orgname/org-name
+	// already do. In practice LACNIC's inetnum responses have "owner:" but
+	// no "descr:", while RIPE/APNIC have "descr:" but no "owner:", so the
+	// two rarely collide -- but were they to, owner winning is consistent
+	// with how ASNFields already treats this identical LACNIC key.
+	"owner": func(f *IPFields, v string) { f.OrgName = v },
+	"descr": func(f *IPFields, v string) { f.descr = v },
+	"orgid": func(f *IPFields, v string) { f.OrgID = v },
+	"org":   func(f *IPFields, v string) { f.OrgID = v },
+	// "ownerid" is LACNIC's RPSL vocabulary for the registry-assigned
+	// holder ID (e.g. "UY-LACN-LACNIC") -- distinct from "orgid"/"org",
+	// which LACNIC's inetnum response never emits.
+	"ownerid":       func(f *IPFields, v string) { f.OrgID = v },
 	"country":       func(f *IPFields, v string) { f.Country = v },
 	"regdate":       func(f *IPFields, v string) { f.Registered = v },
 	"created":       func(f *IPFields, v string) { f.Registered = v },
 	"updated":       func(f *IPFields, v string) { f.Updated = v },
 	"last-modified": func(f *IPFields, v string) { f.Updated = v },
+	// "changed" is LACNIC's RPSL vocabulary for last-modified -- distinct
+	// from "updated"/"last-modified", which LACNIC's inetnum response
+	// never emits (confirmed live against 200.3.12.1).
+	"changed":       func(f *IPFields, v string) { f.Updated = v },
 	"orgabuseemail": func(f *IPFields, v string) { f.AbuseEmail = v },
 	"abuse-mailbox": func(f *IPFields, v string) { f.AbuseEmail = v },
 	"orgabusephone": func(f *IPFields, v string) { f.AbusePhone = v },
@@ -79,14 +102,17 @@ var ipFieldGet = map[string]func(*IPFields) string{
 	"nettype":       func(f *IPFields) string { return f.NetType },
 	"orgname":       func(f *IPFields) string { return f.OrgName },
 	"org-name":      func(f *IPFields) string { return f.OrgName },
+	"owner":         func(f *IPFields) string { return f.OrgName },
 	"descr":         func(f *IPFields) string { return f.descr },
 	"orgid":         func(f *IPFields) string { return f.OrgID },
 	"org":           func(f *IPFields) string { return f.OrgID },
+	"ownerid":       func(f *IPFields) string { return f.OrgID },
 	"country":       func(f *IPFields) string { return f.Country },
 	"regdate":       func(f *IPFields) string { return f.Registered },
 	"created":       func(f *IPFields) string { return f.Registered },
 	"updated":       func(f *IPFields) string { return f.Updated },
 	"last-modified": func(f *IPFields) string { return f.Updated },
+	"changed":       func(f *IPFields) string { return f.Updated },
 	"orgabuseemail": func(f *IPFields) string { return f.AbuseEmail },
 	"abuse-mailbox": func(f *IPFields) string { return f.AbuseEmail },
 	"orgabusephone": func(f *IPFields) string { return f.AbusePhone },
