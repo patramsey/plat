@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-10
+
 ### Added
 - IP-address lookups. `plat 8.8.8.8` (or any IPv4/IPv6 address) now
   finds the RIR holding the containing netblock and queries its RDAP
@@ -15,11 +17,11 @@ follows [Semantic Versioning](https://semver.org/).
   a netblock's own (handle, CIDR, start/end address, parent handle,
   holding organization) rather than a domain's. `-o json` sets
   `"objectType": "ip"` to distinguish the shape from a domain record's
-  `"objectType": "domain"`. This supersedes 0.1.5's IP-input rejection
-  below: reserved/private addresses (`10.0.0.1`, `127.0.0.1`, `::1`,
-  ...) still exit 2 with a friendly error, since no RIR allocates them
-  to an organization, but an ordinary public address now returns real
-  data instead of exiting 2 outright.
+  `"objectType": "domain"`, an additive change that leaves
+  `schemaVersion` at 1 and domain output otherwise unchanged.
+  Reserved/private addresses (`10.0.0.1`, `127.0.0.1`, `::1`, ...) exit
+  2 with a friendly error, since no RIR allocates them to an
+  organization.
 
 ### Removed
 - The hidden `plat whois` and `plat merge` debug subcommands, dev-only
@@ -29,16 +31,7 @@ follows [Semantic Versioning](https://semver.org/).
   supersedes them with full parsed output and provenance. No documented
   interface changes. See #45.
 
-## [0.1.5] - 2026-08-05
-
 ### Fixed
-- IP-address input is now rejected with a clear error instead of
-  producing a meaningless record. `plat 8.8.8.8` previously exited 0 and
-  emitted a schema-clean record built from a WHOIS response about the
-  "TLD" `8`; bare IPv6 leaked an IDNA library internal rather than a
-  friendly message. IPv4, IPv6, bracketed IPv6, and CIDR input now exit 2
-  and point at the issue tracking real RDAP IP-object support. Domains
-  whose labels are numeric (`123.com`) are unaffected.
 - Lifecycle stage text misattributed two of its three timeline durations
   to ICANN policy. Only the 30-day Redemption Grace Period is actually
   ICANN-mandated (Expired Registration Recovery Policy §3.1); the 45-day
@@ -118,8 +111,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.1.5...HEAD
-[0.1.5]: https://github.com/patramsey/plat/compare/v0.1.4...v0.1.5
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/patramsey/plat/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/patramsey/plat/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/patramsey/plat/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/patramsey/plat/compare/v0.1.1...v0.1.2
