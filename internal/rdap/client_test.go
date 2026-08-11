@@ -502,6 +502,92 @@ func TestClient_ASN(t *testing.T) {
 	}
 }
 
+// TestClient_ASN_RealARINGolden decodes a real RDAP autnum document
+// (captured live from https://rdap.arin.net/registry/autnum/15169) rather
+// than the hand-written inline JSON every other ASN client test in this
+// file uses. Every other ASN-path test -- here and in
+// internal/collect/adapt_asn_test.go -- either hand-writes a minimal JSON
+// body or constructs rdap.ASNResponse/Entity/VCardArray structs directly,
+// so nothing before this test hermetically proved a real RIR's autnum
+// document actually decodes the way the entity/vCard extraction code
+// assumes; that was validated only by live runs against actual RIRs. The
+// domain path already has this coverage via testdata/rdap/*.json; this is
+// the ASN path's counterpart.
+func TestClient_ASN_RealARINGolden(t *testing.T) {
+	body, err := os.ReadFile("../../testdata/rdap/arin-as15169.json")
+	if err != nil {
+		t.Fatalf("reading golden: %v", err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.ASN(context.Background(), srv.URL, 15169)
+	if err != nil {
+		t.Fatalf("ASN: %v", err)
+	}
+	if res.ASN == nil {
+		t.Fatal("Result.ASN = nil, want the parsed object")
+	}
+	a := res.ASN
+
+	if a.Handle != "AS15169" {
+		t.Errorf("Handle = %q, want AS15169", a.Handle)
+	}
+	if a.Name != "GOOGLE" {
+		t.Errorf("Name = %q, want GOOGLE", a.Name)
+	}
+	if a.StartAutnum != 15169 || a.EndAutnum != 15169 {
+		t.Errorf("StartAutnum/EndAutnum = %d/%d, want 15169/15169", a.StartAutnum, a.EndAutnum)
+	}
+	if len(a.Status) != 1 || a.Status[0] != "active" {
+		t.Errorf("Status = %v, want [active]", a.Status)
+	}
+
+	reg, ok := a.RegistrantEntity()
+	if !ok {
+		t.Fatal("RegistrantEntity() ok = false, want true")
+	}
+	if reg.VCardArray.FullName != "Google LLC" {
+		t.Errorf("RegistrantEntity().VCardArray.FullName = %q, want Google LLC", reg.VCardArray.FullName)
+	}
+
+	// ARIN nests its abuse-role entity inside the top-level registrant
+	// entity's own "entities" array rather than listing it at the top
+	// level -- unlike the abuse-role entity in the collect package's
+	// hand-built arinLikeASN test fixture, which (like every other ASN
+	// adapter test) places it at the top level for convenience.
+	// AbuseEntity's entityByRole deliberately only scans top-level
+	// entities (mirrors DomainResponse's M3-era "nested traversal is a
+	// later milestone" scope), so it must NOT find ARIN's real, nested
+	// abuse entity here. This golden is what proves that gap is real on
+	// live data, not just a theoretical corner the hand-built fixtures
+	// never exercised.
+	if _, ok := a.AbuseEntity(); ok {
+		t.Error("AbuseEntity() ok = true, want false (ARIN's abuse entity is nested under registrant, not top-level)")
+	}
+
+	registered, ok := a.Registered()
+	if !ok || !registered.Parsed {
+		t.Fatalf("Registered() = %+v, %v, want a parsed event", registered, ok)
+	}
+	if registered.Raw != "2000-03-30T00:00:00-05:00" {
+		t.Errorf("Registered().Raw = %q, want 2000-03-30T00:00:00-05:00", registered.Raw)
+	}
+
+	updated, ok := a.Updated()
+	if !ok || !updated.Parsed {
+		t.Fatalf("Updated() = %+v, %v, want a parsed event", updated, ok)
+	}
+	if updated.Raw != "2012-02-24T09:44:34-05:00" {
+		t.Errorf("Updated().Raw = %q, want 2012-02-24T09:44:34-05:00", updated.Raw)
+	}
+}
+
 func TestClient_ASN_NotFound(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
