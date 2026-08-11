@@ -42,8 +42,14 @@ func fullASNRecord() model.ASNRecord {
 				},
 			},
 		},
+		// org.name, not country: country is a field no ASN adapter can
+		// ever actually mark redacted (only org.name -- the registrant
+		// vCard's full name -- has a redaction check at all; see
+		// internal/collect/adapt_asn.go). The original fixture used
+		// country, which meant this golden certified an encoder shape
+		// the real pipeline could never produce.
 		Redacted: []model.RedactionNotice{
-			{Field: model.FieldASNCountry, Source: model.SourceRegistryRDAP, Reason: "redacted"},
+			{Field: model.FieldOrgName, Source: model.SourceRegistryRDAP, Reason: "redacted"},
 		},
 		Sources: []model.SourceResult{
 			{Source: model.SourceRegistryRDAP, OK: true, Latency: 120 * time.Millisecond},

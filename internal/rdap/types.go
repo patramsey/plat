@@ -517,3 +517,19 @@ func (a *ASNResponse) Registered() (RDAPTime, bool) { return a.eventBySlot(slotC
 // Updated returns the last-changed event's date, if present. Mirrors
 // DomainResponse.Updated.
 func (a *ASNResponse) Updated() (RDAPTime, bool) { return a.eventBySlot(slotUpdated) }
+
+// RedactionRemarks returns remarks whose title or type suggests redacted
+// data. Mirrors DomainResponse.RedactionRemarks -- same shallow,
+// informational signal, not a full RFC 9537 evaluation.
+func (a *ASNResponse) RedactionRemarks() []Remark {
+	var out []Remark
+	for _, r := range a.Remarks {
+		lt := strings.ToLower(r.Title)
+		ly := strings.ToLower(r.Type)
+		if strings.Contains(lt, "redact") || strings.Contains(lt, "privacy") ||
+			strings.Contains(ly, "redact") || strings.Contains(ly, "privacy") {
+			out = append(out, r)
+		}
+	}
+	return out
+}

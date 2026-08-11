@@ -60,6 +60,22 @@ func fromASNRDAP(meta model.SourceResult, resp *rdap.ASNResponse) model.ASNSourc
 	if regEntity, ok := resp.RegistrantEntity(); ok {
 		if model.IsRedactedPlaceholder(regEntity.VCardArray.FullName) {
 			sr.RedactedFields[model.FieldOrgName] = true
+			// RedactedFields alone is not enough to surface a redaction
+			// notice: mergeState.scalar (internal/merge/merge.go, shared
+			// with the domain and IP paths and not touched by this fix)
+			// checks c.Redacted only after an empty-value guard that
+			// fires first for every ASN redaction, since OrgName is
+			// deliberately left empty above -- so a RedactedFields-only
+			// signal is silently dropped before the record ever sees it.
+			// Appending directly to sr.Redactions here bypasses that
+			// broken path entirely and is what merge.MergeASN
+			// (internal/merge/asn.go) actually surfaces as
+			// ASNRecord.Redacted.
+			sr.Redactions = append(sr.Redactions, model.RedactionNotice{
+				Field:  model.FieldOrgName,
+				Source: meta.Source,
+				Reason: "redacted",
+			})
 		} else {
 			sr.OrgName = regEntity.VCardArray.FullName
 		}
@@ -67,6 +83,21 @@ func fromASNRDAP(meta model.SourceResult, resp *rdap.ASNResponse) model.ASNSourc
 	if abuseEntity, ok := resp.AbuseEntity(); ok {
 		sr.AbuseEmail = abuseEntity.VCardArray.Email
 		sr.AbusePhone = abuseEntity.VCardArray.Tel
+	}
+
+	// A second, independent redaction signal: some RIRs annotate a
+	// redacted autnum with an explicit remark (RFC 9537-adjacent, not a
+	// full evaluation of it -- see RedactionRemarks) rather than (or in
+	// addition to) a placeholder vCard value. Mirrors FromRDAP's identical
+	// handling for domains (internal/collect/adapt_rdap.go); "unknown" is
+	// used for Field here too since a remark isn't tied to one specific
+	// field the way the vCard-placeholder check above is.
+	for _, rem := range resp.RedactionRemarks() {
+		sr.Redactions = append(sr.Redactions, model.RedactionNotice{
+			Field:  "unknown",
+			Source: meta.Source,
+			Reason: rem.Title,
+		})
 	}
 
 	sr.Present = asnRDAPPresent(sr)
@@ -161,6 +192,15 @@ func fromASNHop(meta model.SourceResult, hop whois.Hop) model.ASNSourceRecord {
 
 	if model.IsRedactedPlaceholder(f.OrgName) {
 		sr.RedactedFields[model.FieldOrgName] = true
+		// See fromASNRDAP's identical reasoning: mergeState.scalar never
+		// surfaces a RedactedFields-only signal when the value is left
+		// empty (as it deliberately is here), so sr.Redactions is
+		// populated directly.
+		sr.Redactions = append(sr.Redactions, model.RedactionNotice{
+			Field:  model.FieldOrgName,
+			Source: meta.Source,
+			Reason: "redacted",
+		})
 	} else {
 		sr.OrgName = f.OrgName
 	}

@@ -176,7 +176,7 @@ record.
     { "field": "org.abuseEmail", "values": { "registry-rdap": "network-abuse@google.com", "registry-whois": "abuse@google.com" } }
   ],
   "redacted": [
-    { "field": "country", "source": "registry-rdap", "reason": "redacted" }
+    { "field": "org.name", "source": "registry-rdap", "reason": "redacted" }
   ],
   "sources": [
     { "source": "registry-rdap", "ok": true, "notFound": false, "latencyMs": 120 },
@@ -185,7 +185,7 @@ record.
 }
 ```
 
-- **String fields** (`handle`, `name`, `type`, `startAutnum`, `endAutnum`, `country`, `org.name`, `org.id`, `org.abuseEmail`, `org.abusePhone`): same string-field shape as the domain schema. `type` is the RIR's allocation/assignment type — a source-reported classification, not a plat-derived one; no current RIR vocabulary reliably populates it, so it's typically absent. `startAutnum`/`endAutnum` are the AS number range's first/last autnum, each independently omittable — the human/plain renderers combine them into a single `start - end` row, but the JSON schema keeps them as two separate fields. Despite being numeric, both are encoded as JSON strings (matching `startAddress`/`endAddress` on IP records), not numbers.
+- **String fields** (`handle`, `name`, `type`, `startAutnum`, `endAutnum`, `country`, `org.name`, `org.id`, `org.abuseEmail`, `org.abusePhone`): same string-field shape as the domain schema. `type` is the RIR's allocation/assignment type — a source-reported classification, not a plat-derived one. LACNIC's RDAP autnum response populates it (e.g. `"DIRECT ALLOCATION"`, confirmed live against AS28573); WHOIS never does, since no RPSL or ARIN-style key maps to it, so `type` is present when a RIR's RDAP service reports one and absent otherwise. `startAutnum`/`endAutnum` are the AS number range's first/last autnum, each independently omittable — the human/plain renderers combine them into a single `start - end` row, but the JSON schema keeps them as two separate fields. Despite being numeric, both are encoded as JSON strings (matching `startAddress`/`endAddress` on IP records), not numbers.
 - **List field** (`status`): same list-field shape as the domain schema — the RIR's own status vocabulary, passed through unchanged (there is no EPP-equivalent standard for autnum status).
 - **Time fields** (`registered`, `updated`): same time-field shape as the domain schema (`value`/`raw`/`parsed`/`sources`). There is no `expires` — AS number assignments don't expire the way domain registrations do.
 - **`org`** is an object of up to 4 string fields (`name`, `id`, `abuseEmail`, `abusePhone`), each following the string-field shape above and each independently omittable — identical in shape to an IP record's `org`. The whole `org` key is omitted only if every one of its sub-fields is absent.

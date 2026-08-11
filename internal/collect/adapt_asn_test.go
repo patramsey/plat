@@ -3,6 +3,7 @@ package collect
 import (
 	"testing"
 
+	"github.com/patramsey/plat/internal/merge"
 	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/whois"
@@ -154,6 +155,47 @@ func TestFromASNRDAP_RedactedOrgName(t *testing.T) {
 	}
 	if !sr.Present {
 		t.Error("Present = false, want true (Handle is populated even though OrgName is redacted)")
+	}
+}
+
+// TestFromASNRDAP_RedactedOrgName_ProducesRedactionNoticeEndToEnd is a
+// regression test for a real defect caught during whole-branch review: a
+// redacted registrant vCard set RedactedFields[org.name] but left
+// sr.Redactions empty, and merge.MergeASN's shared scalar() helper only
+// checks a candidate's Redacted flag AFTER an empty-value guard that
+// fires first (since the redacted OrgName is deliberately left ""). The
+// notice was silently dropped -- RedactedFields was set, but
+// ASNRecord.Redacted always came back []. Feeding fromASNRDAP's real
+// output through merge.MergeASN (not a hand-built ASNRecord, which is
+// what let this slip past both docs/schema.md and testdata/schema/
+// asn-record.json) must now produce a real redacted[] entry, and the
+// lower-precedence WHOIS source's org name must win instead.
+func TestFromASNRDAP_RedactedOrgName_ProducesRedactionNoticeEndToEnd(t *testing.T) {
+	rdapResp := &rdap.ASNResponse{
+		Handle: "AS64512",
+		Entities: rdap.EntityList{
+			{Roles: []string{"registrant"}, VCardArray: rdap.VCardArray{FullName: "REDACTED FOR PRIVACY"}},
+		},
+	}
+	rdapSR := fromASNRDAP(model.SourceResult{Source: model.SourceRegistryRDAP, OK: true}, rdapResp)
+
+	whoisSR := fromASNHop(model.SourceResult{Source: model.SourceRegistryWHOIS, OK: true}, whois.Hop{
+		ASNFields: &parse.ASNFields{Handle: "AS64512", OrgName: "Example Holdings LLC"},
+	})
+
+	rec := merge.MergeASN([]model.ASNSourceRecord{rdapSR, whoisSR})
+
+	if rec.Org.Name.Value != "Example Holdings LLC" {
+		t.Errorf("Org.Name = %q, want the WHOIS source's value (registry-rdap's was redacted)", rec.Org.Name.Value)
+	}
+	found := false
+	for _, notice := range rec.Redacted {
+		if notice.Field == model.FieldOrgName && notice.Source == model.SourceRegistryRDAP {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("rec.Redacted = %+v, want an org.name notice attributed to registry-rdap", rec.Redacted)
 	}
 }
 
