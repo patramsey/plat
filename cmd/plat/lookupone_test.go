@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -564,5 +565,99 @@ func TestLookupOne_ASN_JSONOutput_ObjectTypeIsASN(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), `"objectType":"asn"`) {
 		t.Errorf(`stdout missing "objectType":"asn", got:%s`, stdout.String())
+	}
+}
+
+// TestLookupOne_ASN_SpinnerBranch_HumanFormat is lookupOneASN's counterpart
+// to TestLookupOne_SpinnerBranch_HumanFormat: StderrTTY: true + FormatHuman
+// is exactly the condition lookupOneASN checks to route work() through
+// spinner.Run instead of calling it directly, and no other ASN test in this
+// file exercises it.
+func TestLookupOne_ASN_SpinnerBranch_HumanFormat(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(asnTestRDAPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return asnTestWHOISText
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewASNResolver(map[[2]uint32]string{
+		{15169, 15169}: rdapSrv.URL,
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &stdout, &stderr, resolver, "AS15169",
+		lookupOptions{whoisIANAServer: ianaAddr},
+		nil, render.FormatHuman, uiConfig{StderrTTY: true},
+	)
+
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "AS15169") {
+		t.Errorf("stdout missing handle -- spinner.Run may have interfered with the result, got:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "Google LLC") {
+		t.Errorf("stdout missing WHOIS-sourced org name, got:\n%s", stdout.String())
+	}
+}
+
+// errWriter is an io.Writer that always fails, used below to force
+// lookupOneASN's render-error branch (cmd/plat/main.go, the `if err :=
+// renderASNRecord(...); err != nil` block): with a successful collect/merge
+// (code == 0), the only way renderASNRecord returns a non-nil error is a
+// write failure on stdout, since its own format-dispatch branches are
+// already covered directly in main_test.go against valid writers.
+type errWriter struct{}
+
+func (errWriter) Write([]byte) (int, error) {
+	return 0, errors.New("errWriter: forced write failure")
+}
+
+// TestLookupOne_ASN_RenderErrorPath_ExitCode3 covers lookupOneASN's
+// render-error branch: a successful lookup (code == 0) whose render step
+// fails must report the error and return exit 3, not 0. Quiet mode's
+// renderASNRecord path is a single fmt.Fprintln, the simplest way to force
+// that failure deterministically without depending on any renderer's
+// internals.
+func TestLookupOne_ASN_RenderErrorPath_ExitCode3(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(asnTestRDAPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return asnTestWHOISText
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewASNResolver(map[[2]uint32]string{
+		{15169, 15169}: rdapSrv.URL,
+	})
+
+	var stderr bytes.Buffer
+	code := lookupOne(
+		context.Background(), errWriter{}, &stderr, resolver, "AS15169",
+		lookupOptions{whoisIANAServer: ianaAddr, Quiet: true},
+		nil, render.FormatPlain, uiConfig{},
+	)
+
+	if code != 3 {
+		t.Errorf("exit code = %d, want 3\nstderr: %s", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "AS15169") {
+		t.Errorf("stderr missing ASN in render-failure message, got:\n%s", stderr.String())
 	}
 }
