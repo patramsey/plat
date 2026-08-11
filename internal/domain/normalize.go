@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"golang.org/x/net/idna"
@@ -47,6 +48,7 @@ const (
 	KindDomain Kind = iota
 	KindIPv4
 	KindIPv6
+	KindASN
 )
 
 // Query is Normalize's result: a kind plus exactly one populated payload.
@@ -55,6 +57,7 @@ type Query struct {
 	Kind  Kind
 	Name  Name       // KindDomain
 	IP    netip.Addr // KindIPv4 / KindIPv6
+	ASN   uint32     // KindASN
 	Input string     // the original input, for error messages
 }
 
@@ -80,6 +83,9 @@ func Normalize(input string) (Query, error) {
 	// ("https://8.8.8.8/x") and the bracketed IPv6 host form.
 	if addr, ok := parseIPInput(s); ok {
 		return ipQuery(addr, input)
+	}
+	if asn, ok := parseASNInput(s); ok {
+		return Query{Kind: KindASN, ASN: asn, Input: input}, nil
 	}
 
 	// idna.Lookup (not the bare idna.ToASCII/Punycode profile) is
@@ -128,6 +134,25 @@ func parseIPInput(s string) (netip.Addr, bool) {
 		return prefix.Masked().Addr().Unmap(), true
 	}
 	return netip.Addr{}, false
+}
+
+// parseASNInput reports whether s names an autonomous system number in
+// the "AS15169" form and returns it. A bare number is deliberately NOT
+// accepted: it is likelier a typo'd domain than an intentional ASN, and
+// silently treating it as one would turn a typo into a successful lookup
+// of the wrong object.
+func parseASNInput(s string) (uint32, bool) {
+	if len(s) < 3 {
+		return 0, false
+	}
+	if !strings.EqualFold(s[:2], "as") {
+		return 0, false
+	}
+	n, err := strconv.ParseUint(s[2:], 10, 32)
+	if err != nil {
+		return 0, false
+	}
+	return uint32(n), true
 }
 
 // v4Broadcast is the IPv4 limited broadcast address, 255.255.255.255 --

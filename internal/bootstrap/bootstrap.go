@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -21,6 +22,7 @@ var bootstrapURL = "https://data.iana.org/rdap/dns.json"
 var (
 	ipv4URL = "https://data.iana.org/rdap/ipv4.json"
 	ipv6URL = "https://data.iana.org/rdap/ipv6.json"
+	asnURL  = "https://data.iana.org/rdap/asn.json"
 )
 
 const (
@@ -33,8 +35,9 @@ const (
 // its RIR's RDAP service base URL, as published by IANA's RDAP bootstrap
 // registries (RFC 9224).
 type Resolver struct {
-	byTLD    map[string]string
-	byPrefix map[netip.Prefix]string
+	byTLD      map[string]string
+	byPrefix   map[netip.Prefix]string
+	byASNRange map[[2]uint32]string
 }
 
 // NewResolver builds a Resolver directly from a TLD -> RDAP base URL map,
@@ -52,6 +55,14 @@ func NewResolver(byTLD map[string]string) *Resolver {
 // point a Resolver at a fake RDAP server without touching the network.
 func NewIPResolver(prefixes map[netip.Prefix]string) *Resolver {
 	return &Resolver{byPrefix: prefixes}
+}
+
+// NewASNResolver builds a Resolver from an ASN-range -> RDAP base URL
+// map, bypassing Load's fetch/cache/embedded-fallback chain. Load remains
+// the only production entry point; this exists so other packages' tests
+// can point a Resolver at a fake RDAP server without touching the network.
+func NewASNResolver(ranges map[[2]uint32]string) *Resolver {
+	return &Resolver{byASNRange: ranges}
 }
 
 // BaseURL returns the RDAP base URL for tld and whether the TLD has RDAP
@@ -76,6 +87,19 @@ func (r *Resolver) IPBaseURL(addr netip.Addr) (string, bool) {
 		}
 	}
 	return best, bestBits >= 0
+}
+
+// ASNBaseURL returns the RDAP base URL for the RIR holding asn, and
+// whether any delegated range contains it. Unlike IP delegations, IANA's
+// ASN ranges do not overlap, so the first containing range wins -- there
+// is no most-specific-match rule to apply.
+func (r *Resolver) ASNBaseURL(asn uint32) (string, bool) {
+	for span, url := range r.byASNRange {
+		if asn >= span[0] && asn <= span[1] {
+			return url, true
+		}
+	}
+	return "", false
 }
 
 type bootstrapDoc struct {
@@ -124,6 +148,50 @@ func parsePrefixes(data []byte, into map[netip.Prefix]string) error {
 		}
 	}
 	return nil
+}
+
+// parseASNRanges reads an IANA asn.json bootstrap document. It shares
+// dns.json's services structure; only the keys differ (ASN numbers or
+// "start-end" ranges rather than TLD strings). An unparseable entry is
+// skipped rather than failing the whole document.
+func parseASNRanges(data []byte, into map[[2]uint32]string) error {
+	var doc bootstrapDoc
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("bootstrap: parsing ASN registry: %w", err)
+	}
+	for _, service := range doc.Services {
+		if len(service) < 2 || len(service[1]) == 0 {
+			continue
+		}
+		base := strings.TrimRight(service[1][0], "/") + "/"
+		for _, entry := range service[0] {
+			start, end, ok := parseASNSpan(entry)
+			if !ok {
+				continue
+			}
+			into[[2]uint32{start, end}] = base
+		}
+	}
+	return nil
+}
+
+// parseASNSpan parses "15169" or "36864-37887". A single number yields an
+// inclusive one-element span.
+func parseASNSpan(entry string) (uint32, uint32, bool) {
+	entry = strings.TrimSpace(entry)
+	lo, hi, found := strings.Cut(entry, "-")
+	start, err := strconv.ParseUint(strings.TrimSpace(lo), 10, 32)
+	if err != nil {
+		return 0, 0, false
+	}
+	if !found {
+		return uint32(start), uint32(start), true
+	}
+	end, err := strconv.ParseUint(strings.TrimSpace(hi), 10, 32)
+	if err != nil || end < start {
+		return 0, 0, false
+	}
+	return uint32(start), uint32(end), true
 }
 
 // Options controls Load's behavior.
@@ -204,9 +272,10 @@ func validBootstrapJSON(data []byte) bool {
 //
 // The TLD registry (dns.json) is required: a failure to parse it, even
 // from the embedded fallback, fails Load. The IP registries (ipv4.json,
-// ipv6.json) are populated best-effort afterward -- each falls back
-// independently, and a failure to fetch or parse either one leaves IP
-// lookups unavailable without affecting domain lookups.
+// ipv6.json) and the ASN registry (asn.json) are populated best-effort
+// afterward -- each falls back independently, and a failure to fetch or
+// parse any one of them leaves that lookup kind unavailable without
+// affecting the others.
 func Load(ctx context.Context, opts Options) (*Resolver, error) {
 	data, err := fetchOrEmbedded(ctx, path(cacheFileName), bootstrapURL, embedded, opts)
 	if err != nil {
@@ -231,6 +300,11 @@ func Load(ctx context.Context, opts Options) (*Resolver, error) {
 			continue
 		}
 		_ = parsePrefixes(data, r.byPrefix)
+	}
+
+	r.byASNRange = make(map[[2]uint32]string)
+	if data, err := fetchOrEmbedded(ctx, path("asn.json"), asnURL, embeddedASN, opts); err == nil {
+		_ = parseASNRanges(data, r.byASNRange)
 	}
 
 	return r, nil
