@@ -176,6 +176,48 @@ func TestFromASNRDAP_RIRStatusPassesThroughVerbatim(t *testing.T) {
 	}
 }
 
+// TestFromASNRDAP_LACNICBareHandleGetsASPrefix is a regression test for a
+// real defect caught during live verification against AS28573: LACNIC's
+// RDAP autnum response reports handle as the bare number "28573", unlike
+// every other tested RIR's "AS28573" form -- and unlike WHOIS's aut-num-
+// derived Handle, which is always prefixed by construction (see
+// normalizeASNHandle's doc comment). Left unnormalized, this produced a
+// false handle conflict between two sources that genuinely agree on the
+// same ASN.
+func TestFromASNRDAP_LACNICBareHandleGetsASPrefix(t *testing.T) {
+	resp := &rdap.ASNResponse{
+		Handle:      "28573",
+		StartAutnum: 28573,
+		EndAutnum:   28573,
+	}
+
+	sr := fromASNRDAP(model.SourceResult{Source: model.SourceRegistryRDAP, OK: true}, resp)
+
+	if sr.Handle != "AS28573" {
+		t.Errorf("Handle = %q, want AS28573 (bare RDAP handle normalized to match WHOIS's prefixed form)", sr.Handle)
+	}
+}
+
+func TestNormalizeASNHandle(t *testing.T) {
+	tests := []struct {
+		name, in, want string
+	}{
+		{"bare numeric gets prefixed", "28573", "AS28573"},
+		{"already prefixed unchanged", "AS15169", "AS15169"},
+		{"already prefixed lowercase unchanged", "as15169", "as15169"},
+		{"empty stays empty", "", ""},
+		{"non-numeric handle unchanged", "test", "test"},
+		{"non-numeric org-style handle unchanged", "ORG-BAdI1-AFRINIC", "ORG-BAdI1-AFRINIC"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeASNHandle(tt.in); got != tt.want {
+				t.Errorf("normalizeASNHandle(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFromASNHop_PopulatedFields(t *testing.T) {
 	hop := whois.Hop{
 		ASNFields: &parse.ASNFields{

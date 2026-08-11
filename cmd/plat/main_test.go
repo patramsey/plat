@@ -807,6 +807,64 @@ func TestIPQuietSummary(t *testing.T) {
 	}
 }
 
+func TestASNQuietSummary(t *testing.T) {
+	tests := []struct {
+		name string
+		rec  model.ASNRecord
+		want string
+	}{
+		{
+			name: "handle and org both present",
+			rec: model.ASNRecord{
+				Handle: model.Field[string]{Value: "AS15169", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+				Org: model.OrgInfo{
+					Name: model.Field[string]{Value: "Google LLC", Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+				},
+			},
+			want: "AS15169 · Google LLC",
+		},
+		{
+			name: "handle present, org absent",
+			rec: model.ASNRecord{
+				Handle: model.Field[string]{Value: "AS15169", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+			},
+			want: "AS15169",
+		},
+		{
+			name: "org present, handle absent",
+			rec: model.ASNRecord{
+				Org: model.OrgInfo{
+					Name: model.Field[string]{Value: "Google LLC", Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+				},
+			},
+			want: "Google LLC",
+		},
+		{
+			name: "neither handle nor org, name present",
+			rec: model.ASNRecord{
+				Name: model.Field[string]{Value: "GOOGLE", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+			},
+			want: "GOOGLE",
+		},
+		{
+			name: "fully empty record",
+			rec:  model.ASNRecord{},
+			want: "no data",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := asnQuietSummary(tt.rec)
+			if got != tt.want {
+				t.Errorf("asnQuietSummary() = %q, want %q", got, tt.want)
+			}
+			if strings.HasPrefix(got, "·") || strings.HasSuffix(got, "·") {
+				t.Errorf("asnQuietSummary() = %q, separator dangles with no value on one side", got)
+			}
+		})
+	}
+}
+
 func TestRenderIPRecord_DispatchesFormatHumanToStyledRenderer(t *testing.T) {
 	rec := model.IPRecord{
 		CIDR: model.Field[string]{Value: "8.8.8.0/24", Sources: []model.SourceID{model.SourceRegistryRDAP}},
@@ -892,6 +950,98 @@ func TestRenderIPRecord_QuietIgnoredForMachineFormats(t *testing.T) {
 	ui := uiConfig{Dark: false, Width: 80}
 	var buf bytes.Buffer
 	if err := renderIPRecord(&buf, render.FormatJSON, rec, false, false, false, true, ui); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !json.Valid(buf.Bytes()) {
+		t.Errorf("expected --quiet to be ignored for -o json (full JSON still emitted), got: %s", buf.String())
+	}
+}
+
+func TestRenderASNRecord_DispatchesFormatHumanToStyledRenderer(t *testing.T) {
+	rec := model.ASNRecord{
+		Handle: model.Field[string]{Value: "AS15169", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	var humanBuf, plainBuf bytes.Buffer
+	ui := uiConfig{Dark: false, Width: 80}
+
+	if err := renderASNRecord(&humanBuf, render.FormatHuman, rec, false, false, false, false, ui); err != nil {
+		t.Fatalf("unexpected error rendering FormatHuman: %v", err)
+	}
+	if err := renderASNRecord(&plainBuf, render.FormatPlain, rec, false, false, false, false, ui); err != nil {
+		t.Fatalf("unexpected error rendering FormatPlain: %v", err)
+	}
+	if humanBuf.String() == plainBuf.String() {
+		t.Error("FormatHuman and FormatPlain produced byte-identical output — expected the styled renderer's layout to differ from the plain renderer's")
+	}
+	if !strings.Contains(humanBuf.String(), "AS15169") {
+		t.Errorf("FormatHuman output missing the handle value, got:\n%s", humanBuf.String())
+	}
+}
+
+func TestRenderASNRecord_DispatchesJSONAndNDJSON(t *testing.T) {
+	rec := model.ASNRecord{
+		Handle: model.Field[string]{Value: "AS15169", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	ui := uiConfig{}
+
+	var jsonBuf bytes.Buffer
+	if err := renderASNRecord(&jsonBuf, render.FormatJSON, rec, false, false, false, false, ui); err != nil {
+		t.Fatalf("unexpected error rendering FormatJSON: %v", err)
+	}
+	if !strings.Contains(jsonBuf.String(), `"schemaVersion":1`) {
+		t.Errorf("FormatJSON output missing schemaVersion, got:\n%s", jsonBuf.String())
+	}
+	if !strings.Contains(jsonBuf.String(), `"AS15169"`) {
+		t.Errorf("FormatJSON output missing handle value, got:\n%s", jsonBuf.String())
+	}
+
+	var ndjsonBuf bytes.Buffer
+	if err := renderASNRecord(&ndjsonBuf, render.FormatNDJSON, rec, false, false, false, false, ui); err != nil {
+		t.Fatalf("unexpected error rendering FormatNDJSON: %v", err)
+	}
+	if !strings.Contains(ndjsonBuf.String(), `"handle"`) {
+		t.Errorf("FormatNDJSON output missing handle field, got:\n%s", ndjsonBuf.String())
+	}
+}
+
+func TestRenderASNRecord_Quiet(t *testing.T) {
+	rec := model.ASNRecord{
+		Handle: model.Field[string]{Value: "AS15169", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Org: model.OrgInfo{
+			Name: model.Field[string]{Value: "Google LLC", Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+		},
+	}
+	ui := uiConfig{Dark: false, Width: 80}
+
+	tests := []struct {
+		name   string
+		format render.Format
+	}{
+		{"human", render.FormatHuman},
+		{"plain", render.FormatPlain},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := renderASNRecord(&buf, tt.format, rec, false, false, false, true, ui); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			got := strings.TrimRight(buf.String(), "\n")
+			want := "AS15169 · Google LLC"
+			if got != want {
+				t.Errorf("renderASNRecord(quiet=true, format=%v) = %q, want %q", tt.format, got, want)
+			}
+		})
+	}
+}
+
+func TestRenderASNRecord_QuietIgnoredForMachineFormats(t *testing.T) {
+	rec := model.ASNRecord{
+		Handle: model.Field[string]{Value: "AS15169", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	ui := uiConfig{Dark: false, Width: 80}
+	var buf bytes.Buffer
+	if err := renderASNRecord(&buf, render.FormatJSON, rec, false, false, false, true, ui); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !json.Valid(buf.Bytes()) {

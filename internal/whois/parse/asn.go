@@ -104,13 +104,35 @@ var asnFieldGet = map[string]func(*ASNFields) string{
 // to (an object starts with a line whose key is "as-block" or "aut-num"
 // and ends at the next blank line, per RPSL's object-separator rule) and
 // skips every line belonging to an as-block object outright.
+//
+// APNIC (verified live against AS4808) can additionally place a "role"
+// object -- an administrative contact, not the as-block -- between the
+// as-block and the aut-num object. That role object carries its own
+// "country" and "last-modified" (the contact's own address/record-update
+// time, e.g. APNIC's own hostmaster team), which share asnSynonyms keys
+// with the aut-num object's identically-named but semantically unrelated
+// fields. Skipping as-block alone isn't enough to keep that from
+// shadowing the real ASN data, and there's no closed list of every
+// RPSL contact-object class name (role, person, organisation, irt,
+// mntner...) that might similarly precede aut-num across RIRs. Rather
+// than skip every non-aut-num object by name, ParseASN instead lets the
+// aut-num object's own values always win: once inAutNum, set()
+// unconditionally overwrites (instead of the usual first-occurrence-wins
+// skip-if-already-set), so whatever a preceding object incidentally
+// captured is corrected the moment the real aut-num data is reached.
+// Objects after aut-num (e.g. an "irt" object supplying abuse-mailbox,
+// which aut-num itself never carries) still use ordinary
+// first-occurrence-wins, so they keep filling in fields aut-num left
+// empty exactly as before.
 func ParseASN(raw string) ASNFields {
 	var f ASNFields
 	inASBlock := false
+	inAutNum := false
 	for _, line := range strings.Split(raw, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			inASBlock = false
+			inAutNum = false
 			continue
 		}
 		if strings.HasPrefix(line, "#") || strings.HasPrefix(line, "%") {
@@ -128,6 +150,7 @@ func ParseASN(raw string) ASNFields {
 			inASBlock = true
 		case "aut-num":
 			inASBlock = false
+			inAutNum = true
 		}
 		if inASBlock {
 			continue
@@ -140,8 +163,10 @@ func ParseASN(raw string) ASNFields {
 		if !known {
 			continue
 		}
-		if get, ok := asnFieldGet[key]; ok && get(&f) != "" {
-			continue // first occurrence wins
+		if !inAutNum {
+			if get, ok := asnFieldGet[key]; ok && get(&f) != "" {
+				continue // first occurrence wins
+			}
 		}
 		set(&f, val)
 	}

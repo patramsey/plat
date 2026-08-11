@@ -6,6 +6,19 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- ASN lookups. `plat AS15169` (the `AS` prefix is required) now finds the
+  RIR holding the autonomous system and queries its RDAP and WHOIS,
+  merging the result with the same per-field provenance as a domain or IP
+  lookup. There's no registrar leg -- only `registry-rdap`/
+  `registry-whois` ever appear as sources -- and the record's fields are
+  an autonomous system's own (handle, AS name, start/end autnum range,
+  holding organization) rather than a domain's or netblock's. `-o json`
+  sets `"objectType": "asn"` to distinguish the shape from a domain or IP
+  record's, an additive change that leaves `schemaVersion` at 1 and
+  existing output otherwise unchanged. A bare number (`plat 15169`) is
+  not treated as an ASN lookup, since it's likelier a typo'd domain.
+
 ## [0.2.0] - 2026-08-10
 
 ### Added

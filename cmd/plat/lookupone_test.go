@@ -389,3 +389,180 @@ func TestLookupOne_IP_JSONOutput_ObjectTypeIsIP(t *testing.T) {
 		t.Errorf(`stdout missing "objectType":"ip", got:%s`, stdout.String())
 	}
 }
+
+const asnTestRDAPBody = `{
+  "objectClassName": "autnum",
+  "handle": "AS15169",
+  "startAutnum": 15169,
+  "endAutnum": 15169,
+  "name": "GOOGLE",
+  "type": "DIRECT ALLOCATION",
+  "status": ["active"],
+  "events": [{"eventAction": "registration", "eventDate": "2000-03-30T00:00:00Z"}],
+  "entities": [{"roles": ["registrant"], "vcardArray": ["vcard", [["fn", {}, "text", "Google LLC"]]]}]
+}`
+
+const asnTestWHOISText = "ASNumber:       15169\nASName:         GOOGLE\nASHandle:       AS15169\nOrgName:        Google LLC\nOrgId:          GOGL\nRegDate:        2000-03-30\nUpdated:        2012-02-24\n"
+
+func TestLookupOne_ASN_HappyPath_RDAPAndWHOIS(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(asnTestRDAPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return asnTestWHOISText
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewASNResolver(map[[2]uint32]string{
+		{15169, 15169}: rdapSrv.URL,
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &stdout, &stderr, resolver, "AS15169",
+		lookupOptions{whoisIANAServer: ianaAddr},
+		nil, render.FormatPlain, uiConfig{},
+	)
+
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "AS15169") {
+		t.Errorf("stdout missing handle, got:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "Google LLC") {
+		t.Errorf("stdout missing org name, got:\n%s", stdout.String())
+	}
+}
+
+func TestLookupOne_ASN_WHOISOnlyDegradedMode(t *testing.T) {
+	// An empty resolver (no ranges registered) means ASNBaseURL always
+	// returns ("", false) -- no RDAP coverage for the ASN, so
+	// collect.CollectASN degrades to WHOIS-only (its needRDAP check
+	// requires a non-empty base URL).
+	resolver := bootstrap.NewASNResolver(map[[2]uint32]string{})
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return asnTestWHOISText
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &stdout, &stderr, resolver, "AS15169",
+		lookupOptions{whoisIANAServer: ianaAddr},
+		nil, render.FormatPlain, uiConfig{},
+	)
+
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Google LLC") {
+		t.Errorf("stdout missing WHOIS-sourced org name, got:\n%s", stdout.String())
+	}
+	// RDAP was never queried -- the RDAP-only Type value must be absent,
+	// confirming this really is WHOIS-only rather than RDAP silently
+	// having succeeded.
+	if strings.Contains(stdout.String(), "DIRECT ALLOCATION") {
+		t.Errorf("stdout contains the RDAP-only Type value -- RDAP should never have been queried, got:\n%s", stdout.String())
+	}
+}
+
+func TestLookupOne_ASN_NotFound_ExitCode1(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		// "no match" is one of internal/whois/parse's notFoundMarkers
+		// (case-insensitive substring match).
+		return "No match found for AS15169.\n"
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewASNResolver(map[[2]uint32]string{
+		{15169, 15169}: rdapSrv.URL,
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &stdout, &stderr, resolver, "AS15169",
+		lookupOptions{whoisIANAServer: ianaAddr},
+		nil, render.FormatPlain, uiConfig{},
+	)
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "is not registered") {
+		t.Errorf("stderr missing not-registered message, got:\n%s", stderr.String())
+	}
+}
+
+func TestLookupOne_ASN_FailurePath_ExitCode3(t *testing.T) {
+	// Same "unreachable loopback" convention TestLookupOne_FailurePath_ExitCode3
+	// uses for the domain path -- a fast, hermetic connection-refused
+	// failure, no real network needed.
+	resolver := bootstrap.NewASNResolver(map[[2]uint32]string{
+		{15169, 15169}: "http://127.0.0.1:1/unreachable",
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &stdout, &stderr, resolver, "AS15169",
+		lookupOptions{whoisIANAServer: "127.0.0.1:1", Timeout: time.Second},
+		nil, render.FormatPlain, uiConfig{},
+	)
+
+	if code != 3 {
+		t.Errorf("exit code = %d, want 3\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "AS15169") {
+		t.Errorf("stderr missing ASN in failure message, got:\n%s", stderr.String())
+	}
+}
+
+func TestLookupOne_ASN_JSONOutput_ObjectTypeIsASN(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(asnTestRDAPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return asnTestWHOISText
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewASNResolver(map[[2]uint32]string{
+		{15169, 15169}: rdapSrv.URL,
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &stdout, &stderr, resolver, "AS15169",
+		lookupOptions{whoisIANAServer: ianaAddr},
+		nil, render.FormatJSON, uiConfig{},
+	)
+
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"objectType":"asn"`) {
+		t.Errorf(`stdout missing "objectType":"asn", got:%s`, stdout.String())
+	}
+}

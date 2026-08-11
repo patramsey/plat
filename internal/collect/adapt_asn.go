@@ -2,6 +2,7 @@ package collect
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
@@ -28,7 +29,7 @@ func fromASNRDAP(meta model.SourceResult, resp *rdap.ASNResponse) model.ASNSourc
 
 	sr := model.ASNSourceRecord{
 		Meta:           meta,
-		Handle:         resp.Handle,
+		Handle:         normalizeASNHandle(resp.Handle),
 		Name:           resp.Name,
 		Type:           resp.Type,
 		Country:        resp.Country,
@@ -70,6 +71,29 @@ func fromASNRDAP(meta model.SourceResult, resp *rdap.ASNResponse) model.ASNSourc
 
 	sr.Present = asnRDAPPresent(sr)
 	return sr
+}
+
+// normalizeASNHandle prefixes a bare numeric RDAP autnum handle with "AS",
+// so it compares equal to WHOIS's handle -- verified live against LACNIC
+// (AS28573), whose RDAP autnum response reports handle as the bare
+// number "28573" while every other tested RIR (ARIN, RIPE, APNIC,
+// AFRINIC) reports the conventional "AS28573" form, matching what
+// asnSynonyms's "aut-num"/"ashandle" mappings always produce on the
+// WHOIS side (the RPSL aut-num class attribute and ARIN's ASHandle key
+// are both already prefixed by construction). Without this, an
+// otherwise-agreeing RDAP/WHOIS pair reports a false handle conflict --
+// same failure mode as the IP feature's Parent-handle formatting bug
+// (see parentHandleFromWHOIS), just on the RDAP side instead of WHOIS's.
+// A handle that already carries the prefix (case-insensitively), or
+// isn't purely numeric, is returned unchanged.
+func normalizeASNHandle(handle string) string {
+	if handle == "" || strings.HasPrefix(strings.ToUpper(handle), "AS") {
+		return handle
+	}
+	if _, err := strconv.ParseUint(handle, 10, 32); err != nil {
+		return handle
+	}
+	return "AS" + handle
 }
 
 // asnRDAPPresent reports whether resp yielded any non-empty field,
