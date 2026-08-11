@@ -2,6 +2,7 @@ package rdap
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -360,3 +361,94 @@ func (d *DomainResponse) RedactionRemarks() []Remark {
 	}
 	return out
 }
+
+// CIDR0 is an RFC 9083 cidr0 extension entry: the CIDR form of an IP
+// network's range. Exactly one of V4Prefix/V6Prefix is populated.
+type CIDR0 struct {
+	V4Prefix string `json:"v4prefix"`
+	V6Prefix string `json:"v6prefix"`
+	Length   int    `json:"length"`
+}
+
+// Prefix renders the entry as standard CIDR notation ("8.8.8.0/24"),
+// or "" if neither prefix field was populated.
+func (c CIDR0) Prefix() string {
+	switch {
+	case c.V4Prefix != "":
+		return fmt.Sprintf("%s/%d", c.V4Prefix, c.Length)
+	case c.V6Prefix != "":
+		return fmt.Sprintf("%s/%d", c.V6Prefix, c.Length)
+	default:
+		return ""
+	}
+}
+
+// IPNetworkResponse is a trimmed RFC 9083 "ip network" object view. Note
+// what is absent relative to DomainResponse: no expiry, no registrar, no
+// nameservers, no DNSSEC -- IP allocations have none of those.
+type IPNetworkResponse struct {
+	ObjectClassName string     `json:"objectClassName"`
+	Handle          string     `json:"handle"`
+	StartAddress    string     `json:"startAddress"`
+	EndAddress      string     `json:"endAddress"`
+	IPVersion       string     `json:"ipVersion"`
+	Name            string     `json:"name"`
+	Type            string     `json:"type"`
+	Country         string     `json:"country"`
+	ParentHandle    string     `json:"parentHandle"`
+	Status          StatusList `json:"status"`
+	CIDR0CIDRs      []CIDR0    `json:"cidr0_cidrs"`
+	Events          []Event    `json:"events"`
+	Entities        EntityList `json:"entities"`
+	Remarks         RemarkList `json:"remarks"`
+	Port43          string     `json:"port43"`
+}
+
+// entityByRole mirrors DomainResponse.entityByRole -- kept as a separate
+// method rather than refactored into a shared free function alongside it,
+// since the domain path must stay untouched (see the domainAt/ipAt
+// precedent from the bootstrap package).
+func (n *IPNetworkResponse) entityByRole(role string) (Entity, bool) {
+	for _, e := range n.Entities {
+		for _, r := range e.Roles {
+			if strings.EqualFold(r, role) {
+				return e, true
+			}
+		}
+	}
+	return Entity{}, false
+}
+
+// RegistrantEntity returns the first entity whose Roles includes
+// "registrant" (case-insensitive), if any. An IP network's "registrant"
+// entity is its owning organization -- e.g. ARIN's response for 8.8.8.8
+// carries an entity with handle "GOGL" and roles ["registrant"].
+func (n *IPNetworkResponse) RegistrantEntity() (Entity, bool) {
+	return n.entityByRole("registrant")
+}
+
+// AbuseEntity returns the first entity whose Roles includes "abuse", if
+// any. Mirrors DomainResponse.AbuseEntity.
+func (n *IPNetworkResponse) AbuseEntity() (Entity, bool) {
+	return n.entityByRole("abuse")
+}
+
+// eventBySlot mirrors DomainResponse.eventBySlot.
+func (n *IPNetworkResponse) eventBySlot(slot eventSlot) (RDAPTime, bool) {
+	for _, e := range n.Events {
+		if normalizeEventAction(e.Action) == slot {
+			return e.Date, true
+		}
+	}
+	return RDAPTime{}, false
+}
+
+// Registered returns the registration event's date, if present. Mirrors
+// DomainResponse.Created -- named Registered rather than Created since an
+// IP allocation is "registered" with a RIR, not "created" the way a
+// domain is.
+func (n *IPNetworkResponse) Registered() (RDAPTime, bool) { return n.eventBySlot(slotCreated) }
+
+// Updated returns the last-changed event's date, if present. Mirrors
+// DomainResponse.Updated.
+func (n *IPNetworkResponse) Updated() (RDAPTime, bool) { return n.eventBySlot(slotUpdated) }

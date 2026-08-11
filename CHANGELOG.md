@@ -6,6 +6,29 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- IP-address lookups. `plat 8.8.8.8` (or any IPv4/IPv6 address) now
+  finds the RIR holding the containing netblock and queries its RDAP
+  and WHOIS, merging the result with the same per-field provenance as
+  a domain lookup. There's no registrar leg -- only `registry-rdap`/
+  `registry-whois` ever appear as sources -- and the record's fields are
+  a netblock's own (handle, CIDR, start/end address, parent handle,
+  holding organization) rather than a domain's. `-o json` sets
+  `"objectType": "ip"` to distinguish the shape from a domain record's
+  `"objectType": "domain"`. This supersedes 0.1.5's IP-input rejection
+  below: reserved/private addresses (`10.0.0.1`, `127.0.0.1`, `::1`,
+  ...) still exit 2 with a friendly error, since no RIR allocates them
+  to an organization, but an ordinary public address now returns real
+  data instead of exiting 2 outright.
+
+### Removed
+- The hidden `plat whois` and `plat merge` debug subcommands, dev-only
+  scaffolding used to prove the WHOIS engine and merge engine end to end
+  before `--source`/`-o` existed. Both were `Hidden: true` (never in
+  `--help`) and strictly inferior to `--source whois -o plain -v`, which
+  supersedes them with full parsed output and provenance. No documented
+  interface changes. See #45.
+
 ## [0.1.5] - 2026-08-05
 
 ### Fixed

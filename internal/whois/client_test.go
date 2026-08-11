@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -115,10 +116,11 @@ func TestClient_ReferralChasing(t *testing.T) {
 	})
 
 	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 	result, err := c.Lookup(context.Background(), name)
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
@@ -158,10 +160,11 @@ func TestClient_LookupTimeoutReturnsPartialResult(t *testing.T) {
 	}()
 
 	c := &Client{IANAServer: ln.Addr().String(), Timeout: 200 * time.Millisecond}
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	start := time.Now()
 	result, err := c.Lookup(context.Background(), name)
@@ -198,10 +201,11 @@ func TestClient_ReferralChasing_BracketsDialectTLD(t *testing.T) {
 	_ = registrarAddr // the registry response above has no "Registrar WHOIS Server" field, so the chain stops at 2 hops — that's fine, this test's purpose is proving the IANA hop's whois: line parses correctly for a brackets-dialect TLD, not exercising a full 3-hop chain
 
 	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
-	name, err := domain.Normalize("example.jp")
+	q, err := domain.Normalize("example.jp")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 	result, err := c.Lookup(context.Background(), name)
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
@@ -235,10 +239,11 @@ func TestClient_ReferralChasing_LegacyReferFieldStillSupported(t *testing.T) {
 	})
 
 	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 	result, err := c.Lookup(context.Background(), name)
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
@@ -254,10 +259,11 @@ func TestClient_RateLimitDetected(t *testing.T) {
 	})
 
 	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 	result, err := c.Lookup(context.Background(), name)
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
@@ -291,10 +297,11 @@ func TestClient_QueryServerSkipsReferralChasing(t *testing.T) {
 		_, _ = conn.Write([]byte("Domain Name: EXAMPLE.COM\nRegistrar: Direct Registrar, Inc.\n"))
 	}()
 
-	name, err := domain.Normalize("example.com")
+	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 
 	c := &Client{Timeout: 2 * time.Second}
 	hop := c.QueryServer(context.Background(), ln.Addr().String(), name)
@@ -331,10 +338,11 @@ func TestClient_ReferralChasing_RegistrarHopUsesGenericTemplateNotDomainTLD(t *t
 	})
 
 	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
-	name, err := domain.Normalize("example.jp")
+	q, err := domain.Normalize("example.jp")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
+	name := q.Name
 	result, err := c.Lookup(context.Background(), name)
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
@@ -344,5 +352,30 @@ func TestClient_ReferralChasing_RegistrarHopUsesGenericTemplateNotDomainTLD(t *t
 	}
 	if result.Hops[2].Fields.Registrar != "Example JP Registrar" {
 		t.Errorf("registrar hop Registrar = %q, want %q (this is the regression this test guards: the registrar hop must be parsed with the default kv dialect, not the domain's own .jp brackets dialect, since a registrar WHOIS server's reply format doesn't depend on the queried domain's TLD)", result.Hops[2].Fields.Registrar, "Example JP Registrar")
+	}
+}
+
+func TestLookupIP_FollowsIANAReferral(t *testing.T) {
+	rirAddr := startListener(t, func(q string) string {
+		return "NetRange:       8.8.8.0 - 8.8.8.255\nNetName:        GOGL\nOrgName:        Google LLC\n"
+	})
+	ianaAddr := startListener(t, func(q string) string {
+		return "refer:          " + rirAddr + "\n"
+	})
+
+	c := &Client{IANAServer: ianaAddr, Timeout: 5 * time.Second}
+	res, err := c.LookupIP(context.Background(), netip.MustParseAddr("8.8.8.8"))
+	if err != nil {
+		t.Fatalf("LookupIP: %v", err)
+	}
+	if len(res.Hops) != 2 {
+		t.Fatalf("hops = %d, want 2 (IANA then RIR)", len(res.Hops))
+	}
+	last := res.Hops[len(res.Hops)-1]
+	if last.IPFields == nil {
+		t.Fatal("final hop IPFields = nil, want parsed IP fields")
+	}
+	if last.IPFields.NetName != "GOGL" {
+		t.Errorf("NetName = %q, want GOGL", last.IPFields.NetName)
 	}
 }

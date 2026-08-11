@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"strings"
 	"testing"
@@ -271,6 +272,198 @@ func TestClientDomain_RetriesOn429(t *testing.T) {
 	}
 	if result.Domain.LDHName != "EXAMPLE.ORG" {
 		t.Errorf("LDHName = %q, want EXAMPLE.ORG", result.Domain.LDHName)
+	}
+}
+
+func TestClient_IP(t *testing.T) {
+	const body = `{
+	  "objectClassName": "ip network",
+	  "handle": "NET-8-8-8-0-2",
+	  "startAddress": "8.8.8.0",
+	  "endAddress": "8.8.8.255",
+	  "ipVersion": "v4",
+	  "name": "GOGL",
+	  "type": "DIRECT ALLOCATION",
+	  "parentHandle": "NET-8-0-0-0-0",
+	  "status": ["active"],
+	  "cidr0_cidrs": [{"v4prefix": "8.8.8.0", "length": 24}],
+	  "events": [{"eventAction": "registration", "eventDate": "2023-12-28T17:24:33-05:00"}],
+	  "port43": "whois.arin.net"
+	}`
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.IP(context.Background(), srv.URL, netip.MustParseAddr("8.8.8.8"))
+	if err != nil {
+		t.Fatalf("IP: %v", err)
+	}
+	if gotPath != "/ip/8.8.8.8" {
+		t.Errorf("request path = %q, want /ip/8.8.8.8", gotPath)
+	}
+	if res.IPNetwork == nil {
+		t.Fatal("Result.IPNetwork = nil, want the parsed object")
+	}
+	if res.IPNetwork.Handle != "NET-8-8-8-0-2" {
+		t.Errorf("Handle = %q, want NET-8-8-8-0-2", res.IPNetwork.Handle)
+	}
+	if len(res.IPNetwork.CIDR0CIDRs) != 1 || res.IPNetwork.CIDR0CIDRs[0].Length != 24 {
+		t.Errorf("CIDR0CIDRs = %+v, want one /24 entry", res.IPNetwork.CIDR0CIDRs)
+	}
+	if res.IPNetwork.Port43 != "whois.arin.net" {
+		t.Errorf("Port43 = %q, want whois.arin.net", res.IPNetwork.Port43)
+	}
+}
+
+func TestClient_IP_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	_, err := c.IP(context.Background(), srv.URL, netip.MustParseAddr("8.8.8.8"))
+	if !errors.Is(err, ErrDomainNotFound) {
+		t.Errorf("err = %v, want ErrDomainNotFound", err)
+	}
+}
+
+func TestClient_IP_RetriesOn429(t *testing.T) {
+	const body = `{
+	  "objectClassName": "ip network",
+	  "handle": "NET-8-8-8-0-2",
+	  "startAddress": "8.8.8.0",
+	  "endAddress": "8.8.8.255",
+	  "ipVersion": "v4",
+	  "name": "GOGL"
+	}`
+	var requestCount int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount == 1 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.IP(context.Background(), srv.URL, netip.MustParseAddr("8.8.8.8"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if requestCount != 2 {
+		t.Fatalf("requestCount = %d, want 2 (one 429, one successful retry)", requestCount)
+	}
+	if res.IPNetwork == nil {
+		t.Fatal("IPNetwork is nil")
+	}
+	if res.IPNetwork.Handle != "NET-8-8-8-0-2" {
+		t.Errorf("Handle = %q, want NET-8-8-8-0-2", res.IPNetwork.Handle)
+	}
+}
+
+func TestClient_IP_ErrorStatusSurfacesTitle(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"errorCode":500,"title":"Internal Server Error"}`))
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.IP(context.Background(), srv.URL, netip.MustParseAddr("8.8.8.8"))
+	if err == nil {
+		t.Fatal("expected an error for a 500 status")
+	}
+	if !strings.Contains(err.Error(), "Internal Server Error") {
+		t.Errorf("err = %q, want it to contain the server's title", err.Error())
+	}
+	var malformed *MalformedResponseError
+	if errors.As(err, &malformed) {
+		t.Errorf("err = %v, want a plain error surfacing the title, not *MalformedResponseError", err)
+	}
+	if res == nil || res.StatusCode != http.StatusInternalServerError {
+		t.Errorf("Result.StatusCode not populated as 500: %+v", res)
+	}
+}
+
+func TestClient_IP_MalformedBody(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+		wantErrSet  bool // whether MalformedResponseError.Err should be non-nil
+	}{
+		{
+			name:        "non-JSON body",
+			contentType: "text/html",
+			body:        "<html><body>upstream error</body></html>",
+		},
+		{
+			name:        "malformed JSON structure",
+			contentType: "application/rdap+json",
+			body:        `{"objectClassName":"ip network","cidr0_cidrs":"not-an-array"}`,
+			wantErrSet:  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", tt.contentType)
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			defer srv.Close()
+
+			c := &Client{}
+			res, err := c.IP(context.Background(), srv.URL, netip.MustParseAddr("8.8.8.8"))
+			var malformed *MalformedResponseError
+			if !errors.As(err, &malformed) {
+				t.Fatalf("error = %v (%T), want *MalformedResponseError", err, err)
+			}
+			if malformed.URL == "" || malformed.StatusCode == 0 || malformed.Snippet == "" {
+				t.Errorf("MalformedResponseError fields not populated: %+v", malformed)
+			}
+			if tt.wantErrSet && malformed.Err == nil {
+				t.Errorf("Err = nil, want the underlying json.Unmarshal error to be wrapped")
+			}
+			if res == nil || res.IPNetwork != nil {
+				t.Errorf("IPNetwork should remain nil on malformed body, got %+v", res)
+			}
+		})
+	}
+}
+
+func TestClient_IP_WrongObjectClassName(t *testing.T) {
+	body := `{"objectClassName":"nameserver","handle":"NS1.EXAMPLE.COM"}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.IP(context.Background(), srv.URL, netip.MustParseAddr("8.8.8.8"))
+	var malformed *MalformedResponseError
+	if !errors.As(err, &malformed) {
+		t.Fatalf("error = %v (%T), want *MalformedResponseError", err, err)
+	}
+	if res == nil {
+		t.Fatal("Result should still be returned when objectClassName mismatches")
+	}
+	if res.IPNetwork != nil {
+		t.Errorf("IPNetwork = %+v, want nil when objectClassName is not \"ip network\"", res.IPNetwork)
 	}
 }
 

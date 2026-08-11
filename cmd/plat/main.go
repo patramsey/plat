@@ -138,8 +138,8 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var noColorFlag bool
 
 	root := &cobra.Command{
-		Use:           "plat <domain> [domain...]",
-		Short:         "Look up domain ownership via RDAP and WHOIS",
+		Use:           "plat <domain|ip> [domain|ip...]",
+		Short:         "Look up domain or IP ownership via RDAP and WHOIS",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args: func(cmd *cobra.Command, cliArgs []string) error {
@@ -233,8 +233,6 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	versionCmd.Flags().BoolVar(&versionFull, "full", false, "include Go version and platform (human: extra lines; json: extra keys)")
 	root.AddCommand(versionCmd)
 
-	root.AddCommand(newWhoisCommand(stdout))
-	root.AddCommand(newMergeCommand(stdout))
 	root.AddCommand(newGendocsCommand(root))
 
 	err := root.Execute()
@@ -316,21 +314,33 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 // format is FormatHuman — never for Plain/JSON/NDJSON, and never when
 // stderr is redirected even if stdout is a terminal.
 func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, input string, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
-	name, err := domain.Normalize(input)
+	q, err := domain.Normalize(input)
 	if err != nil {
 		reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui)
 		return 2
 	}
 
-	baseURL, _ := resolver.BaseURL(name.TLD) // "" is fine — Collect degrades to WHOIS-only
+	switch q.Kind {
+	case domain.KindIPv4, domain.KindIPv6:
+		return lookupOneIP(ctx, stdout, stderr, resolver, q, opts, sources, format, ui)
+	default:
+		return lookupOneDomain(ctx, stdout, stderr, resolver, q, opts, sources, format, ui)
+	}
+}
+
+// lookupOneDomain is lookupOne's KindDomain branch — the pre-M6 lookup
+// flow, unchanged apart from being split out of lookupOne so it can share
+// a signature shape with lookupOneIP.
+func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
+	baseURL, _ := resolver.BaseURL(q.Name.TLD) // "" is fine — Collect degrades to WHOIS-only
 	collectOpts := collect.Options{NoFollow: opts.NoFollow, Timeout: opts.Timeout, Sources: sources}
 
 	var records []model.SourceRecord
 	work := func() {
-		records = collect.Collect(ctx, name, baseURL, opts.whoisIANAServer, collectOpts)
+		records = collect.Collect(ctx, q.Name, baseURL, opts.whoisIANAServer, collectOpts)
 	}
 	if ui.StderrTTY && format == render.FormatHuman {
-		spinner.Run(stderr, "looking up "+name.Punycode+"...", work)
+		spinner.Run(stderr, "looking up "+q.Name.Punycode+"...", work)
 	} else {
 		work()
 	}
@@ -340,12 +350,47 @@ func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstra
 	code := deriveOutcome(record.Sources)
 	if code == 0 {
 		if err := renderRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
-			reportLookupError(stderr, format, name.Punycode, err, record.Sources, opts.Verbose, ui)
+			reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui)
 			return 3
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, name.Punycode, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
+	reportLookupError(stderr, format, q.Name.Punycode, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
+	return code
+}
+
+// lookupOneIP is lookupOne's KindIPv4/KindIPv6 branch: the IP counterpart
+// of lookupOneDomain, sharing the same collect -> merge -> render-or-report
+// shape, but fanning out via collect.CollectIP/merge.MergeIP (two sources,
+// no registrar hop) instead of Collect/Merge. deriveOutcome/
+// lookupOutcomeError operate on []model.SourceResult, which model.IPRecord
+// carries just like model.Record, so both are reused unchanged -- exit
+// codes stay consistent between the domain and IP paths.
+func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
+	baseURL, _ := resolver.IPBaseURL(q.IP) // "" is fine — CollectIP degrades to WHOIS-only
+	collectOpts := collect.Options{Timeout: opts.Timeout, Sources: sources}
+
+	var records []model.IPSourceRecord
+	work := func() {
+		records = collect.CollectIP(ctx, q.IP, baseURL, opts.whoisIANAServer, collectOpts)
+	}
+	if ui.StderrTTY && format == render.FormatHuman {
+		spinner.Run(stderr, "looking up "+q.Input+"...", work)
+	} else {
+		work()
+	}
+
+	record := merge.MergeIP(records)
+
+	code := deriveOutcome(record.Sources)
+	if code == 0 {
+		if err := renderIPRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
+			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+			return 3
+		}
+		return 0
+	}
+	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
 	return code
 }
 
@@ -400,6 +445,50 @@ func renderRecord(w io.Writer, format render.Format, record model.Record, raw, v
 		return human.Render(w, record, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts})
 	default: // FormatPlain
 		return plain.Render(w, record, plain.Options{Verbose: verbose, ShowConflicts: showConflicts})
+	}
+}
+
+// renderIPRecord is renderRecord's IP counterpart. -q's one-line summary
+// has no lock/expiry/lifecycle verdict to report (an IP allocation has
+// none of those), so it degrades to "<cidr> · <org name>", falling back
+// to whichever of the two is actually present, and finally to the record's
+// handle if neither is -- mirroring renderRecord's own always-print-
+// something-identifying behavior for a quiet summary with nothing to say.
+func renderIPRecord(w io.Writer, format render.Format, rec model.IPRecord, raw, verbose, showConflicts, quiet bool, ui uiConfig) error {
+	if quiet && !render.IsMachine(format) {
+		_, err := fmt.Fprintln(w, ipQuietSummary(rec))
+		return err
+	}
+	switch format {
+	case render.FormatJSON:
+		return machine.EncodeIP(w, rec, machine.Options{Raw: raw})
+	case render.FormatNDJSON:
+		return machine.EncodeIPNDJSON(w, rec, machine.Options{Raw: raw})
+	case render.FormatHuman:
+		return human.RenderIP(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts})
+	default: // FormatPlain
+		return plain.RenderIP(w, rec, plain.Options{Verbose: verbose, ShowConflicts: showConflicts})
+	}
+}
+
+// ipQuietSummary builds -q's one-line "<cidr> · <org name>" summary for an
+// IP lookup, degrading gracefully when either half is absent: just the
+// other half alone, or the handle if neither CIDR nor org name came back
+// from any source.
+func ipQuietSummary(rec model.IPRecord) string {
+	cidr := rec.CIDR.Value
+	org := rec.Org.Name.Value
+	switch {
+	case cidr != "" && org != "":
+		return cidr + " · " + org
+	case cidr != "":
+		return cidr
+	case org != "":
+		return org
+	case rec.Handle.Value != "":
+		return rec.Handle.Value
+	default:
+		return "no data"
 	}
 }
 
