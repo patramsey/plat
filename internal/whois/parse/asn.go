@@ -105,29 +105,42 @@ var asnFieldGet = map[string]func(*ASNFields) string{
 // and ends at the next blank line, per RPSL's object-separator rule) and
 // skips every line belonging to an as-block object outright.
 //
-// APNIC (verified live against AS4808) can additionally place a "role"
-// object -- an administrative contact, not the as-block -- between the
-// as-block and the aut-num object. That role object carries its own
-// "country" and "last-modified" (the contact's own address/record-update
-// time, e.g. APNIC's own hostmaster team), which share asnSynonyms keys
-// with the aut-num object's identically-named but semantically unrelated
-// fields. Skipping as-block alone isn't enough to keep that from
-// shadowing the real ASN data, and there's no closed list of every
-// RPSL contact-object class name (role, person, organisation, irt,
-// mntner...) that might similarly precede aut-num across RIRs. Rather
-// than skip every non-aut-num object by name, ParseASN instead lets the
-// aut-num object's own values always win: once inAutNum, set()
-// unconditionally overwrites (instead of the usual first-occurrence-wins
-// skip-if-already-set), so whatever a preceding object incidentally
-// captured is corrected the moment the real aut-num data is reached.
-// Objects after aut-num (e.g. an "irt" object supplying abuse-mailbox,
-// which aut-num itself never carries) still use ordinary
-// first-occurrence-wins, so they keep filling in fields aut-num left
-// empty exactly as before.
+// APNIC (verified live against AS4608/AS4808) can additionally place a
+// "role" object -- an administrative contact, not the as-block --
+// between the as-block and the aut-num object. That role object carries
+// its own "country" and "last-modified" (the contact's own
+// address/record-update time, e.g. APNIC's own hostmaster team), which
+// share asnSynonyms keys with the aut-num object's identically-named but
+// semantically unrelated fields. Skipping as-block alone isn't enough to
+// keep that from shadowing the real ASN data, and there's no closed list
+// of every RPSL contact-object class name (role, person, organisation,
+// irt, mntner...) that might similarly precede aut-num across RIRs.
+// Rather than skip every non-aut-num object by name, ParseASN instead
+// lets the aut-num object's own values win over anything a *different*
+// object already captured -- but, critically, only once per field: the
+// first occurrence *within* the aut-num object itself still wins over
+// later ones in the same object. This matters because a single aut-num
+// object can carry a field's key more than once for entirely legitimate
+// RPSL reasons -- APNIC's aut-num for AS4608 has seven "descr:" lines,
+// the first being the org name ("Asia Pacific Network Information
+// Centre") and the rest a multi-line postal address ending in
+// "Australia". Plain last-occurrence-wins inside aut-num would report
+// the postal address's country line as the org name. ParseASN tracks,
+// per field key, whether the currently-stored value came from the
+// aut-num object (fromAutNum): inside aut-num, a field already sourced
+// from aut-num itself is left alone (first-occurrence-wins, scoped to
+// the object); a field whose current value came from some earlier,
+// different object is overwritten (aut-num's own data always
+// supersedes a preceding object's). Objects after aut-num (e.g. an
+// "irt" object supplying abuse-mailbox, which aut-num itself never
+// carries) still use ordinary first-occurrence-wins against whatever is
+// already set, so they keep filling in fields aut-num left empty exactly
+// as before.
 func ParseASN(raw string) ASNFields {
 	var f ASNFields
 	inASBlock := false
 	inAutNum := false
+	fromAutNum := map[string]bool{}
 	for _, line := range strings.Split(raw, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -163,10 +176,17 @@ func ParseASN(raw string) ASNFields {
 		if !known {
 			continue
 		}
-		if !inAutNum {
-			if get, ok := asnFieldGet[key]; ok && get(&f) != "" {
-				continue // first occurrence wins
+
+		if inAutNum {
+			if fromAutNum[key] {
+				continue // first occurrence within aut-num wins
 			}
+			set(&f, val)
+			fromAutNum[key] = true
+			continue
+		}
+		if get, ok := asnFieldGet[key]; ok && get(&f) != "" {
+			continue // first occurrence wins
 		}
 		set(&f, val)
 	}

@@ -92,6 +92,47 @@ func TestParseASN_APNIC_RoleObjectDoesNotShadowAutNum(t *testing.T) {
 	}
 }
 
+// TestParseASN_APNIC_FirstDescrWithinAutNumWins is a regression test for
+// a real defect introduced by the fix above and caught during live
+// verification against AS4608: the aut-num-always-wins rule was
+// implemented as an unconditional overwrite, which meant the LAST
+// occurrence of a repeated key within the aut-num object itself won, not
+// the first. APNIC's aut-num object for AS4608 carries seven "descr:"
+// lines -- the first is the real org name ("Asia Pacific Network
+// Information Centre"), the remaining six are a multi-line postal
+// address ending in "Australia". Unconditional overwrite reported
+// "Australia" as OrgName. ParseASN must still apply first-occurrence-wins
+// *within* the aut-num object; only a value belonging to some earlier,
+// different object should ever be overwritten by aut-num's own data. See
+// ParseASN's doc comment for the fromAutNum mechanism.
+func TestParseASN_APNIC_FirstDescrWithinAutNumWins(t *testing.T) {
+	raw, err := os.ReadFile("../../../testdata/whois/apnic-as4608.txt")
+	if err != nil {
+		t.Fatalf("reading golden: %v", err)
+	}
+	f := ParseASN(string(raw))
+
+	if f.OrgName == "Australia" {
+		t.Fatal("OrgName came from the aut-num object's last descr line (the postal address's country); want the first")
+	}
+	if f.OrgName != "Asia Pacific Network Information Centre" {
+		t.Errorf("OrgName = %q, want Asia Pacific Network Information Centre (the aut-num object's first descr line)", f.OrgName)
+	}
+	// Country ("AU") is a genuinely separate key from the address's
+	// trailing "descr: Australia" line, and must still come through
+	// correctly -- confirming the fix didn't overcorrect into ignoring
+	// aut-num's own country key entirely.
+	if f.Country != "AU" {
+		t.Errorf("Country = %q, want AU", f.Country)
+	}
+	if f.Name != "APNIC-SERVICES" {
+		t.Errorf("Name = %q, want APNIC-SERVICES", f.Name)
+	}
+	if f.Handle != "AS4608" {
+		t.Errorf("Handle = %q, want AS4608", f.Handle)
+	}
+}
+
 func TestParseASN_EmptyInput(t *testing.T) {
 	if got := ParseASN(""); !reflect.DeepEqual(got, ASNFields{}) {
 		t.Errorf("ParseASN(\"\") = %+v, want the zero value", got)
