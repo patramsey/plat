@@ -332,6 +332,15 @@ func (m *mergeState) nameservers(present []model.SourceRecord) model.Field[[]str
 		}
 	}
 
+	// Sorted last, after dedup/first-seen and conflict/agreement detection
+	// have all consumed the first-seen order: upstream RDAP servers (see
+	// issue #49) don't return nameservers in a stable order between
+	// requests, and since registrar-rdap is the highest-precedence source
+	// its shuffling would otherwise propagate straight into plat's output.
+	// Values are already normalized (lowercased, trailing dot stripped)
+	// before comparison, so a lexical sort here is purely a presentation
+	// choice with no semantic meaning lost.
+	sort.Strings(order)
 	return model.Field[[]string]{Value: order, Sources: agreeing}
 }
 
@@ -391,7 +400,16 @@ func (m *mergeState) status(present []model.SourceRecord) model.Field[[]string] 
 	if len(contributors) == 0 {
 		return model.Field[[]string]{}
 	}
-	return model.Field[[]string]{Value: dropRedundantBareStatuses(order, seen), Sources: contributors}
+	// Sorted after dropRedundantBareStatuses rather than before: the drop
+	// step filters purely on membership in seen (client<X>/server<X>
+	// presence), never on position, so sorting before or after it yields
+	// an identical final set in an identical final order either way.
+	// Sorting last keeps this a pure presentation step layered on top of
+	// the untouched dedup/drop logic, for the same upstream-nondeterminism
+	// reason as nameservers() above.
+	result := dropRedundantBareStatuses(order, seen)
+	sort.Strings(result)
+	return model.Field[[]string]{Value: result, Sources: contributors}
 }
 
 // dropRedundantBareStatuses removes any status in order that is a bare

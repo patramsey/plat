@@ -1,6 +1,10 @@
 package merge
 
-import "github.com/patramsey/plat/internal/model"
+import (
+	"sort"
+
+	"github.com/patramsey/plat/internal/model"
+)
 
 // MergeIP combines per-source IP records into one unified,
 // provenance-annotated IPRecord. Like Merge, it is a pure function, never
@@ -96,5 +100,8 @@ func ipStatus(present []model.IPSourceRecord) model.Field[[]string] {
 	if len(contributors) == 0 {
 		return model.Field[[]string]{}
 	}
+	// Sorted last for the same reason as domain status() in merge.go:
+	// deterministic output regardless of upstream ordering.
+	sort.Strings(order)
 	return model.Field[[]string]{Value: order, Sources: contributors}
 }
