@@ -6,6 +6,16 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- `-o json` and `-o ndjson` are now byte-reproducible across runs. The
+  `nameservers` and `status` arrays are sorted, so repeated lookups of an
+  unchanged domain, IP, or ASN produce identical output. Previously the
+  order tracked whatever the highest-precedence source returned, and at
+  least one registrar's RDAP server returns nameservers in a different
+  order on every request -- so diffing two runs, or hashing the output,
+  saw spurious changes. Values and source attribution are unaffected;
+  only ordering changed, so `schemaVersion` stays 1.
+
 ## [0.3.0] - 2026-08-11
 
 ### Added
