@@ -1,0 +1,25 @@
+# Coverage thresholds for https://app.codecov.io/gh/patramsey/plat
+#
+# Without this file Codecov defaults both statuses to `target: auto`, which
+# measures a pull request against whatever the base branch's coverage
+# happens to be. That ratchets: every PR that improves coverage raises the
+# bar for the next one, so a PR touching realistic code (defensive branches,
+# CLI plumbing, a vendor quirk) fails for being merely good rather than
+# better than average. A stated target is a standard the project can
+# actually hold.
+coverage:
+  status:
+    # project guards the codebase as a whole against slow erosion. The
+    # threshold absorbs the small dips that come from honest refactors --
+    # deleting well-tested code raises the denominator's share of
+    # hard-to-test paths without anything actually getting worse.
+    project:
+      default:
+        target: 90%
+        threshold: 1%
+
+    # patch judges only the lines a PR touches. Fixed rather than auto:
+    # 90% is the bar, regardless of where the project average drifts.
+    patch:
+      default:
+        target: 90%
