@@ -186,6 +186,15 @@ var commonFieldKeys = []string{
 // commonFields gains or loses a key without commonFieldKeys being kept in
 // sync, that's reported too (non-fatally, so the per-key subtests below
 // still run and still name any specific key that stopped resolving).
+//
+// Scope: this proves reachability, not targeting. Because the assertion
+// is "the sentinel appears SOMEWHERE in %+v", a setter wired to the wrong
+// field (e.g. "orgid" accidentally writing OrgName) would still pass --
+// the sentinel shows up in the struct dump either way. That's the right
+// scope for the bug class that actually shipped here (a key missing from
+// one table entirely, not a key pointed at the wrong field); the golden
+// tests (TestParseIP_*, TestParseASN_*) are what pin each key to its
+// correct field.
 func TestCommonVocabularyReachesBothParsers(t *testing.T) {
 	if len(commonFieldKeys) != len(commonFields) {
 		t.Errorf("commonFieldKeys has %d entries, commonFields has %d -- keep commonFieldKeys in sync with commonFields", len(commonFieldKeys), len(commonFields))
