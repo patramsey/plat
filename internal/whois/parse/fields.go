@@ -87,10 +87,19 @@ var commonFields = map[string]fieldRef[CommonFields]{
 // commonFields' entries populate either concrete parser's table without
 // the vocabulary itself ever being redeclared per type.
 func liftCommon[T any](ref fieldRef[CommonFields], common func(*T) *CommonFields) fieldRef[T] {
-	return fieldRef[T]{
+	lifted := fieldRef[T]{
 		set: func(f *T, v string) { ref.set(common(f), v) },
-		get: func(f *T) string { return ref.get(common(f)) },
 	}
+	// A nil ref.get must stay nil once lifted, not become a non-nil
+	// wrapper that panics when called: every commonFields entry has a
+	// getter today, but a future getter-less shared key (append-valued,
+	// like ipFields' own "status") would otherwise panic on first use in
+	// both ParseIP's and ParseASN's lookup, since both treat a non-nil get
+	// as "safe to call".
+	if ref.get != nil {
+		lifted.get = func(f *T) string { return ref.get(common(f)) }
+	}
+	return lifted
 }
 
 // buildFields merges commonFields, lifted via common, into a type's own

@@ -178,7 +178,13 @@ func ParseASN(raw string) ASNFields {
 			fromAutNum[key] = true
 			continue
 		}
-		if ref.get(&f) != "" {
+		// A nil get (no asnFields entry has one today) falls through to
+		// set unconditionally -- this exactly restores base's semantics
+		// (`if get, ok := asnFieldGet[key]; ok && get(&f) != ""`), which
+		// also fell through to set on a getter-less key. Guards against a
+		// future getter-less shared key panicking here instead of a
+		// silent, harmless no-op.
+		if ref.get != nil && ref.get(&f) != "" {
 			continue // first occurrence wins
 		}
 		ref.set(&f, val)
