@@ -245,3 +245,26 @@ source:      TEST
 		t.Errorf("Statuses = %v, want %v (only the aut-num object's own status, none of the surrounding role objects')", f.Statuses, want)
 	}
 }
+
+// TestASNStatusSuppressedOutsideAutNum pins a deliberate asymmetry with
+// ParseIP (see TestIPStatusAccumulatesUnconditionally in ip_test.go): ASN
+// responses routinely place non-aut-num RPSL objects (as-block, role,
+// person...) around the aut-num object, and those objects' own
+// "status:" lines describe that object, not the ASN's status -- see
+// ParseASN's status-handling comment for the APNIC/RIPE cases this
+// caught live. So unlike ParseIP, which has no object tracking to gate
+// on at all, ParseASN deliberately suppresses every "status:" line seen
+// outside an aut-num object rather than accumulating it. Don't "fix"
+// this into unconditional accumulation to match ParseIP without first
+// confirming no real RIR response places a legitimate status-bearing
+// object outside aut-num.
+func TestASNStatusSuppressedOutsideAutNum(t *testing.T) {
+	raw := `role:        Some Contact
+status:      BOGUS
+source:      TEST
+`
+	f := ParseASN(raw)
+	if len(f.Statuses) != 0 {
+		t.Errorf("Statuses = %v, want none (status outside aut-num must be suppressed)", f.Statuses)
+	}
+}
