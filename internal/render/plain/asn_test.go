@@ -312,3 +312,26 @@ func TestRenderASN_UnhandledFieldOrderEntryPanics(t *testing.T) {
 	}()
 	writeASNField(nil, model.ASNRecord{}, model.FieldSpec{Label: "Bogus", Key: "bogus"})
 }
+
+// TestRenderASN_LegendOmitsRegistrarSources is the ASN counterpart to
+// TestRenderIP_LegendOmitsRegistrarSources -- an autonomous system is
+// registered directly with an RIR and has no registrar. Kept as a pair so
+// neither object type quietly regains the domain legend.
+func TestRenderASN_LegendOmitsRegistrarSources(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderASN(&buf, fullASNRecord(), Options{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+
+	for _, absent := range []string{"registrar-rdap", "registrar-whois"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("ASN legend mentions %q, but an ASN has no registrar:\n%s", absent, out)
+		}
+	}
+	for _, want := range []string{"GR registry-rdap", "GW registry-whois"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("ASN legend is missing %q:\n%s", want, out)
+		}
+	}
+}

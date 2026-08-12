@@ -6,6 +6,20 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- IP and ASN lookups no longer advertise source codes that cannot apply
+  to them. Both renderers printed the same fixed four-source legend
+  (`RR registrar-rdap  GR registry-rdap  RW registrar-whois  GW
+  registry-whois`) for every object type, but an IP allocation or an
+  autonomous system is registered directly with an RIR and has no
+  registrar at all -- so `RR`/`RW` explained badges that could never
+  appear, reading as "plat failed to reach the registrar" rather than
+  "no such source exists". IP and ASN records now show only
+  `GR registry-rdap  GW registry-whois`. Domain output is unchanged, and
+  all four codes remain correct there. Affects the human and plain
+  renderers; JSON/NDJSON carry full source names and were never
+  affected.
+
 ## [0.3.1] - 2026-08-12
 
 ### Fixed

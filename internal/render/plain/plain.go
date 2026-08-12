@@ -41,7 +41,7 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 	for _, fd := range model.FieldOrder {
 		writeField(tw, r, fd)
 	}
-	writeSourceLegend(tw)
+	writeSourceLegend(tw, legendWithRegistrar)
 
 	if opts.Verbose {
 		writeSourcesBlock(tw, r.Sources)
@@ -243,12 +243,30 @@ func formatSources(sources []model.SourceID) string {
 	return strings.Join(strs, ", ")
 }
 
+// Legend text decoding sourceCode's abbreviations. Two variants, because
+// which sources can exist depends on the object type: a domain is held by
+// a registrar under a registry, so all four codes are reachable, while an
+// IP allocation or an autonomous system is registered directly with an RIR
+// and has no registrar at all. Listing RR/RW on an IP or ASN record
+// explains badges that can never appear there, which reads as "plat failed
+// to reach the registrar" rather than "no such source exists".
+//
+// Kept in step with the same pair in internal/render/human/rows.go -- the
+// two renderers must decode the same codes the same way.
+const (
+	legendWithRegistrar = "RR registrar-rdap   GR registry-rdap   RW registrar-whois   GW registry-whois"
+	legendRegistryOnly  = "GR registry-rdap   GW registry-whois"
+)
+
 // writeSourceLegend prints the key decoding sourceCode's abbreviations --
 // unconditionally, not gated by --verbose or --conflicts, since the codes
 // it explains appear in the DEFAULT view; hiding the legend by default
 // would make the default output undecodable, not just less detailed.
-func writeSourceLegend(tw *tabwriter.Writer) {
-	_, _ = fmt.Fprintln(tw, "RR registrar-rdap   GR registry-rdap   RW registrar-whois   GW registry-whois")
+//
+// legend is the caller's choice of the two constants above: domain records
+// pass legendWithRegistrar, IP and ASN records pass legendRegistryOnly.
+func writeSourceLegend(tw *tabwriter.Writer, legend string) {
+	_, _ = fmt.Fprintln(tw, legend)
 }
 
 // formatConflictValues renders a Conflict's map in model.Precedence order

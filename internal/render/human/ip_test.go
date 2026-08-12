@@ -399,3 +399,26 @@ func TestRenderIP_UnhandledFieldOrderEntryPanics(t *testing.T) {
 	var b strings.Builder
 	writeIPField(&b, NewTheme(false), 80, model.IPRecord{}, model.FieldSpec{Label: "Bogus", Key: "bogus"})
 }
+
+// TestRenderIP_LegendOmitsRegistrarSources is the IP counterpart to
+// TestRenderASN_LegendOmitsRegistrarSources -- an IP allocation is held
+// directly from an RIR, with no registrar in the chain. Kept as a pair so
+// neither object type quietly regains the domain legend.
+func TestRenderIP_LegendOmitsRegistrarSources(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderIP(&buf, fullIPRecord(), Options{Theme: NewTheme(false), Width: 100}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+
+	for _, absent := range []string{"registrar-rdap", "registrar-whois"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("IP legend mentions %q, but an IP allocation has no registrar:\n%s", absent, out)
+		}
+	}
+	for _, want := range []string{"GR registry-rdap", "GW registry-whois"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("IP legend is missing %q:\n%s", want, out)
+		}
+	}
+}

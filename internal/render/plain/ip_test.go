@@ -320,3 +320,28 @@ func TestRenderIP_UnhandledFieldOrderEntryPanics(t *testing.T) {
 	}()
 	writeIPField(nil, model.IPRecord{}, model.FieldSpec{Label: "Bogus", Key: "bogus"})
 }
+
+// TestRenderIP_LegendOmitsRegistrarSources mirrors the human renderer's
+// test of the same name. An IP allocation is held directly from an RIR
+// with no registrar in the chain, so registrar-rdap/registrar-whois can
+// never supply a field here; listing their codes explains badges that
+// cannot appear. This matters at least as much in plain as in human --
+// plain is what pipes and scripts consume.
+func TestRenderIP_LegendOmitsRegistrarSources(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderIP(&buf, fullIPRecord(), Options{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+
+	for _, absent := range []string{"registrar-rdap", "registrar-whois"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("IP legend mentions %q, but an IP allocation has no registrar:\n%s", absent, out)
+		}
+	}
+	for _, want := range []string{"GR registry-rdap", "GW registry-whois"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("IP legend is missing %q:\n%s", want, out)
+		}
+	}
+}
