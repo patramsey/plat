@@ -60,7 +60,15 @@ jobs:
             exit 1
           fi
         env:
-          COVERAGE_FLOOR: "90"
+          # 94, not the 90 in codecov.yml -- deliberately a different
+          # number, because this is a different metric (see above). Actual
+          # coverage has sat at 95.2-95.3% across every commit since the
+          # ASN feature landed, so 94 leaves ~1.3 points of slack, roughly
+          # 13x the largest swing observed over that stretch. A fixed
+          # floor rather than a ratchet: honest refactors that delete
+          # well-tested code shouldn't fail CI for raising the
+          # hard-to-test share of what remains.
+          COVERAGE_FLOOR: "94"
 
   build:
     runs-on: ubuntu-latest

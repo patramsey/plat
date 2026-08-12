@@ -22,8 +22,16 @@ coverage:
     # this file as declaring both statuses, so the cause looks
     # repo-level and outside the repository. Until that is sorted out,
     # the real whole-project floor is enforced by the "Enforce total
-    # coverage floor" step in .github/workflows/ci.yml. Keep the two
-    # targets in sync if either changes.
+    # coverage floor" step in .github/workflows/ci.yml.
+    #
+    # That step's floor is 94, and the mismatch with the 90 below is
+    # deliberate: the two measure different things. Codecov counts
+    # partially-covered branches separately and reports ~93% for the
+    # same profile `go tool cover` scores ~95%. Raising this target to
+    # match CI's would put it *above* actual Codecov-measured coverage
+    # and fail the moment the status started posting. If this status is
+    # ever re-enabled, re-derive its target from Codecov's own reported
+    # number -- do not copy CI's.
     project:
       default:
         target: 90%
