@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-12
+
 ### Fixed
 - LACNIC-held IP lookups (`plat 200.3.12.1`, etc.) no longer silently
   drop registry-WHOIS data. `internal/whois/parse/ip.go` was missing
@@ -162,7 +164,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/patramsey/plat/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/patramsey/plat/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/patramsey/plat/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/patramsey/plat/compare/v0.1.3...v0.1.4
