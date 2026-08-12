@@ -62,6 +62,60 @@ func TestParseIP_RIPE(t *testing.T) {
 	}
 }
 
+// TestParseIP_RIPE_IPv6 covers the "inet6num" key, which had no golden at
+// all until this test: every captured IP response used ARIN's "NetRange"
+// or RPSL's IPv4 "inetnum", so both the setter and getter for "inet6num"
+// were entirely unexercised even though plat accepts IPv6 queries
+// (domain.KindIPv6). A typo in that one table entry would have shipped
+// silently -- IPv6 lookups would have gone registry-RDAP-only, exactly the
+// failure mode LACNIC IP lookups had through v0.3.0.
+//
+// The golden also exercises the deliberate no-object-boundary-tracking
+// decision: the inet6num object leads, so plain first-occurrence-wins must
+// pick its created/last-modified over the trailing organisation and role
+// objects, which carry their own (later) dates.
+func TestParseIP_RIPE_IPv6(t *testing.T) {
+	raw, err := os.ReadFile("../../../testdata/whois/ripe-2001-67c-2e8.txt")
+	if err != nil {
+		t.Fatalf("reading golden: %v", err)
+	}
+	f := ParseIP(string(raw))
+
+	if f.NetRange != "2001:67c:2e8::/48" {
+		t.Errorf("NetRange = %q, want RIPE's inet6num value", f.NetRange)
+	}
+	if f.NetName != "RIPE-NCC-NET" {
+		t.Errorf("NetName = %q, want RIPE-NCC-NET", f.NetName)
+	}
+	if f.OrgID != "ORG-RIEN1-RIPE" {
+		t.Errorf("OrgID = %q, want ORG-RIEN1-RIPE (from the inet6num block's org line)", f.OrgID)
+	}
+	if f.Country != "NL" {
+		t.Errorf("Country = %q, want NL", f.Country)
+	}
+	const wantOrgName = "Reseaux IP Europeens Network Coordination Centre (RIPE NCC)"
+	if f.OrgName != wantOrgName {
+		t.Errorf("OrgName = %q, want %q", f.OrgName, wantOrgName)
+	}
+	if f.AbuseEmail != "abuse@ripe.net" {
+		t.Errorf("AbuseEmail = %q, want abuse@ripe.net (from abuse-mailbox)", f.AbuseEmail)
+	}
+	// IP status accumulates unconditionally with no object gating -- the
+	// deliberate asymmetry against ParseASN, which suppresses status
+	// outside aut-num. This golden carries exactly one status line.
+	if len(f.Statuses) != 1 || f.Statuses[0] != "ASSIGNED PI" {
+		t.Errorf("Statuses = %q, want [ASSIGNED PI]", f.Statuses)
+	}
+	// First occurrence wins: these are the inet6num object's own dates,
+	// not the later organisation block's (2012-03-09 / 2026-05-13).
+	if ParseDate(f.Registered).Time.Format("2006-01-02") != "2010-09-17" {
+		t.Errorf("Registered = %q, want the inet6num object's 2010-09-17 created date", f.Registered)
+	}
+	if ParseDate(f.Updated).Time.Format("2006-01-02") != "2026-03-19" {
+		t.Errorf("Updated = %q, want the inet6num object's 2026-03-19 last-modified date", f.Updated)
+	}
+}
+
 // TestParseIP_DescrFallsBackWhenNoOrgName covers the inet6num case noted
 // during live verification: 2001:67c:2e8::1's inet6num block has no
 // descr line at all, so org-name wins outright with no ambiguity. This

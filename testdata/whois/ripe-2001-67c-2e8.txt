@@ -1,0 +1,104 @@
+% This is the RIPE Database query service.
+% The objects are in RPSL format.
+%
+% The RIPE Database is subject to Terms and Conditions.
+% See https://docs.db.ripe.net/terms-conditions.html
+
+% Note: this output has been filtered.
+%       To receive output for a database update, use the "-B" flag.
+
+% Information related to '2001:67c:2e8::/48'
+
+% Abuse contact for '2001:67c:2e8::/48' is 'abuse@ripe.net'
+
+inet6num:       2001:67c:2e8::/48
+netname:        RIPE-NCC-NET
+org:            ORG-RIEN1-RIPE
+country:        NL
+admin-c:        MDIR-RIPE
+tech-c:         OPS4-RIPE
+status:         ASSIGNED PI
+mnt-by:         RIPE-NCC-END-MNT
+mnt-by:         RIPE-NCC-MNT
+mnt-routes:     RIPE-NCC-MNT
+mnt-domains:    RIPE-NCC-MNT
+created:        2010-09-17T13:18:51Z
+last-modified:  2026-03-19T09:18:20Z
+source:         RIPE
+
+organisation:   ORG-RIEN1-RIPE
+org-name:       Reseaux IP Europeens Network Coordination Centre (RIPE NCC)
+country:        NL
+reg-nr:         40539632
+org-type:       LIR
+descr:          RIPE NCC Operations
+address:        P.O. Box 10096
+address:        1001 EB
+address:        Amsterdam
+address:        NETHERLANDS
+phone:          +31205354444
+fax-no:         +31205354445
+admin-c:        MENN1-RIPE
+admin-c:        MDIR-RIPE
+abuse-c:        ops4-ripe
+mnt-ref:        RIPE-NCC-HM-MNT
+mnt-ref:        RIPE-NCC-MNT
+mnt-by:         RIPE-NCC-HM-MNT
+mnt-by:         RIPE-NCC-MNT
+created:        2012-03-09T13:21:52Z
+last-modified:  2026-05-13T07:34:07Z
+source:         RIPE # Filtered
+
+role:           Managing Director
+address:        RIPE Network Coordination Centre
+address:        P.O. Box 10096
+address:        1001 EB Amsterdam
+address:        the Netherlands
+phone:          +31 20 535 4444
+org:            ORG-NCC1-RIPE
+nic-hdl:        MDIR-RIPE
+admin-c:        HPH2
+mnt-by:         RIPE-NCC-HM-MNT
+created:        2020-01-20T14:51:21Z
+last-modified:  2026-07-10T09:46:08Z
+source:         RIPE # Filtered
+
+role:           RIPE NCC Operations
+address:        Stationsplein 11
+address:        1012 AB Amsterdam
+address:        The Netherlands
+phone:          +31 20 535 4444
+fax-no:         +31 20 535 4445
+abuse-mailbox:  abuse@ripe.net
+admin-c:        MDIR-RIPE
+tech-c:         MENN1-RIPE
+tech-c:         RCO-RIPE
+tech-c:         CNAG-RIPE
+tech-c:         SO2011-RIPE
+tech-c:         TOL666-RIPE
+tech-c:         ADM6699-RIPE
+tech-c:         TIB-RIPE
+tech-c:         SG16480-RIPE
+tech-c:         RDM397-RIPE
+nic-hdl:        OPS4-RIPE
+mnt-by:         RIPE-NCC-MNT
+mnt-ref:        RIPE-NCC-MNT
+created:        2002-09-16T10:35:19Z
+last-modified:  2026-03-19T09:41:10Z
+source:         RIPE # Filtered
+
+% Information related to '2001:67c:2e8::/48AS3333'
+
+route6:         2001:67c:2e8::/48
+descr:          RIPE-NCC
+origin:         AS3333
+mnt-lower:      RIPE-NCC-MNT
+mnt-routes:     RIPE-NCC-MNT
+mnt-by:         RIPE-NCC-MNT
+created:        2010-09-27T12:14:23Z
+last-modified:  2010-09-27T12:14:23Z
+source:         RIPE
+
+% This query was served by the RIPE Database Query Service version 1.123 (SHETLAND)
+
+
