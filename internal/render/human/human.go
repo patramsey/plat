@@ -102,7 +102,7 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 	for _, fd := range model.FieldOrder {
 		writeField(&b, th, innerWidth, r, fd)
 	}
-	writeSourceLegend(&b, th, innerWidth)
+	writeSourceLegend(&b, th, innerWidth, legendWithRegistrar)
 
 	if opts.Verbose {
 		writeSources(&b, th, innerWidth, r.Sources)

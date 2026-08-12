@@ -41,7 +41,7 @@ func RenderASN(w io.Writer, r model.ASNRecord, opts Options) error {
 	for _, fd := range model.ASNFieldOrder {
 		writeASNField(&b, th, innerWidth, r, fd)
 	}
-	writeSourceLegend(&b, th, innerWidth)
+	writeSourceLegend(&b, th, innerWidth, legendRegistryOnly)
 
 	if opts.Verbose {
 		writeSources(&b, th, innerWidth, r.Sources)

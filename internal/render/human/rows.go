@@ -262,15 +262,28 @@ func wrapItems(items []string, width int, sep string) []string {
 	return append(lines, cur)
 }
 
+// Legend text decoding sourceCode's abbreviations. Two variants, because
+// which sources can exist depends on the object type: a domain is held by
+// a registrar under a registry, so all four codes are reachable, while an
+// IP allocation or an autonomous system is registered directly with an RIR
+// and has no registrar at all. Listing RR/RW on an IP or ASN record
+// explains badges that can never appear there, which reads as "plat failed
+// to reach the registrar" rather than "no such source exists".
+const (
+	legendWithRegistrar = "RR registrar-rdap   GR registry-rdap   RW registrar-whois   GW registry-whois"
+	legendRegistryOnly  = "GR registry-rdap   GW registry-whois"
+)
+
 // writeSourceLegend prints the key decoding sourceCode's abbreviations --
 // unconditionally, not gated by --verbose or --conflicts, since the codes
 // it explains appear in the DEFAULT view; hiding the legend by default
 // would make the default output undecodable, not just less detailed. The
-// legend text itself is ~77 columns, wide enough to need the same
-// wrap-safety every other line in this file gets rather than assuming it
-// always fits.
-func writeSourceLegend(b *strings.Builder, th Theme, width int) {
-	const legend = "RR registrar-rdap   GR registry-rdap   RW registrar-whois   GW registry-whois"
+// widest legend is ~77 columns, wide enough to need the same wrap-safety
+// every other line in this file gets rather than assuming it always fits.
+//
+// legend is the caller's choice of the two constants above: domain records
+// pass legendWithRegistrar, IP and ASN records pass legendRegistryOnly.
+func writeSourceLegend(b *strings.Builder, th Theme, width int, legend string) {
 	b.WriteString("\n")
 	for _, line := range wrapValue(legend, width) {
 		b.WriteString(th.Muted.Render(line) + "\n")

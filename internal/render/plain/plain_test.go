@@ -321,3 +321,28 @@ func TestRender_LifecycleSectionOmitsEstimateWhenAbsent(t *testing.T) {
 		}
 	}
 }
+
+// TestRender_DomainLegendKeepsRegistrarSources guards the opposite
+// direction from its IP and ASN siblings in this package: domains genuinely
+// can be sourced from all four, so the registrar codes must stay. Without
+// it, giving every object type the registry-only legend would pass the
+// suite while making the default domain view undecodable.
+func TestRender_DomainLegendKeepsRegistrarSources(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+
+	for _, want := range []string{
+		"RR registrar-rdap", "GR registry-rdap",
+		"RW registrar-whois", "GW registry-whois",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("domain legend is missing %q -- all four sources are reachable for a domain:\n%s", want, out)
+		}
+	}
+}

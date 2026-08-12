@@ -390,3 +390,29 @@ func TestRenderASN_UnhandledFieldOrderEntryPanics(t *testing.T) {
 	var b strings.Builder
 	writeASNField(&b, NewTheme(false), 80, model.ASNRecord{}, model.FieldSpec{Label: "Bogus", Key: "bogus"})
 }
+
+// TestRenderASN_LegendOmitsRegistrarSources pins the object-type-aware
+// legend. An autonomous system is registered directly with an RIR and has
+// no registrar, so registrar-rdap/registrar-whois can never supply a field
+// here -- listing their codes explains badges that cannot appear, which
+// reads as "plat failed to reach the registrar" rather than "no such
+// source exists". The registry codes must still be explained, since those
+// badges do appear in the default view.
+func TestRenderASN_LegendOmitsRegistrarSources(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderASN(&buf, fullASNRecord(), Options{Theme: NewTheme(false), Width: 100}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+
+	for _, absent := range []string{"registrar-rdap", "registrar-whois"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("ASN legend mentions %q, but an ASN has no registrar:\n%s", absent, out)
+		}
+	}
+	for _, want := range []string{"GR registry-rdap", "GW registry-whois"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("ASN legend is missing %q:\n%s", want, out)
+		}
+	}
+}
