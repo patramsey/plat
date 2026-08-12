@@ -60,6 +60,17 @@ jobs:
             exit 1
           fi
         env:
+          # A deliberately loose floor, not a ratchet. Actual coverage has
+          # sat at 95.2-95.3% across every commit since the ASN feature
+          # landed, so this leaves real headroom on purpose: an honest
+          # refactor that deletes well-tested code raises the hard-to-test
+          # share of what remains without anything getting worse, and
+          # shouldn't fail CI for it. The tradeoff is that gradual erosion
+          # above this line goes uncaught -- catching that was Codecov's
+          # `project` status's job, which does not post (see above).
+          #
+          # Numerically equal to codecov.yml's project target, but not the
+          # same measurement -- see the note there before changing either.
           COVERAGE_FLOOR: "90"
 
   build:
