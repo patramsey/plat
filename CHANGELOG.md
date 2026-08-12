@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-12
+
 ### Fixed
 - IP and ASN lookups no longer advertise source codes that cannot apply
   to them. Both renderers printed the same fixed four-source legend
@@ -178,7 +180,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/patramsey/plat/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/patramsey/plat/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/patramsey/plat/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/patramsey/plat/compare/v0.1.4...v0.2.0
