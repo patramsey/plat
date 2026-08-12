@@ -1,0 +1,56 @@
+% IP Client: 75.166.204.25
+ 
+% Joint Whois - whois.lacnic.net
+%  This server accepts single ASN, IPv4 or IPv6 queries
+
+% LACNIC resource: whois.lacnic.net
+
+
+% Copyright LACNIC lacnic.net
+%  The data below is provided for information purposes
+%  and to assist persons in obtaining information about or
+%  related to AS and IP numbers registrations
+%  By submitting a whois query, you agree to use this data
+%  only for lawful purposes.
+%  2026-08-11 23:13:16 (Z Z)
+
+inetnum:     200.3.12.0/22
+status:      assigned
+aut-num:     AS28001
+owner:       LACNIC - Latin American and Caribbean IP address
+ownerid:     UY-LACN-LACNIC
+responsible: Ernesto Majó
+address:     Rambla República de México, 6125, Esquina 6 de Abril
+address:     11400 - Montevideo - Montevideo
+country:     UY
+phone:       +598  26042222 [4401]
+owner-c:     AIL
+tech-c:      AIL
+abuse-c:     AIL
+inetrev:     200.3.12.0/22
+nserver:     NS.LACNIC.NET
+nsstat:      20260809 AA
+nslastaa:    20260809
+nserver:     NS2.LACNIC.NET
+nsstat:      20260809 AA
+nslastaa:    20260809
+nserver:     NS4.LACNIC.NET
+nsstat:      20260809 AA
+nslastaa:    20260809
+created:     20080902
+changed:     20080902
+
+nic-hdl:     AIL
+person:      Carlos M Martínez
+e-mail:      ipadmin@lacnic.net
+address:     Rambla Rep. de México, 6125, Casa de Internet
+address:     11400 - Montevideo - Montevideo
+country:     UY
+phone:       +598  26042222 [4401]
+created:     20080125
+changed:     20260120
+
+% whois.lacnic.net accepts only direct match queries.
+% Types of queries are: POCs, ownerid, CIDR blocks, IP
+% and AS numbers.
+
