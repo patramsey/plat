@@ -220,20 +220,22 @@ func TestFromIPRDAP_RIRStatusPassesThroughVerbatim(t *testing.T) {
 func TestFromIPHop_PopulatedFields(t *testing.T) {
 	hop := whois.Hop{
 		IPFields: &parse.IPFields{
-			NetRange:   "8.8.8.0 - 8.8.8.255",
-			CIDR:       "8.8.8.0/24",
-			NetName:    "GOGL",
-			Handle:     "NET-8-8-8-0-2",
-			Parent:     "NET-8-0-0-0-0",
-			NetType:    "Direct Allocation",
-			OrgName:    "Google LLC",
-			OrgID:      "GOGL",
-			Country:    "US",
-			Registered: "2023-12-28",
-			Updated:    "2023-12-29",
-			AbuseEmail: "network-abuse@google.com",
-			AbusePhone: "+1-650-253-0000",
-			Statuses:   []string{"active"},
+			CommonFields: parse.CommonFields{
+				Handle:     "NET-8-8-8-0-2",
+				OrgName:    "Google LLC",
+				OrgID:      "GOGL",
+				Country:    "US",
+				Registered: "2023-12-28",
+				Updated:    "2023-12-29",
+				AbuseEmail: "network-abuse@google.com",
+				AbusePhone: "+1-650-253-0000",
+				Statuses:   []string{"active"},
+			},
+			NetRange: "8.8.8.0 - 8.8.8.255",
+			CIDR:     "8.8.8.0/24",
+			NetName:  "GOGL",
+			Parent:   "NET-8-0-0-0-0",
+			NetType:  "Direct Allocation",
 		},
 	}
 
@@ -329,7 +331,7 @@ func TestFromIPHop_HopError(t *testing.T) {
 func TestFromIPHop_RateLimited(t *testing.T) {
 	hop := whois.Hop{
 		Fields:   parse.Fields{RateLimited: true},
-		IPFields: &parse.IPFields{Handle: "NET-1-2-3-0-1"},
+		IPFields: &parse.IPFields{CommonFields: parse.CommonFields{Handle: "NET-1-2-3-0-1"}},
 	}
 
 	sr := fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS, OK: true}, hop)
@@ -348,7 +350,7 @@ func TestFromIPHop_RateLimited(t *testing.T) {
 func TestFromIPHop_Unsupported(t *testing.T) {
 	hop := whois.Hop{
 		Fields:   parse.Fields{Unsupported: true},
-		IPFields: &parse.IPFields{Handle: "NET-1-2-3-0-1"},
+		IPFields: &parse.IPFields{CommonFields: parse.CommonFields{Handle: "NET-1-2-3-0-1"}},
 	}
 
 	sr := fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS, OK: true}, hop)
@@ -374,8 +376,10 @@ func TestFromIPHop_Unsupported(t *testing.T) {
 func TestFromIPHop_RIRStatusPassesThroughVerbatim(t *testing.T) {
 	hop := whois.Hop{
 		IPFields: &parse.IPFields{
-			Handle:   "test",
-			Statuses: []string{"ASSIGNED PA"},
+			CommonFields: parse.CommonFields{
+				Handle:   "test",
+				Statuses: []string{"ASSIGNED PA"},
+			},
 		},
 	}
 
@@ -389,8 +393,10 @@ func TestFromIPHop_RIRStatusPassesThroughVerbatim(t *testing.T) {
 func TestFromIPHop_RedactedOrgName(t *testing.T) {
 	hop := whois.Hop{
 		IPFields: &parse.IPFields{
-			Handle:  "NET-1-2-3-0-1",
-			OrgName: "REDACTED FOR PRIVACY",
+			CommonFields: parse.CommonFields{
+				Handle:  "NET-1-2-3-0-1",
+				OrgName: "REDACTED FOR PRIVACY",
+			},
 		},
 	}
 
@@ -415,7 +421,9 @@ func TestFromIPHop_ARINParentNotationNormalized(t *testing.T) {
 	// conflict.
 	hop := whois.Hop{
 		IPFields: &parse.IPFields{
-			Handle: "NET-8-8-8-0-2",
+			CommonFields: parse.CommonFields{
+				Handle: "NET-8-8-8-0-2",
+			},
 			Parent: "NET8 (NET-8-0-0-0-0)",
 		},
 	}

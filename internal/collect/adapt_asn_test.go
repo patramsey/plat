@@ -180,7 +180,7 @@ func TestFromASNRDAP_RedactedOrgName_ProducesRedactionNoticeEndToEnd(t *testing.
 	rdapSR := fromASNRDAP(model.SourceResult{Source: model.SourceRegistryRDAP, OK: true}, rdapResp)
 
 	whoisSR := fromASNHop(model.SourceResult{Source: model.SourceRegistryWHOIS, OK: true}, whois.Hop{
-		ASNFields: &parse.ASNFields{Handle: "AS64512", OrgName: "Example Holdings LLC"},
+		ASNFields: &parse.ASNFields{CommonFields: parse.CommonFields{Handle: "AS64512", OrgName: "Example Holdings LLC"}},
 	})
 
 	rec := merge.MergeASN([]model.ASNSourceRecord{rdapSR, whoisSR})
@@ -263,18 +263,20 @@ func TestNormalizeASNHandle(t *testing.T) {
 func TestFromASNHop_PopulatedFields(t *testing.T) {
 	hop := whois.Hop{
 		ASNFields: &parse.ASNFields{
-			Number:     "15169",
-			Name:       "GOOGLE",
-			Handle:     "AS15169",
-			Type:       "Direct Allocation",
-			OrgName:    "Google LLC",
-			OrgID:      "GOGL",
-			Country:    "US",
-			Registered: "2000-03-30",
-			Updated:    "2023-12-29",
-			AbuseEmail: "network-abuse@google.com",
-			AbusePhone: "+1-650-253-0000",
-			Statuses:   []string{"active"},
+			CommonFields: parse.CommonFields{
+				Handle:     "AS15169",
+				OrgName:    "Google LLC",
+				OrgID:      "GOGL",
+				Country:    "US",
+				Registered: "2000-03-30",
+				Updated:    "2023-12-29",
+				AbuseEmail: "network-abuse@google.com",
+				AbusePhone: "+1-650-253-0000",
+				Statuses:   []string{"active"},
+			},
+			Number: "15169",
+			Name:   "GOOGLE",
+			Type:   "Direct Allocation",
 		},
 	}
 
@@ -360,7 +362,7 @@ func TestFromASNHop_HopError(t *testing.T) {
 func TestFromASNHop_RateLimited(t *testing.T) {
 	hop := whois.Hop{
 		Fields:    parse.Fields{RateLimited: true},
-		ASNFields: &parse.ASNFields{Handle: "AS64512"},
+		ASNFields: &parse.ASNFields{CommonFields: parse.CommonFields{Handle: "AS64512"}},
 	}
 
 	sr := fromASNHop(model.SourceResult{Source: model.SourceRegistryWHOIS, OK: true}, hop)
@@ -379,7 +381,7 @@ func TestFromASNHop_RateLimited(t *testing.T) {
 func TestFromASNHop_Unsupported(t *testing.T) {
 	hop := whois.Hop{
 		Fields:    parse.Fields{Unsupported: true},
-		ASNFields: &parse.ASNFields{Handle: "AS64512"},
+		ASNFields: &parse.ASNFields{CommonFields: parse.CommonFields{Handle: "AS64512"}},
 	}
 
 	sr := fromASNHop(model.SourceResult{Source: model.SourceRegistryWHOIS, OK: true}, hop)
@@ -402,8 +404,10 @@ func TestFromASNHop_Unsupported(t *testing.T) {
 func TestFromASNHop_RIRStatusPassesThroughVerbatim(t *testing.T) {
 	hop := whois.Hop{
 		ASNFields: &parse.ASNFields{
-			Handle:   "test",
-			Statuses: []string{"ASSIGNED PA"},
+			CommonFields: parse.CommonFields{
+				Handle:   "test",
+				Statuses: []string{"ASSIGNED PA"},
+			},
 		},
 	}
 
@@ -417,8 +421,10 @@ func TestFromASNHop_RIRStatusPassesThroughVerbatim(t *testing.T) {
 func TestFromASNHop_RedactedOrgName(t *testing.T) {
 	hop := whois.Hop{
 		ASNFields: &parse.ASNFields{
-			Handle:  "AS64512",
-			OrgName: "REDACTED FOR PRIVACY",
+			CommonFields: parse.CommonFields{
+				Handle:  "AS64512",
+				OrgName: "REDACTED FOR PRIVACY",
+			},
 		},
 	}
 

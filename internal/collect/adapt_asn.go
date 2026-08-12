@@ -109,7 +109,7 @@ func fromASNRDAP(meta model.SourceResult, resp *rdap.ASNResponse) model.ASNSourc
 // (AS28573), whose RDAP autnum response reports handle as the bare
 // number "28573" while every other tested RIR (ARIN, RIPE, APNIC,
 // AFRINIC) reports the conventional "AS28573" form, matching what
-// asnSynonyms's "aut-num"/"ashandle" mappings always produce on the
+// asnFields's "aut-num"/"ashandle" mappings always produce on the
 // WHOIS side (the RPSL aut-num class attribute and ARIN's ASHandle key
 // are both already prefixed by construction). Without this, an
 // otherwise-agreeing RDAP/WHOIS pair reports a false handle conflict --

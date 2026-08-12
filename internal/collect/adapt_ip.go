@@ -186,7 +186,7 @@ func ipHopPresent(sr model.IPSourceRecord) bool {
 
 // splitNetRange splits a WHOIS NetRange/inetnum/inet6num value of the
 // "<start> - <end>" shape ARIN, RIPE, APNIC, LACNIC, and AFRINIC all use
-// (see ipSynonyms in internal/whois/parse/ip.go, which maps all three keys
+// (see ipFields in internal/whois/parse/ip.go, which maps all three keys
 // onto the same NetRange field) into its bare start and end addresses.
 // Any input that isn't cleanly two hyphen-separated, non-empty halves --
 // empty, no hyphen at all, or a hyphen with nothing (or only whitespace)

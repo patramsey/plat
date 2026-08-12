@@ -1,8 +1,10 @@
 package parse
 
 import (
+	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -138,5 +140,114 @@ func TestParseIP_EmptyInput(t *testing.T) {
 	// this reason); reflect.DeepEqual preserves the same zero-value intent.
 	if got := ParseIP(""); !reflect.DeepEqual(got, IPFields{}) {
 		t.Errorf("ParseIP(\"\") = %+v, want the zero value", got)
+	}
+}
+
+// commonFieldKeys is a hardcoded snapshot of commonFields' key set,
+// deliberately independent of the live map. Ranging directly over
+// commonFields (the brief's original sketch) cannot actually catch a key
+// disappearing from the table: `for key := range commonFields` just
+// produces one fewer subtest when a key is removed, and a test with no
+// case for the missing key trivially "passes" -- confirmed by hand while
+// sanity-checking this test (see TestCommonVocabularyReachesBothParsers'
+// doc comment). Keying off an independent list means a key vanishing from
+// commonFields still gets asked about below, and fails loudly instead of
+// silently going untested.
+var commonFieldKeys = []string{
+	"orgname", "org-name", "owner", "descr", "orgid", "org", "ownerid",
+	"country", "regdate", "created", "updated", "last-modified", "changed",
+	"orgabuseemail", "abuse-mailbox", "orgabusephone",
+}
+
+// TestCommonVocabularyReachesBothParsers is the regression test for the
+// class of bug this consolidation exists to prevent: a shared WHOIS key
+// mapped for one object type and forgotten for the other. LACNIC's
+// owner/ownerid/changed keys were fixed in the ASN parser and shipped
+// unmapped in the IP parser, silently single-sourcing every LACNIC IP
+// lookup. If someone adds a shared key to only one table, this fails.
+//
+// The per-key assertion compares fmt.Sprintf("%+v", ...) of the whole
+// returned struct against a sentinel value, deliberately including a
+// subtest for commonFields' "descr" key even though CommonFields.descr is
+// unexported: fmt's struct formatting reads unexported field values
+// directly via reflection (verified by hand -- %+v on a struct value
+// prints unexported fields' contents, not just their names, including
+// through struct embedding), so the sentinel shows up in the raw %+v
+// output for descr exactly as it does for every exported field. This
+// matters beyond descr's own subtest: descr is the one key with a
+// same-package fallback (both parsers copy descr into the exported
+// OrgName when OrgName is otherwise empty) that would mask a broken %+v
+// assumption by surfacing the sentinel through OrgName regardless: every
+// other key here has no such fallback, so %+v actually reaching
+// unexported fields -- not just descr's fallback path -- is what makes
+// this test meaningful across the full table, not only for descr.
+//
+// The leading non-subtest check guards the other direction: if
+// commonFields gains or loses a key without commonFieldKeys being kept in
+// sync, that's reported too (non-fatally, so the per-key subtests below
+// still run and still name any specific key that stopped resolving).
+//
+// Scope: this proves reachability, not targeting. Because the assertion
+// is "the sentinel appears SOMEWHERE in %+v", a setter wired to the wrong
+// field (e.g. "orgid" accidentally writing OrgName) would still pass --
+// the sentinel shows up in the struct dump either way. That's the right
+// scope for the bug class that actually shipped here (a key missing from
+// one table entirely, not a key pointed at the wrong field); the golden
+// tests (TestParseIP_*, TestParseASN_*) are what pin each key to its
+// correct field.
+func TestCommonVocabularyReachesBothParsers(t *testing.T) {
+	if len(commonFieldKeys) != len(commonFields) {
+		t.Errorf("commonFieldKeys has %d entries, commonFields has %d -- keep commonFieldKeys in sync with commonFields", len(commonFieldKeys), len(commonFields))
+	}
+	for _, key := range commonFieldKeys {
+		t.Run(key, func(t *testing.T) {
+			raw := key + ": sentinel-value\n"
+			ip := ParseIP(raw)
+			asn := ParseASN(raw)
+			if !strings.Contains(fmt.Sprintf("%+v", ip), "sentinel-value") {
+				t.Errorf("ParseIP dropped shared key %q", key)
+			}
+			if !strings.Contains(fmt.Sprintf("%+v", asn), "sentinel-value") {
+				t.Errorf("ParseASN dropped shared key %q", key)
+			}
+		})
+	}
+}
+
+// TestIPDoesNotApplyObjectBoundaryTracking pins a deliberate asymmetry
+// with ParseASN, which skips as-block objects and gives aut-num
+// two-level precedence (see ParseASN's doc comment). ParseIP has neither:
+// in every real IP response the primary object leads (ARIN "NetRange:",
+// RIPE and LACNIC "inetnum:"), so plain first-occurrence-wins already
+// keeps a trailing object (here, a contact "role:" block) from shadowing
+// it -- adding ASN-style object-boundary machinery would ship a path no
+// real response exercises. If a RIR ever leads with an interposing
+// object, revisit this; don't delete it in passing because it looks
+// inconsistent with asn.go.
+func TestIPDoesNotApplyObjectBoundaryTracking(t *testing.T) {
+	raw := "inetnum: 10.0.0.0/8\ncountry: AA\n\nrole: Some Contact\ncountry: ZZ\n"
+	f := ParseIP(raw)
+	if f.Country != "AA" {
+		t.Errorf("Country = %q, want AA (first occurrence wins, no object gating)", f.Country)
+	}
+}
+
+// TestIPStatusAccumulatesUnconditionally pins a deliberate asymmetry with
+// ParseASN (see TestASNStatusSuppressedOutsideAutNum in asn_test.go):
+// ParseIP has no object-boundary tracking at all (see
+// TestIPDoesNotApplyObjectBoundaryTracking above), so it has no notion of
+// "inside" vs. "outside" a primary object to gate status on in the first
+// place -- every "status:" line in the response accumulates into
+// f.Statuses unconditionally, regardless of which RPSL object it belongs
+// to. This matches every real IP response observed live, where the
+// netblock object leads and no other object in practice carries its own
+// status line. Don't add ASN-style object gating here without a real
+// response that needs it.
+func TestIPStatusAccumulatesUnconditionally(t *testing.T) {
+	raw := "inetnum: 10.0.0.0/8\nstatus: ALLOCATED\n\nrole: Some Contact\nstatus: ANOTHER\n"
+	f := ParseIP(raw)
+	want := []string{"ALLOCATED", "ANOTHER"}
+	if !reflect.DeepEqual(f.Statuses, want) {
+		t.Errorf("Statuses = %v, want %v (every status line accumulates, no object gating)", f.Statuses, want)
 	}
 }

@@ -24,6 +24,24 @@ follows [Semantic Versioning](https://semver.org/).
   saw spurious changes. Values and source attribution are unaffected;
   only ordering changed, so `schemaVersion` stays 1.
 
+### Changed
+- Internal maintenance: `internal/whois/parse`'s IP and ASN WHOIS parsers
+  shared the same vocabulary (org name, org ID, country, dates, abuse
+  contacts) in two separately maintained lookup tables that had already
+  drifted out of sync twice -- once for `status`, once for LACNIC's
+  `owner`/`ownerid`/`changed` keys (see above). The shared vocabulary is
+  now declared once (`commonFields`) and lifted into both parsers' tables,
+  and `TestCommonVocabularyReachesBothParsers` fails if a future shared
+  key is ever added for only one of them. No behavior change: outputs for
+  `example.com`, `8.8.8.8`, `193.0.6.139`, `200.3.12.1`, `AS15169`,
+  `AS3333`, and `AS28573` are byte-identical to the pre-refactor build.
+  One latent difference: `ParseASN` now also recognizes `ownerid` (the
+  pre-refactor `asnSynonyms` lacked it, unlike its IP counterpart). No
+  ASN golden response carries that key today, so nothing observable
+  changes; it's noted here because a future LACNIC ASN response that
+  does carry it will now be parsed correctly instead of silently
+  dropped.
+
 ## [0.3.0] - 2026-08-11
 
 ### Added
