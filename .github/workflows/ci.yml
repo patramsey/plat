@@ -33,6 +33,35 @@ jobs:
           files: coverage.out
           fail_ci_if_error: false
 
+      # The whole-project floor is enforced here rather than by Codecov's
+      # `project` status, which has never actually posted on this repo --
+      # not on any PR since coverage reporting was added, and not even
+      # before codecov.yml existed, when Codecov's own defaults would have
+      # emitted it. Codecov has the data (it reports ~93% for main and
+      # computes base/head totals per PR) and codecov.yml declares the
+      # status, so the cause appears to be repo-level and outside the
+      # repository. `codecov/patch` does post and still guards new lines.
+      #
+      # Runs after the upload so a floor breach is still recorded in
+      # Codecov rather than skipping the report entirely.
+      #
+      # This floor is measured with `go tool cover`, which reports a few
+      # points higher than Codecov for the same profile (Codecov counts
+      # partially-covered branches separately). The two numbers are
+      # expected to disagree -- ~95% here vs ~93% there at time of
+      # writing -- so compare this step's output against itself over
+      # time, not against the Codecov dashboard.
+      - name: Enforce total coverage floor
+        run: |
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ {print $3}' | tr -d '%')
+          echo "total coverage: ${total}% (floor: ${COVERAGE_FLOOR}%)"
+          if awk -v t="$total" -v f="$COVERAGE_FLOOR" 'BEGIN { exit !(t + 0 < f + 0) }'; then
+            echo "::error::total coverage ${total}% is below the ${COVERAGE_FLOOR}% floor"
+            exit 1
+          fi
+        env:
+          COVERAGE_FLOOR: "90"
+
   build:
     runs-on: ubuntu-latest
     strategy:

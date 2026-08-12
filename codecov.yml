@@ -13,6 +13,17 @@ coverage:
     # threshold absorbs the small dips that come from honest refactors --
     # deleting well-tested code raises the denominator's share of
     # hard-to-test paths without anything actually getting worse.
+    #
+    # NOTE: this status does not currently post. No `codecov/project`
+    # check has appeared on any PR -- including PRs predating this file,
+    # when Codecov's defaults would have emitted one -- while
+    # `codecov/patch` posts normally. Codecov has the data (it reports
+    # ~93% for main and computes base/head totals per PR) and validates
+    # this file as declaring both statuses, so the cause looks
+    # repo-level and outside the repository. Until that is sorted out,
+    # the real whole-project floor is enforced by the "Enforce total
+    # coverage floor" step in .github/workflows/ci.yml. Keep the two
+    # targets in sync if either changes.
     project:
       default:
         target: 90%
