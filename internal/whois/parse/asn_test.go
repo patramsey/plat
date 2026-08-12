@@ -170,8 +170,8 @@ func TestParseASN_LACNIC(t *testing.T) {
 
 // TestParseASN_AFRINIC_OrgNameFromOrganisationObject is a golden-file
 // regression test for the org-name/AFRINIC asymmetry noted alongside the
-// LACNIC fix: "org-name" was present in ipSynonyms but missing from
-// asnSynonyms, even though AFRINIC's aut-num response follows the exact
+// LACNIC fix: "org-name" was present in ipFields but missing from
+// asnFields, even though AFRINIC's aut-num response follows the exact
 // same shape (a bare "org:" handle pointing at a trailing "organisation:"
 // object whose "org-name:" carries the real identity) for ASNs as it does
 // for IP networks.
@@ -224,7 +224,7 @@ source:      TEST
 // regression: a "status:" line belonging to some other RPSL object (a
 // role/person/organisation contact object) must never leak into
 // f.Statuses, whether that object precedes or follows the aut-num
-// object. Before the fix, "status" had no asnFieldGet entry, so it
+// object. Before the fix, "status" had no getter entry in asnFields, so it
 // bypassed the aut-num-always-wins gate entirely and any object's status
 // line was appended unconditionally.
 func TestParseASN_StatusFromNonAutNumObjectIsSuppressed(t *testing.T) {
