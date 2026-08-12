@@ -85,7 +85,13 @@ brews:
     # install` despite existing in the repo.
     directory: Formula
     homepage: "https://github.com/patramsey/plat"
-    description: "Domain lookup via WHOIS and RDAP with per-field source provenance"
+    # Kept under Homebrew's 80-character soft limit for `desc`, and phrased
+    # to avoid `brew audit --strict`'s other rules: no leading article, no
+    # leading formula name, no trailing period. Widened past "Domain
+    # lookup" when IP and ASN support shipped -- this string is what
+    # `brew search` and `brew info` show, so it is the first description of
+    # plat a prospective user reads.
+    description: "Domain, IP, and ASN lookup via WHOIS and RDAP with per-field source provenance"
     license: "MIT"
 
 release:
