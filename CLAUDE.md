@@ -4,17 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-This repository currently contains only `plat-plan.md` — no Go module, source code, or tests exist yet. That plan document is the authoritative spec for everything about this project (architecture, data model, CLI surface, milestones). **Read `plat-plan.md` in full before scaffolding or implementing anything** — it is far more detailed than what's summarized below.
+Shipped and released — latest tag `v0.3.1`. The module is scaffolded, 14 packages under `cmd/` and `internal/`, released via goreleaser (binaries, checksums, Homebrew tap).
 
-Before scaffolding the module (per the plan's own first task): verify no meaningful GitHub/pkg.go.dev/Homebrew collision exists for the name `plat`. Fallback names if needed: `terrier`, `folio` (avoid `rdapper`, `whodis`, `whodap` — already taken).
+Working today: domain lookups, IP-address lookups, and ASN lookups — each merged from RDAP and WHOIS with per-field provenance, rendered human/plain/JSON/NDJSON.
+
+`plat-plan.md` is the original design document. It remains useful for the *reasoning* behind the architecture, data model, and CLI surface, but it is **no longer authoritative on current state** — it predates the IP and ASN features and describes work as unstarted that has since shipped. Where the plan and the code disagree, the code wins. Prefer reading the code, `README.md`, and `CHANGELOG.md` for what exists now.
 
 ## What plat is
 
-A Go CLI that looks up domain ownership by querying WHOIS and RDAP concurrently from both registry and registrar, merges the results into one record with **per-field provenance** (which source supplied each value, and where sources conflict), and renders it via a styled terminal UI (Lip Gloss v2) or stable JSON.
+A Go CLI that looks up ownership of a **domain, IP address, or autonomous system** by querying WHOIS and RDAP concurrently, merges the results into one record with **per-field provenance** (which source supplied each value, and where sources conflict), and renders it via a styled terminal UI (Lip Gloss v2) or stable JSON.
 
-## Commands (once scaffolded)
+For domains the two sources are registry and registrar; for IPs and ASNs they are the responsible RIR's RDAP and WHOIS. All three object types share the same merge engine, provenance model, and renderers.
 
-Standard Go tooling per the plan's tooling choices:
+## Commands
+
+Standard Go tooling:
 - Build: `go build ./...`
 - Test: `go test ./...` (single package: `go test ./internal/merge/...`)
 - Lint: `golangci-lint run`
@@ -102,11 +106,19 @@ This is a render-and-exit tool for v1 — **not** an interactive Bubble Tea app 
 - `httptest` for mocking RDAP; a small local TCP listener for WHOIS to test referral chasing, timeouts, and per-server quirks.
 - Merge engine gets table-driven tests over precedence, redaction override, and conflict detection.
 - Renderer snapshot tests run with color forced off.
+- Goldens for IP/ASN cover all five RIRs (ARIN, RIPE, APNIC, LACNIC, AFRINIC), whose WHOIS vocabularies genuinely differ. **Every serious bug in the IP and ASN features surfaced only past ARIN** — verify live against multiple RIRs, not just the first one that works.
+- CI enforces a 90% whole-project coverage floor (`go tool cover`, actual ~95%). Codecov's `project` status does not post on this repo, so that floor is the real gate — see the comments in `.github/workflows/ci.yml` and `codecov.yml`, which explain why the two numbers there are not interchangeable.
 
 ## Demo GIF maintenance
 
-`README.md`'s demo GIF is recorded from `docs/demo.tape` via `vhs docs/demo.tape` (requires `vhs`, plus its `ffmpeg`/`ttyd` runtime deps). Regenerate it whenever a change touches what the three commands in that script print — flags, output formatting, or the sample domains' field values — so the GIF never goes stale relative to the tool it's demonstrating.
+`README.md`'s demo GIF is recorded from `docs/demo.tape` via `vhs docs/demo.tape` (requires `vhs`, plus its `ffmpeg`/`ttyd` runtime deps). Regenerate it whenever a change touches what the commands in that script print — flags, output formatting, or the sample domains' field values — so the GIF never goes stale relative to the tool it's demonstrating.
 
-## Non-goals for v1
+**Known gap:** the tape's three commands are all domain lookups. IP and ASN lookups shipped after it was written and are not demonstrated, so the GIF undersells the tool. Adding them means re-recording, which needs `vhs` installed locally.
 
-IP/ASN lookups, availability monitoring, bulk lookups, watch mode, historical WHOIS archiving, acting as a WHOIS/RDAP server. Design internals to not preclude these later, but don't build them now.
+## Non-goals
+
+**IP and ASN lookups were once listed here and have since shipped** (v0.2.0 and v0.3.0) — don't re-add them.
+
+Still out of scope: availability monitoring, watch mode, historical WHOIS archiving, acting as a WHOIS/RDAP server. Design internals to not preclude these, but don't build them.
+
+Deferred rather than rejected, each tracked as an open issue: `--diff` between runs (#33), bulk mode (#34), interactive Bubble Tea mode (#35), extracting `internal/` as a public library (#36). #50 tracks the remaining duplication across the three object types — the parser vocabulary half is done; the fetch trio, `presentSorted`×3, `status`×3, and the two adapters are deliberately left alone, since none has ever caused a bug.
