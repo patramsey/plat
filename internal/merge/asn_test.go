@@ -73,7 +73,7 @@ func TestMergeASN_RDAPWinsOnConflict(t *testing.T) {
 }
 
 // TestMergeASN_StatusIsSortedRegardlessOfInputOrder covers issue #49's
-// deterministic-ordering fix for asnStatus's union, which shares the
+// deterministic-ordering fix for statusUnion's union, which shares the
 // identical append-union shape as domain nameservers/status.
 func TestMergeASN_StatusIsSortedRegardlessOfInputOrder(t *testing.T) {
 	want := []string{"active", "allocated", "reassigned"}
