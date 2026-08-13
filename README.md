@@ -128,6 +128,15 @@ plat example.com -o json --raw
 plat example.com -o json > before.json
 plat --diff before.json example.com
 
+# --diff compares merged values only, not provenance, so a source that
+# flaps between runs (a rate-limited RIR, a timed-out registrar WHOIS)
+# does not itself trigger exit 4 as long as the remaining sources still
+# agree on each field's underlying value. It can still under- or
+# over-report a change if that flap removes a field's only supplying
+# source, or flips a value's serialized precision/format without
+# changing the underlying fact -- see internal/diff's package doc
+# comment for the exact edge cases.
+
 # Restrict which sources are queried
 plat example.com --source rdap       # registry + registrar RDAP only
 plat example.com --source whois      # registry + registrar WHOIS only
@@ -325,6 +334,9 @@ hyperlink are stripped automatically).
 The `-o json`/`-o ndjson` wire format is a versioned, stable schema,
 unaffected by `-v` or any of the styling above — see
 [`docs/schema.md`](docs/schema.md) for the full field-by-field reference.
+`--diff -o json` emits a different, separately-versioned schema (a report
+of what changed, not a record) and doesn't emit the record schema at all —
+see `docs/schema.md`'s `--diff` output section.
 
 ## Exit Codes
 

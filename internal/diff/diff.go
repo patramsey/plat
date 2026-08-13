@@ -3,23 +3,26 @@
 // It deliberately compares values only. Provenance and conflicts are
 // ignored: sources flap, and a rate-limited RIR or a timed-out registrar
 // WHOIS would otherwise produce churn on nearly every field and drown the
-// real signal. As long as the remaining sources agree on a field's value,
-// a source dropping out produces no diff for that field.
+// real signal. As long as the remaining sources agree on a field's
+// underlying fact -- not necessarily its exact serialized string -- a
+// source dropping out produces no diff for that field.
 //
-// That guarantee has two edge cases, both observed in practice rather
+// That guarantee shows up in two ways, both observed in practice rather
 // than hypothetical. First, when a dropped source was the *only* one
-// supplying a field (e.g. only RDAP carries Status), the field itself
-// disappears, which is a real reportable change (Kind Removed), not
-// noise. Second, when the remaining sources agree on a field's value but
-// not its precision or format -- RDAP's full RFC 3339 timestamps versus
-// WHOIS's date-only ones, for instance -- losing the higher-precedence
-// source can flip the merged value even though nothing about the
-// underlying record changed, and that surfaces as a spurious Changed
-// entry. Neither case is silently miscounted: both still produce an
-// accurate diff of the two merged records as they actually stood, but a
-// user comparing snapshots taken across a flaky lookup should expect
-// values-only diffing to suppress provenance churn, not every
-// consequence of a source dropping out.
+// supplying a value -- a whole scalar field (e.g. Status on an ASN at
+// ARIN, where WHOIS supplies no status), or just one item of a list
+// field -- that value disappears, which is a real reportable change
+// (Kind Removed for a whole field, Kind ListChanged for one lost list
+// item), not noise. Second, when the remaining sources agree on the
+// underlying fact but serialize it differently -- RDAP's full RFC 3339
+// timestamps versus WHOIS's date-only ones, for instance -- losing the
+// higher-precedence source can flip the merged value's exact string even
+// though nothing about the underlying record changed, and that surfaces
+// as a spurious Changed entry. Neither case is silently miscounted: both
+// still produce an accurate diff of the two merged records as they
+// actually stood, but a user comparing snapshots taken across a flaky
+// lookup should expect values-only diffing to suppress provenance churn,
+// not every consequence of a source dropping out.
 package diff
 
 import (
