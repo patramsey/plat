@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -1090,5 +1092,49 @@ func TestRun_NoColorFlagRegistered(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "--no-color") {
 		t.Errorf("expected --no-color to be listed in --help output, got:\n%s", stdout.String())
+	}
+}
+
+func TestDiff_RejectsNameMismatch(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "snap.json")
+	if err := os.WriteFile(path, []byte(`{"schemaVersion":1,"objectType":"domain","domain":{"value":"example.com","sources":["registry-rdap"]},"conflicts":[],"redacted":[],"sources":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out, errBuf bytes.Buffer
+	code := run([]string{"--diff", path, "iana.org"}, &out, &errBuf, uiConfig{})
+	if code != 2 {
+		t.Errorf("exit = %d, want 2 (usage error)", code)
+	}
+	if !strings.Contains(errBuf.String(), "snapshot is for") {
+		t.Errorf("stderr missing the mismatch message:\n%s", errBuf.String())
+	}
+}
+
+func TestDiff_RejectsNdjson(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "snap.ndjson")
+	line := `{"schemaVersion":1,"objectType":"domain","domain":{"value":"example.com","sources":["registry-rdap"]},"conflicts":[],"redacted":[],"sources":[]}`
+	if err := os.WriteFile(path, []byte(line+"\n"+line+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out, errBuf bytes.Buffer
+	code := run([]string{"--diff", path, "example.com"}, &out, &errBuf, uiConfig{})
+	if code != 2 {
+		t.Errorf("exit = %d, want 2 (usage error)", code)
+	}
+	if !strings.Contains(errBuf.String(), "not ndjson") {
+		t.Errorf("stderr missing the ndjson message:\n%s", errBuf.String())
+	}
+}
+
+func TestDiff_RejectsMultipleNames(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	code := run([]string{"--diff", "irrelevant.json", "a.com", "b.com"}, &out, &errBuf, uiConfig{})
+	if code != 2 {
+		t.Errorf("exit = %d, want 2 (usage error)", code)
+	}
+	if !strings.Contains(errBuf.String(), "exactly one name") {
+		t.Errorf("stderr missing the one-name message:\n%s", errBuf.String())
 	}
 }
