@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"charm.land/lipgloss/v2"
+
+	"github.com/patramsey/plat/internal/render/human"
 )
 
 func sampleChanges() []Change {
@@ -94,5 +98,53 @@ func TestRenderJSON_EmptyChangesIsEmptyArray(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), `"changes":[]`) {
 		t.Errorf("want \"changes\":[] for the empty case, got:\n%s", buf.String())
+	}
+}
+
+// TestRenderHuman_WrapsLongNameserverListAtNarrowWidth is modeled on
+// internal/render/human's TestRender_SourceLegendWrapsAtNarrowWidth: it
+// renders at several narrow widths and asserts no output line exceeds
+// the target, measuring with lipgloss.Width (ANSI-aware) rather than
+// len(), which would miscount the styled output. A ListChanged
+// nameserver change with several long hostnames is exactly the content
+// shape that motivated RenderHuman's width parameter actually wrapping
+// (describe() joins added/removed hostnames with "+"/"-" and spaces,
+// which can run arbitrarily long).
+func TestRenderHuman_WrapsLongNameserverListAtNarrowWidth(t *testing.T) {
+	changes := []Change{
+		{
+			Key: "nameservers", Label: "Nameservers", Kind: ListChanged,
+			AddedItems: []string{
+				"ns1.newregistrar-verylongname.example.net",
+				"ns2.newregistrar-verylongname.example.net",
+			},
+			RemovedItems: []string{
+				"ns1.oldregistrar-verylongname.example.net",
+			},
+		},
+	}
+	th := human.NewTheme(false)
+	for _, width := range []int{40, 60, 80} {
+		var buf bytes.Buffer
+		if err := RenderHuman(&buf, "example.com", changes, th, width); err != nil {
+			t.Fatalf("width %d: RenderHuman: %v", width, err)
+		}
+		out := buf.String()
+		for l := range strings.SplitSeq(out, "\n") {
+			if w := lipgloss.Width(l); w > width {
+				t.Errorf("width %d: line exceeds it (got %d visible columns): %q", width, w, l)
+			}
+		}
+		// Only check short, stable prefixes survive, not the full
+		// hostnames -- at narrow widths lipgloss's word-wrap legitimately
+		// breaks even a single long word (e.g. at a hyphen), same caveat
+		// TestRender_SourceLegendWrapsAtNarrowWidth notes in the human
+		// package. The prefixes are short enough to never need splitting
+		// themselves at any of the tested widths.
+		for _, want := range []string{"ns1", "ns2"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("width %d: expected %q to still appear, got:\n%s", width, want, out)
+			}
+		}
 	}
 }
