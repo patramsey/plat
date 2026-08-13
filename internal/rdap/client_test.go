@@ -768,10 +768,11 @@ func TestRetryAfter(t *testing.T) {
 	}
 }
 
-// TestIP_WrongObjectClassIsMalformed pins the objectClassName check for a
-// second decode target. The domain equivalent already exists above; after
-// the fetchAt consolidation both run through one shared rejection path, so
-// covering only one type would leave that path single-exercised.
+// TestIP_WrongObjectClassIsMalformed overlaps TestClient_IP_WrongObjectClassName
+// (above): both hit the same *MalformedResponseError, non-nil Result, and
+// nil-IPNetwork assertions. It's kept for the one assertion the older test
+// doesn't make — that res.Raw still retains the exact response body when the
+// objectClassName check fails.
 func TestIP_WrongObjectClassIsMalformed(t *testing.T) {
 	body := `{"objectClassName":"domain","ldhName":"EXAMPLE.COM"}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
