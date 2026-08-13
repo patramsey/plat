@@ -77,7 +77,7 @@ func TestCompare(t *testing.T) {
 				t.Fatalf("got %d changes, want %d: %+v", len(got), len(tt.want), got)
 			}
 			for i := range got {
-				if got[i].Key != tt.want[i].Key || got[i].Kind != tt.want[i].Kind ||
+				if got[i].Key != tt.want[i].Key || got[i].Label != tt.want[i].Label || got[i].Kind != tt.want[i].Kind ||
 					got[i].Before != tt.want[i].Before || got[i].After != tt.want[i].After {
 					t.Errorf("change %d = %+v, want %+v", i, got[i], tt.want[i])
 				}
