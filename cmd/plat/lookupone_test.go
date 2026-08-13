@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -165,6 +166,158 @@ func TestLookupOne_FailurePath_ExitCode3(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "example.com") {
 		t.Errorf("stderr missing domain in failure message, got:\n%s", stderr.String())
+	}
+}
+
+// TestLookupOne_Diff exercises --diff's whole success path end to end:
+// encode -> Decode -> Compare -> render -> exit code, none of which any
+// other test in this file touches. It reuses this file's fake-WHOIS/
+// httptest-RDAP harness to produce a real -o json snapshot from one
+// lookup, then feeds that snapshot back in as opts.DiffPath for a second
+// lookup against the same (unchanged) sources, and a third against a
+// hand-mutated copy -- pinning both halves of the contract: unchanged
+// sources must exit 0, and a real difference must exit 4 and be reported
+// in the rendered output.
+func TestLookupOne_Diff(t *testing.T) {
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixture)
+	}))
+	defer rdapSrv.Close()
+
+	registryWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + registryWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
+	baseOpts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+
+	// Produce a baseline -o json snapshot from a fresh lookup -- this is
+	// exactly what a user would have saved via `plat example.com -o json
+	// > before.json`.
+	var baseline, baselineErr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &baseline, &baselineErr, resolver, "example.com",
+		baseOpts, nil, render.FormatJSON, uiConfig{},
+	)
+	if code != 0 {
+		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
+	}
+
+	snapPath := filepath.Join(t.TempDir(), "before.json")
+	if err := os.WriteFile(snapPath, baseline.Bytes(), 0o600); err != nil {
+		t.Fatalf("writing snapshot: %v", err)
+	}
+
+	t.Run("unchanged sources exit 0", func(t *testing.T) {
+		opts := baseOpts
+		opts.DiffPath = snapPath
+		var stdout, stderr bytes.Buffer
+		code := lookupOne(
+			context.Background(), &stdout, &stderr, resolver, "example.com",
+			opts, nil, render.FormatPlain, uiConfig{},
+		)
+		if code != 0 {
+			t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "no changes") {
+			t.Errorf(`stdout missing "no changes", got:\n%s`, stdout.String())
+		}
+	})
+
+	t.Run("mutated field exits 4 and is reported", func(t *testing.T) {
+		mutated := strings.Replace(baseline.String(), "Example Registrar, Inc.", "Mutated Registrar, LLC", 1)
+		if mutated == baseline.String() {
+			t.Fatal("mutation left the snapshot unchanged -- the registrar name text moved in the fixture")
+		}
+		mutatedPath := filepath.Join(t.TempDir(), "mutated.json")
+		if err := os.WriteFile(mutatedPath, []byte(mutated), 0o600); err != nil {
+			t.Fatalf("writing mutated snapshot: %v", err)
+		}
+
+		opts := baseOpts
+		opts.DiffPath = mutatedPath
+		var stdout, stderr bytes.Buffer
+		code := lookupOne(
+			context.Background(), &stdout, &stderr, resolver, "example.com",
+			opts, nil, render.FormatPlain, uiConfig{},
+		)
+		if code != 4 {
+			t.Errorf("exit code = %d, want 4\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "Mutated Registrar, LLC") {
+			t.Errorf("stdout missing the diffed-away value, got:\n%s", stdout.String())
+		}
+		if !strings.Contains(stdout.String(), "1 changed") {
+			t.Errorf("stdout missing change count, got:\n%s", stdout.String())
+		}
+	})
+}
+
+// TestLookupOne_Diff_RenderErrorPath_ExitCode3 covers lookupOneDomain's
+// --diff render-error branch (the `if err := diffRender(...); err != nil`
+// block, distinct from the no-prior renderRecord error branch every other
+// *_RenderErrorPath_ExitCode3 test in this file covers): a successful
+// lookup (code == 0) with a --diff snapshot whose comparison-and-render
+// step fails must report the error and return exit 3, not silently
+// succeed or panic. errWriter (defined below, reused here since this is
+// the same package) forces diff.RenderPlain's write to fail deterministically,
+// without depending on any renderer's internals.
+func TestLookupOne_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixture)
+	}))
+	defer rdapSrv.Close()
+
+	registryWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + registryWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
+	baseOpts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+
+	var baseline, baselineErr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &baseline, &baselineErr, resolver, "example.com",
+		baseOpts, nil, render.FormatJSON, uiConfig{},
+	)
+	if code != 0 {
+		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
+	}
+	snapPath := filepath.Join(t.TempDir(), "before.json")
+	if err := os.WriteFile(snapPath, baseline.Bytes(), 0o600); err != nil {
+		t.Fatalf("writing snapshot: %v", err)
+	}
+
+	opts := baseOpts
+	opts.DiffPath = snapPath
+	var stderr bytes.Buffer
+	code = lookupOne(
+		context.Background(), errWriter{}, &stderr, resolver, "example.com",
+		opts, nil, render.FormatPlain, uiConfig{},
+	)
+	if code != 3 {
+		t.Errorf("exit code = %d, want 3\nstderr: %s", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "example.com") {
+		t.Errorf("stderr missing domain in render-failure message, got:\n%s", stderr.String())
 	}
 }
 
@@ -391,6 +544,191 @@ func TestLookupOne_IP_JSONOutput_ObjectTypeIsIP(t *testing.T) {
 	}
 }
 
+// TestLookupOne_IP_Diff is TestLookupOne_Diff's IP counterpart: the IP
+// path shares diffRender/loadSnapshot with the domain path (see
+// lookupOneIP in main.go), but nothing before this test drove --diff
+// through lookupOneIP end to end -- only the domain path was ever
+// exercised, so a bug wiring IP into diffRender (wrong encode func, wrong
+// prior plumbing) could compile and pass every other test here
+// undetected. Same technique as TestLookupOne_Diff: take a real -o json
+// snapshot from a fresh lookup, feed it back as opts.DiffPath against the
+// same (unchanged) sources for the exit-0 case, and a text-mutated copy
+// for the exit-4 case.
+func TestLookupOne_IP_Diff(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(ipTestRDAPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return ipTestWHOISText
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewIPResolver(map[netip.Prefix]string{
+		netip.MustParsePrefix("8.8.8.0/24"): rdapSrv.URL,
+	})
+	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
+
+	// Produce a baseline -o json snapshot from a fresh lookup, exactly
+	// what a user would have saved via `plat 8.8.8.8 -o json > before.json`.
+	var baseline, baselineErr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &baseline, &baselineErr, resolver, "8.8.8.8",
+		baseOpts, nil, render.FormatJSON, uiConfig{},
+	)
+	if code != 0 {
+		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
+	}
+
+	snapPath := filepath.Join(t.TempDir(), "before.json")
+	if err := os.WriteFile(snapPath, baseline.Bytes(), 0o600); err != nil {
+		t.Fatalf("writing snapshot: %v", err)
+	}
+
+	t.Run("unchanged sources exit 0", func(t *testing.T) {
+		opts := baseOpts
+		opts.DiffPath = snapPath
+		var stdout, stderr bytes.Buffer
+		code := lookupOne(
+			context.Background(), &stdout, &stderr, resolver, "8.8.8.8",
+			opts, nil, render.FormatPlain, uiConfig{},
+		)
+		if code != 0 {
+			t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "no changes") {
+			t.Errorf(`stdout missing "no changes", got:\n%s`, stdout.String())
+		}
+	})
+
+	t.Run("mutated field exits 4 and is reported", func(t *testing.T) {
+		mutated := strings.Replace(baseline.String(), "Google LLC", "Mutated Org LLC", 1)
+		if mutated == baseline.String() {
+			t.Fatal("mutation left the snapshot unchanged -- the org name text moved in the fixture")
+		}
+		mutatedPath := filepath.Join(t.TempDir(), "mutated.json")
+		if err := os.WriteFile(mutatedPath, []byte(mutated), 0o600); err != nil {
+			t.Fatalf("writing mutated snapshot: %v", err)
+		}
+
+		opts := baseOpts
+		opts.DiffPath = mutatedPath
+		var stdout, stderr bytes.Buffer
+		code := lookupOne(
+			context.Background(), &stdout, &stderr, resolver, "8.8.8.8",
+			opts, nil, render.FormatPlain, uiConfig{},
+		)
+		if code != 4 {
+			t.Errorf("exit code = %d, want 4\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "Mutated Org LLC") {
+			t.Errorf("stdout missing the diffed-away value, got:\n%s", stdout.String())
+		}
+		if !strings.Contains(stdout.String(), "1 changed") {
+			t.Errorf("stdout missing change count, got:\n%s", stdout.String())
+		}
+	})
+}
+
+// TestLookupOne_IP_SpinnerBranch_HumanFormat is lookupOneIP's counterpart
+// to TestLookupOne_SpinnerBranch_HumanFormat/
+// TestLookupOne_ASN_SpinnerBranch_HumanFormat: StderrTTY: true + FormatHuman
+// is exactly the condition lookupOneIP checks to route work() through
+// spinner.Run instead of calling it directly, and no other IP test in this
+// file exercises it.
+func TestLookupOne_IP_SpinnerBranch_HumanFormat(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(ipTestRDAPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return ipTestWHOISText
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewIPResolver(map[netip.Prefix]string{
+		netip.MustParsePrefix("8.8.8.0/24"): rdapSrv.URL,
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &stdout, &stderr, resolver, "8.8.8.8",
+		lookupOptions{whoisIANAServer: ianaAddr},
+		nil, render.FormatHuman, uiConfig{StderrTTY: true},
+	)
+
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "8.8.8.0/24") {
+		t.Errorf("stdout missing CIDR -- spinner.Run may have interfered with the result, got:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "Google LLC") {
+		t.Errorf("stdout missing org name, got:\n%s", stdout.String())
+	}
+}
+
+// TestLookupOne_IP_Diff_RenderErrorPath_ExitCode3 is
+// TestLookupOne_Diff_RenderErrorPath_ExitCode3's IP counterpart, covering
+// lookupOneIP's --diff render-error branch.
+func TestLookupOne_IP_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(ipTestRDAPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return ipTestWHOISText
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewIPResolver(map[netip.Prefix]string{
+		netip.MustParsePrefix("8.8.8.0/24"): rdapSrv.URL,
+	})
+	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
+
+	var baseline, baselineErr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &baseline, &baselineErr, resolver, "8.8.8.8",
+		baseOpts, nil, render.FormatJSON, uiConfig{},
+	)
+	if code != 0 {
+		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
+	}
+	snapPath := filepath.Join(t.TempDir(), "before.json")
+	if err := os.WriteFile(snapPath, baseline.Bytes(), 0o600); err != nil {
+		t.Fatalf("writing snapshot: %v", err)
+	}
+
+	opts := baseOpts
+	opts.DiffPath = snapPath
+	var stderr bytes.Buffer
+	code = lookupOne(
+		context.Background(), errWriter{}, &stderr, resolver, "8.8.8.8",
+		opts, nil, render.FormatPlain, uiConfig{},
+	)
+	if code != 3 {
+		t.Errorf("exit code = %d, want 3\nstderr: %s", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "8.8.8.8") {
+		t.Errorf("stderr missing address in render-failure message, got:\n%s", stderr.String())
+	}
+}
+
 const asnTestRDAPBody = `{
   "objectClassName": "autnum",
   "handle": "AS15169",
@@ -565,6 +903,145 @@ func TestLookupOne_ASN_JSONOutput_ObjectTypeIsASN(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), `"objectType":"asn"`) {
 		t.Errorf(`stdout missing "objectType":"asn", got:%s`, stdout.String())
+	}
+}
+
+// TestLookupOne_ASN_Diff is TestLookupOne_Diff's ASN counterpart, mirroring
+// TestLookupOne_IP_Diff: the ASN path shares diffRender/loadSnapshot with
+// the domain and IP paths (see lookupOneASN in main.go), but nothing
+// before this test drove --diff through lookupOneASN end to end. Same
+// snapshot-then-mutate technique: a real -o json snapshot from a fresh
+// lookup feeds back as opts.DiffPath, unchanged for the exit-0 case and
+// text-mutated for the exit-4 case.
+func TestLookupOne_ASN_Diff(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(asnTestRDAPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return asnTestWHOISText
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewASNResolver(map[[2]uint32]string{
+		{15169, 15169}: rdapSrv.URL,
+	})
+	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
+
+	// Produce a baseline -o json snapshot from a fresh lookup, exactly
+	// what a user would have saved via `plat AS15169 -o json > before.json`.
+	var baseline, baselineErr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &baseline, &baselineErr, resolver, "AS15169",
+		baseOpts, nil, render.FormatJSON, uiConfig{},
+	)
+	if code != 0 {
+		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
+	}
+
+	snapPath := filepath.Join(t.TempDir(), "before.json")
+	if err := os.WriteFile(snapPath, baseline.Bytes(), 0o600); err != nil {
+		t.Fatalf("writing snapshot: %v", err)
+	}
+
+	t.Run("unchanged sources exit 0", func(t *testing.T) {
+		opts := baseOpts
+		opts.DiffPath = snapPath
+		var stdout, stderr bytes.Buffer
+		code := lookupOne(
+			context.Background(), &stdout, &stderr, resolver, "AS15169",
+			opts, nil, render.FormatPlain, uiConfig{},
+		)
+		if code != 0 {
+			t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "no changes") {
+			t.Errorf(`stdout missing "no changes", got:\n%s`, stdout.String())
+		}
+	})
+
+	t.Run("mutated field exits 4 and is reported", func(t *testing.T) {
+		mutated := strings.Replace(baseline.String(), "Google LLC", "Mutated Org LLC", 1)
+		if mutated == baseline.String() {
+			t.Fatal("mutation left the snapshot unchanged -- the org name text moved in the fixture")
+		}
+		mutatedPath := filepath.Join(t.TempDir(), "mutated.json")
+		if err := os.WriteFile(mutatedPath, []byte(mutated), 0o600); err != nil {
+			t.Fatalf("writing mutated snapshot: %v", err)
+		}
+
+		opts := baseOpts
+		opts.DiffPath = mutatedPath
+		var stdout, stderr bytes.Buffer
+		code := lookupOne(
+			context.Background(), &stdout, &stderr, resolver, "AS15169",
+			opts, nil, render.FormatPlain, uiConfig{},
+		)
+		if code != 4 {
+			t.Errorf("exit code = %d, want 4\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "Mutated Org LLC") {
+			t.Errorf("stdout missing the diffed-away value, got:\n%s", stdout.String())
+		}
+		if !strings.Contains(stdout.String(), "1 changed") {
+			t.Errorf("stdout missing change count, got:\n%s", stdout.String())
+		}
+	})
+}
+
+// TestLookupOne_ASN_Diff_RenderErrorPath_ExitCode3 is
+// TestLookupOne_Diff_RenderErrorPath_ExitCode3's ASN counterpart, covering
+// lookupOneASN's --diff render-error branch.
+func TestLookupOne_ASN_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(asnTestRDAPBody))
+	}))
+	defer rdapSrv.Close()
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return asnTestWHOISText
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewASNResolver(map[[2]uint32]string{
+		{15169, 15169}: rdapSrv.URL,
+	})
+	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
+
+	var baseline, baselineErr bytes.Buffer
+	code := lookupOne(
+		context.Background(), &baseline, &baselineErr, resolver, "AS15169",
+		baseOpts, nil, render.FormatJSON, uiConfig{},
+	)
+	if code != 0 {
+		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
+	}
+	snapPath := filepath.Join(t.TempDir(), "before.json")
+	if err := os.WriteFile(snapPath, baseline.Bytes(), 0o600); err != nil {
+		t.Fatalf("writing snapshot: %v", err)
+	}
+
+	opts := baseOpts
+	opts.DiffPath = snapPath
+	var stderr bytes.Buffer
+	code = lookupOne(
+		context.Background(), errWriter{}, &stderr, resolver, "AS15169",
+		opts, nil, render.FormatPlain, uiConfig{},
+	)
+	if code != 3 {
+		t.Errorf("exit code = %d, want 3\nstderr: %s", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "AS15169") {
+		t.Errorf("stderr missing ASN in render-failure message, got:\n%s", stderr.String())
 	}
 }
 

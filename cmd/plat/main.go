@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"runtime"
 	"strings"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/patramsey/plat/internal/bootstrap"
 	"github.com/patramsey/plat/internal/collect"
+	"github.com/patramsey/plat/internal/diff"
 	"github.com/patramsey/plat/internal/domain"
 	"github.com/patramsey/plat/internal/merge"
 	"github.com/patramsey/plat/internal/model"
@@ -100,7 +103,7 @@ type usageError struct{ err error }
 func (e usageError) Error() string { return e.err.Error() }
 func (e usageError) Unwrap() error { return e.err }
 
-// exitSignal carries a pre-computed final exit code (0, 1, 2, or 3) out of
+// exitSignal carries a pre-computed final exit code (0, 1, 2, 3, or 4) out of
 // cobra's error-only RunE contract — used by the multi-domain loop, which
 // derives its own worst-of-N outcome rather than a single error. Only
 // constructed for a non-zero code; a fully successful run returns nil
@@ -136,6 +139,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var showVersion bool
 	var quiet bool
 	var noColorFlag bool
+	var diffPath string
 
 	root := &cobra.Command{
 		Use:           "plat <domain|ip|asn> [domain|ip|asn...]",
@@ -179,6 +183,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 				ShowConflicts:    showConflicts,
 				Quiet:            quiet,
 				NoColor:          noColorFlag,
+				DiffPath:         diffPath,
 			}, ui)
 		},
 	}
@@ -205,6 +210,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	root.Flags().BoolVar(&showVersion, "version", false, "print the plat version and exit")
 	root.Flags().BoolVarP(&quiet, "quiet", "q", false, "print a one-line summary per domain (lock status, expiry, conflict count) instead of the full view -- ignored for -o json/ndjson")
 	root.Flags().BoolVar(&noColorFlag, "no-color", false, "disable color output (same effect as the NO_COLOR env var)")
+	root.Flags().StringVar(&diffPath, "diff", "", "compare the lookup against a saved -o json snapshot; exits 4 if anything changed")
 
 	// `completion` is a real subcommand (M7, cobra's built-in generator);
 	// man pages are a build-time-only artifact (M7's gendocs, not a
@@ -250,6 +256,11 @@ type lookupOptions struct {
 	ShowConflicts    bool
 	Quiet            bool
 	NoColor          bool
+	// DiffPath is the --diff flag's value: a path to a saved -o json
+	// snapshot to compare the fresh lookup against. Empty means --diff
+	// was not passed -- the zero value for every existing caller, so no
+	// prior behavior changes when it's unset.
+	DiffPath string
 	// whoisIANAServer overrides the WHOIS server lookupOne queries first
 	// to resolve a TLD's registry server (see collect.Collect's
 	// whoisIANAServer parameter). Unexported and unset by every real flag
@@ -280,6 +291,9 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 	}
 	if format == render.FormatJSON && len(domains) > 1 {
 		return usageError{fmt.Errorf("-o json supports exactly one domain; use -o ndjson for multiple")}
+	}
+	if opts.DiffPath != "" && len(domains) != 1 {
+		return usageError{fmt.Errorf("--diff supports exactly one name")}
 	}
 	sources, err := parseSourceFilter(opts.SourceFilter)
 	if err != nil {
@@ -320,20 +334,175 @@ func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstra
 		return 2
 	}
 
+	// The --diff snapshot is loaded and validated here -- before any
+	// network call -- rather than after the lookup succeeds. The
+	// object-type and name it must match are already fully known from
+	// the normalized query alone, so there is nothing to gain by
+	// spending a real RDAP/WHOIS round trip only to reject a snapshot
+	// that could never have matched.
+	var prior *machine.Snapshot
+	if opts.DiffPath != "" {
+		snap, err := loadSnapshot(opts.DiffPath, q)
+		if err != nil {
+			reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui)
+			return 2
+		}
+		prior = &snap
+	}
+
 	switch q.Kind {
 	case domain.KindIPv4, domain.KindIPv6:
-		return lookupOneIP(ctx, stdout, stderr, resolver, q, opts, sources, format, ui)
+		return lookupOneIP(ctx, stdout, stderr, resolver, q, opts, sources, format, ui, prior)
 	case domain.KindASN:
-		return lookupOneASN(ctx, stdout, stderr, resolver, q, opts, sources, format, ui)
+		return lookupOneASN(ctx, stdout, stderr, resolver, q, opts, sources, format, ui, prior)
 	default:
-		return lookupOneDomain(ctx, stdout, stderr, resolver, q, opts, sources, format, ui)
+		return lookupOneDomain(ctx, stdout, stderr, resolver, q, opts, sources, format, ui, prior)
 	}
+}
+
+// diffObjectType and diffQueryName report what --diff's snapshot
+// guardrail expects a matching snapshot to look like, derived from the
+// normalized query alone -- object type is unambiguous from Kind, and
+// diffQueryName is the display form used in the guardrail's mismatch
+// message. For domains this is exactly what the registry echoes back
+// (case differences only, which loadSnapshot tolerates via
+// strings.EqualFold). For ASNs, RIR handles are the deterministic
+// "AS"+number form regardless of source, so it's known up front too.
+func diffObjectType(q domain.Query) string {
+	switch q.Kind {
+	case domain.KindIPv4, domain.KindIPv6:
+		return "ip"
+	case domain.KindASN:
+		return "asn"
+	default:
+		return "domain"
+	}
+}
+
+// article returns the indefinite article for an objectType value, so the
+// --diff mismatch message reads "is an ip record" / "is an asn record",
+// not "is a ip record" / "is a asn record".
+func article(objectType string) string {
+	switch objectType {
+	case "ip", "asn":
+		return "an"
+	default:
+		return "a"
+	}
+}
+
+func diffQueryName(q domain.Query) string {
+	switch q.Kind {
+	case domain.KindIPv4, domain.KindIPv6:
+		return q.IP.String()
+	case domain.KindASN:
+		return fmt.Sprintf("AS%d", q.ASN)
+	default:
+		return q.Name.Punycode
+	}
+}
+
+// loadSnapshot reads the --diff snapshot and rejects one that does not
+// match what q actually looked up. Refusing beats guessing: silently
+// diffing example.com against a snapshot of iana.org would report every
+// field as changed and look like a real result.
+//
+// The name check is type-aware rather than a single string compare.
+// Domain and ASN snapshots store the same identifier the query itself
+// carries (a domain name; an "AS"+number RIR handle), so an exact
+// case-insensitive match is correct. An IP snapshot's Name is instead
+// the registry's allocated CIDR block (e.g. "8.8.8.0/24"), never the
+// literal address someone typed -- requiring an exact string match
+// there would reject --diff's own most common usage: querying the same
+// address twice. So for an IP query, a snapshot whose Name parses as a
+// CIDR containing the queried address is accepted; anything else falls
+// back to the exact match every other object type uses.
+func loadSnapshot(path string, q domain.Query) (machine.Snapshot, error) {
+	f, err := os.Open(path) //nolint:gosec // path is a user-supplied CLI argument, which is the point
+	if err != nil {
+		return machine.Snapshot{}, usageError{fmt.Errorf("--diff: %w", err)}
+	}
+	defer func() { _ = f.Close() }()
+
+	snap, err := machine.Decode(f)
+	if err != nil {
+		switch {
+		case errors.Is(err, machine.ErrMultipleRecords):
+			return machine.Snapshot{}, usageError{fmt.Errorf("--diff requires a single -o json snapshot, not ndjson")}
+		case errors.Is(err, machine.ErrUnsupportedSchema):
+			return machine.Snapshot{}, usageError{fmt.Errorf("--diff snapshot has an unsupported schemaVersion: %w", err)}
+		case errors.Is(err, machine.ErrUnknownObjectType):
+			return machine.Snapshot{}, usageError{fmt.Errorf("--diff snapshot has an unrecognized objectType: %w", err)}
+		}
+		return machine.Snapshot{}, usageError{fmt.Errorf("--diff: %w", err)}
+	}
+
+	wantObjectType := diffObjectType(q)
+	if snap.ObjectType != wantObjectType {
+		return machine.Snapshot{}, usageError{fmt.Errorf(
+			"--diff snapshot is %s %s record, but the query is %s %s",
+			article(snap.ObjectType), snap.ObjectType, article(wantObjectType), wantObjectType)}
+	}
+	if !diffNameMatches(snap, q) {
+		return machine.Snapshot{}, usageError{fmt.Errorf(
+			"--diff snapshot is for %s, but the query is %s", snap.Name, diffQueryName(q))}
+	}
+	return snap, nil
+}
+
+// diffNameMatches implements loadSnapshot's type-aware name check --
+// see loadSnapshot's doc comment for why IP needs CIDR-containment
+// rather than a literal match.
+func diffNameMatches(snap machine.Snapshot, q domain.Query) bool {
+	if q.Kind == domain.KindIPv4 || q.Kind == domain.KindIPv6 {
+		if prefix, err := netip.ParsePrefix(snap.Name); err == nil {
+			return prefix.Contains(q.IP)
+		}
+	}
+	return strings.EqualFold(snap.Name, diffQueryName(q))
+}
+
+// diffRender is --diff's compare-and-render step, shared by the domain,
+// IP, and ASN lookup paths: it round-trips the fresh record through
+// encode/Decode so both sides of the comparison went through exactly
+// the same transformation, compares against prior, renders in the
+// active format, and reports the resulting exit code (4 if anything
+// changed, 0 otherwise). encode writes the fresh record in the exact
+// -o json shape Decode expects -- machine.Encode, EncodeIP, or
+// EncodeASN, supplied by the caller since each object type has its own.
+func diffRender(w io.Writer, format render.Format, prior machine.Snapshot, encode func(io.Writer) error, ui uiConfig) (int, error) {
+	var freshBuf bytes.Buffer
+	if err := encode(&freshBuf); err != nil {
+		return 0, err
+	}
+	fresh, err := machine.Decode(&freshBuf)
+	if err != nil {
+		return 0, err
+	}
+
+	changes := diff.Compare(prior.Fields(), fresh.Fields())
+
+	switch format {
+	case render.FormatJSON, render.FormatNDJSON:
+		err = diff.RenderJSON(w, fresh.Name, changes)
+	case render.FormatHuman:
+		err = diff.RenderHuman(w, fresh.Name, changes, human.NewTheme(ui.Dark), ui.Width)
+	default:
+		err = diff.RenderPlain(w, fresh.Name, changes)
+	}
+	if err != nil {
+		return 0, err
+	}
+	if len(changes) > 0 {
+		return 4, nil
+	}
+	return 0, nil
 }
 
 // lookupOneDomain is lookupOne's KindDomain branch — the pre-M6 lookup
 // flow, unchanged apart from being split out of lookupOne so it can share
 // a signature shape with lookupOneIP.
-func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
+func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
 	baseURL, _ := resolver.BaseURL(q.Name.TLD) // "" is fine — Collect degrades to WHOIS-only
 	collectOpts := collect.Options{NoFollow: opts.NoFollow, Timeout: opts.Timeout, Sources: sources}
 
@@ -351,6 +520,16 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, resolver *bo
 
 	code := deriveOutcome(record.Sources)
 	if code == 0 {
+		if prior != nil {
+			dcode, err := diffRender(stdout, format, *prior, func(w io.Writer) error {
+				return machine.Encode(w, record, machine.Options{})
+			}, ui)
+			if err != nil {
+				reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui)
+				return 3
+			}
+			return dcode
+		}
 		if err := renderRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
 			reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui)
 			return 3
@@ -368,7 +547,7 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, resolver *bo
 // lookupOutcomeError operate on []model.SourceResult, which model.IPRecord
 // carries just like model.Record, so both are reused unchanged -- exit
 // codes stay consistent between the domain and IP paths.
-func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
+func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
 	baseURL, _ := resolver.IPBaseURL(q.IP) // "" is fine — CollectIP degrades to WHOIS-only
 	collectOpts := collect.Options{Timeout: opts.Timeout, Sources: sources}
 
@@ -386,6 +565,16 @@ func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, resolver *bootst
 
 	code := deriveOutcome(record.Sources)
 	if code == 0 {
+		if prior != nil {
+			dcode, err := diffRender(stdout, format, *prior, func(w io.Writer) error {
+				return machine.EncodeIP(w, record, machine.Options{})
+			}, ui)
+			if err != nil {
+				reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+				return 3
+			}
+			return dcode
+		}
 		if err := renderIPRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
 			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
 			return 3
@@ -403,7 +592,7 @@ func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, resolver *bootst
 // operate on []model.SourceResult, which model.ASNRecord carries just like
 // model.Record and model.IPRecord, so both are reused unchanged -- exit
 // codes stay consistent across the domain, IP, and ASN paths.
-func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
+func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
 	baseURL, _ := resolver.ASNBaseURL(q.ASN) // "" is fine -- CollectASN degrades to WHOIS-only
 	collectOpts := collect.Options{Timeout: opts.Timeout, Sources: sources}
 
@@ -421,6 +610,16 @@ func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, resolver *boots
 
 	code := deriveOutcome(record.Sources)
 	if code == 0 {
+		if prior != nil {
+			dcode, err := diffRender(stdout, format, *prior, func(w io.Writer) error {
+				return machine.EncodeASN(w, record, machine.Options{})
+			}, ui)
+			if err != nil {
+				reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+				return 3
+			}
+			return dcode
+		}
 		if err := renderASNRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
 			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
 			return 3

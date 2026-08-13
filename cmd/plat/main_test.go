@@ -5,14 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/patramsey/plat/internal/domain"
 	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/render"
 	"github.com/patramsey/plat/internal/render/human"
+	"github.com/patramsey/plat/internal/render/machine"
 )
 
 func TestExitCode(t *testing.T) {
@@ -1090,5 +1095,135 @@ func TestRun_NoColorFlagRegistered(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "--no-color") {
 		t.Errorf("expected --no-color to be listed in --help output, got:\n%s", stdout.String())
+	}
+}
+
+func TestDiff_RejectsNameMismatch(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "snap.json")
+	if err := os.WriteFile(path, []byte(`{"schemaVersion":1,"objectType":"domain","domain":{"value":"example.com","sources":["registry-rdap"]},"conflicts":[],"redacted":[],"sources":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out, errBuf bytes.Buffer
+	code := run([]string{"--diff", path, "iana.org"}, &out, &errBuf, uiConfig{})
+	if code != 2 {
+		t.Errorf("exit = %d, want 2 (usage error)", code)
+	}
+	if !strings.Contains(errBuf.String(), "snapshot is for") {
+		t.Errorf("stderr missing the mismatch message:\n%s", errBuf.String())
+	}
+}
+
+func TestDiff_RejectsNdjson(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "snap.ndjson")
+	line := `{"schemaVersion":1,"objectType":"domain","domain":{"value":"example.com","sources":["registry-rdap"]},"conflicts":[],"redacted":[],"sources":[]}`
+	if err := os.WriteFile(path, []byte(line+"\n"+line+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out, errBuf bytes.Buffer
+	code := run([]string{"--diff", path, "example.com"}, &out, &errBuf, uiConfig{})
+	if code != 2 {
+		t.Errorf("exit = %d, want 2 (usage error)", code)
+	}
+	if !strings.Contains(errBuf.String(), "not ndjson") {
+		t.Errorf("stderr missing the ndjson message:\n%s", errBuf.String())
+	}
+}
+
+func TestDiff_RejectsMultipleNames(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	code := run([]string{"--diff", "irrelevant.json", "a.com", "b.com"}, &out, &errBuf, uiConfig{})
+	if code != 2 {
+		t.Errorf("exit = %d, want 2 (usage error)", code)
+	}
+	if !strings.Contains(errBuf.String(), "exactly one name") {
+		t.Errorf("stderr missing the one-name message:\n%s", errBuf.String())
+	}
+}
+
+// TestDiffNameMatches covers loadSnapshot's type-aware name check: an
+// exact case-insensitive match (the strings.EqualFold fallback, used by
+// domain/ASN queries and by any IP snapshot whose Name doesn't parse as
+// a CIDR) versus CIDR-containment matching (used when it does). This
+// was a self-disclosed gap in live verification -- a real defect was
+// found and fixed here (an IP snapshot's Name is always the registry's
+// allocated block, e.g. "8.8.8.0/24", never the literal address
+// queried), but nothing in CI covered it before this test.
+func TestDiffNameMatches(t *testing.T) {
+	tests := []struct {
+		name string
+		snap machine.Snapshot
+		q    domain.Query
+		want bool
+	}{
+		{
+			name: "domain: case-insensitive match falls back to EqualFold",
+			snap: machine.Snapshot{ObjectType: "domain", Name: "EXAMPLE.COM"},
+			q:    domain.Query{Kind: domain.KindDomain, Name: domain.Name{Punycode: "example.com"}},
+			want: true,
+		},
+		{
+			name: "domain: mismatch via EqualFold fallback",
+			snap: machine.Snapshot{ObjectType: "domain", Name: "EXAMPLE.COM"},
+			q:    domain.Query{Kind: domain.KindDomain, Name: domain.Name{Punycode: "example.org"}},
+			want: false,
+		},
+		{
+			name: "asn: case-insensitive handle match falls back to EqualFold",
+			snap: machine.Snapshot{ObjectType: "asn", Name: "as15169"},
+			q:    domain.Query{Kind: domain.KindASN, ASN: 15169},
+			want: true,
+		},
+		{
+			name: "asn: mismatched number via EqualFold fallback",
+			snap: machine.Snapshot{ObjectType: "asn", Name: "AS15169"},
+			q:    domain.Query{Kind: domain.KindASN, ASN: 13335},
+			want: false,
+		},
+		{
+			name: "ip: snapshot Name that isn't a CIDR falls back to EqualFold",
+			snap: machine.Snapshot{ObjectType: "ip", Name: "8.8.8.8"},
+			q:    domain.Query{Kind: domain.KindIPv4, IP: netip.MustParseAddr("8.8.8.8")},
+			want: true,
+		},
+		{
+			name: "ip: literal address matches its own saved CIDR block",
+			snap: machine.Snapshot{ObjectType: "ip", Name: "8.8.8.0/24"},
+			q:    domain.Query{Kind: domain.KindIPv4, IP: netip.MustParseAddr("8.8.8.8")},
+			want: true,
+		},
+		{
+			name: "ip: address outside an unrelated same-family CIDR block",
+			snap: machine.Snapshot{ObjectType: "ip", Name: "8.8.8.0/24"},
+			q:    domain.Query{Kind: domain.KindIPv4, IP: netip.MustParseAddr("1.1.1.1")},
+			want: false,
+		},
+		{
+			name: "ip: ipv6 address matches its own saved ipv6 CIDR block",
+			snap: machine.Snapshot{ObjectType: "ip", Name: "2001:4860:4860::/48"},
+			q:    domain.Query{Kind: domain.KindIPv6, IP: netip.MustParseAddr("2001:4860:4860::8888")},
+			want: true,
+		},
+		{
+			name: "ip: cross-family, ipv6 query against an ipv4 CIDR snapshot never matches",
+			snap: machine.Snapshot{ObjectType: "ip", Name: "8.8.8.0/24"},
+			q:    domain.Query{Kind: domain.KindIPv6, IP: netip.MustParseAddr("2001:4860:4860::8888")},
+			want: false,
+		},
+		{
+			name: "ip: cross-family, ipv4 query against an ipv6 CIDR snapshot never matches",
+			snap: machine.Snapshot{ObjectType: "ip", Name: "2001:4860:4860::/48"},
+			q:    domain.Query{Kind: domain.KindIPv4, IP: netip.MustParseAddr("8.8.8.8")},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := diffNameMatches(tt.snap, tt.q)
+			if got != tt.want {
+				t.Errorf("diffNameMatches(snap.Name=%q, query=%q) = %v, want %v", tt.snap.Name, diffQueryName(tt.q), got, tt.want)
+			}
+		})
 	}
 }

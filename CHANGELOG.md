@@ -6,6 +6,24 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `--diff <snapshot.json>` compares a fresh lookup against a previously
+  saved `-o json` snapshot and reports what changed -- expiry,
+  nameservers, status, and every other merged field. Exits 4 when
+  anything changed, 0 when nothing did; exit codes 1, 2, and 3 keep
+  their existing meanings. Works for domains, IPs, and ASNs. Compares
+  values only: source provenance and conflicts are ignored, so a source
+  simply dropping out of one run does not by itself register as a
+  change. It can still surface one if the remaining sources disagree on
+  a field's precision, or if the dropped source was the only one
+  supplying a field -- e.g. an ASN lookup losing registry-rdap falls
+  back to registry-whois's date-only `Registered`/`Updated` timestamps
+  (`2000-03-30T05:00:00Z` -> `2000-03-30T00:00:00Z`) and loses `Status`
+  entirely, since only RDAP supplies it; both are real differences
+  between the two merged records, not noise.
+  Snapshots saved before v0.3.1 (whose nameserver and status lists were
+  unsorted) compare correctly, since lists are compared as sets.
+
 ### Changed
 - Internal maintenance: the RDAP fetch path and two merge helpers each
   existed as separate near-identical copies per object type -- three

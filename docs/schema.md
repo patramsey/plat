@@ -236,6 +236,73 @@ stdout only ever contains successfully-rendered records in machine mode —
 scripts consuming stdout never need to distinguish a partial/error object
 from a real record.
 
+## `--diff` output
+
+`plat --diff before.json example.com -o json` emits a *different* document
+from the record schema above: not a `Record`, but a report of what changed
+between the saved snapshot and the fresh lookup. It carries its own
+top-level `diffSchemaVersion`, versioned **independently** of the record
+`schemaVersion` above — the record shape and the diff shape change for
+different reasons, so a bump to one never forces a bump to the other. The
+current diff schema version is **1**.
+
+```json
+{
+  "diffSchemaVersion": 1,
+  "name": "example.com",
+  "changes": [
+    {
+      "key": "expires",
+      "label": "Expires",
+      "kind": "changed",
+      "before": "2026-08-03T04:00:00Z",
+      "after": "2027-08-03T04:00:00Z"
+    },
+    {
+      "key": "nameservers",
+      "label": "Nameservers",
+      "kind": "listChanged",
+      "addedItems": ["c.new.net"],
+      "removedItems": ["a.old.net"]
+    }
+  ]
+}
+```
+
+- `name` is the fresh lookup's own identity — domain name, CIDR, or AS
+  handle — the same string that would appear as `domain`/`cidr`/`handle`
+  in a plain (non-diff) record.
+- `changes` is an array of change entries, one per field that differs
+  between the snapshot and the fresh lookup, in the fresh lookup's
+  canonical field order. It is `[]` (never `null`) when nothing changed —
+  scripts can always safely index or iterate it without a nil check.
+- Each change entry has:
+  - `key` — the field's stable identifier, matching the record schema's
+    own field names (`expires`, `nameservers`, `org.name`, ...).
+  - `label` — the same human-readable label the human/plain renderers
+    print for that field (`"Expires"`, `"Nameservers"`, ...).
+  - `kind` — one of four values:
+    - `"changed"` — a scalar field's value differs. `before`/`after` are
+      both present.
+    - `"added"` — the field was absent in the snapshot and present in the
+      fresh lookup. Only `after` is present.
+    - `"removed"` — the field was present in the snapshot and is absent
+      in the fresh lookup. Only `before` is present.
+    - `"listChanged"` — a list-valued field (`status`, `nameservers`)
+      gained or lost items; reordering alone is not a change. Only
+      `addedItems`/`removedItems` are present.
+  - `before`/`after` — the scalar field's old/new value, present only for
+    `kind: "changed"` (both) or the one side that has a value for
+    `"added"`/`"removed"`. Omitted entirely (not empty-string) otherwise.
+  - `addedItems`/`removedItems` — the list field's gained/lost entries,
+    present only for `kind: "listChanged"`, sorted for deterministic
+    output. Omitted entirely (not empty-array) when there's nothing on
+    that side.
+- `--diff` only compares field *values* — see `internal/diff`'s package
+  doc comment for the deliberate scope of what values-only comparison
+  does and doesn't catch when a source drops out between the two
+  lookups.
+
 ## Stability policy
 
 This schema is versioned via the top-level `schemaVersion` field (currently
