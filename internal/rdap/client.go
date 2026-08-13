@@ -296,10 +296,8 @@ func fetchAt[T rdapObject](
 	return result, nil
 }
 
-// domainAt is the shared fetch-and-parse core for both Domain and
-// DomainURL — every existing behavior of Domain (429 retry, 404 handling,
-// malformed-response tolerance, the objectClassName check) lives here,
-// via fetchAt, unchanged from before this method was extracted.
+// domainAt fetches and decodes a domain object via fetchAt. Used by both
+// Domain and DomainURL.
 func (c *Client) domainAt(ctx context.Context, reqURL string) (*Result, error) {
 	return fetchAt(c, ctx, reqURL, "domain",
 		func(r *Result, d *DomainResponse) { r.Domain = d })
@@ -316,10 +314,7 @@ func (c *Client) IP(ctx context.Context, baseURL string, addr netip.Addr) (*Resu
 	return c.ipAt(ctx, reqURL)
 }
 
-// ipAt is the shared fetch-and-parse core for IP queries -- a sibling of
-// domainAt with the same 429 retry, 404 handling, and malformed-response
-// tolerance, differing only in the decode target, the objectClassName
-// check, and which Result field gets populated. Both go through fetchAt.
+// ipAt fetches and decodes an IP network object via fetchAt.
 func (c *Client) ipAt(ctx context.Context, reqURL string) (*Result, error) {
 	return fetchAt(c, ctx, reqURL, "ip network",
 		func(r *Result, n *IPNetworkResponse) { r.IPNetwork = n })
@@ -336,11 +331,7 @@ func (c *Client) ASN(ctx context.Context, baseURL string, asn uint32) (*Result, 
 	return c.asnAt(ctx, reqURL)
 }
 
-// asnAt is the shared fetch-and-parse core for ASN queries -- a sibling of
-// domainAt and ipAt with the same 429 retry, 404 handling, and
-// malformed-response tolerance, differing only in the decode target, the
-// objectClassName check, and which Result field gets populated. All three
-// go through fetchAt.
+// asnAt fetches and decodes an autnum object via fetchAt.
 func (c *Client) asnAt(ctx context.Context, reqURL string) (*Result, error) {
 	return fetchAt(c, ctx, reqURL, "autnum",
 		func(r *Result, a *ASNResponse) { r.ASN = a })
