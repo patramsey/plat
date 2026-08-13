@@ -861,6 +861,60 @@ func TestMerge_LifecycleNilForIDNGTLD(t *testing.T) {
 	}
 }
 
+// TestPresentSorted_OrdersByRankForEveryObjectType pins that the one
+// generic serves all three source-record types and orders each by
+// model.Rank. Before consolidation these were three separate functions;
+// a type silently dropping out of the generic would otherwise only show
+// up as a merge-precedence bug far downstream.
+func TestPresentSorted_OrdersByRankForEveryObjectType(t *testing.T) {
+	// registry-whois ranks below registrar-rdap, so the input is
+	// deliberately in the wrong order and must come back swapped.
+	lo := model.SourceResult{Source: model.SourceRegistryWHOIS}
+	hi := model.SourceResult{Source: model.SourceRegistrarRDAP}
+
+	t.Run("domain", func(t *testing.T) {
+		got := presentSorted([]model.SourceRecord{
+			{Meta: lo, Present: true},
+			{Meta: hi, Present: true},
+			{Meta: hi, Present: false}, // absent: must be dropped
+		})
+		if len(got) != 2 {
+			t.Fatalf("len = %d, want 2 (the absent record must be dropped)", len(got))
+		}
+		if got[0].SourceID() != model.SourceRegistrarRDAP {
+			t.Errorf("got[0] = %q, want registrar-rdap to sort first", got[0].SourceID())
+		}
+	})
+
+	t.Run("ip", func(t *testing.T) {
+		got := presentSorted([]model.IPSourceRecord{
+			{Meta: lo, Present: true},
+			{Meta: hi, Present: true},
+			{Meta: hi, Present: false},
+		})
+		if len(got) != 2 {
+			t.Fatalf("len = %d, want 2 (the absent record must be dropped)", len(got))
+		}
+		if got[0].SourceID() != model.SourceRegistrarRDAP {
+			t.Errorf("got[0] = %q, want registrar-rdap to sort first", got[0].SourceID())
+		}
+	})
+
+	t.Run("asn", func(t *testing.T) {
+		got := presentSorted([]model.ASNSourceRecord{
+			{Meta: lo, Present: true},
+			{Meta: hi, Present: true},
+			{Meta: hi, Present: false},
+		})
+		if len(got) != 2 {
+			t.Fatalf("len = %d, want 2 (the absent record must be dropped)", len(got))
+		}
+		if got[0].SourceID() != model.SourceRegistrarRDAP {
+			t.Errorf("got[0] = %q, want registrar-rdap to sort first", got[0].SourceID())
+		}
+	})
+}
+
 func TestMerge_LifecycleNilForMalformedDomain(t *testing.T) {
 	tests := []struct {
 		name   string

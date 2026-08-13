@@ -17,7 +17,7 @@ func MergeIP(sources []model.IPSourceRecord) model.IPRecord {
 		rec.Sources = append(rec.Sources, s.Meta)
 	}
 
-	present := presentSortedIP(sources)
+	present := presentSorted(sources)
 	st := &mergeState{}
 
 	str := func(field string, get func(model.IPSourceRecord) string) model.Field[string] {
@@ -59,23 +59,6 @@ func MergeIP(sources []model.IPSourceRecord) model.IPRecord {
 	rec.Conflicts = st.conflicts
 	rec.Redacted = st.redactions
 	return rec
-}
-
-func presentSortedIP(sources []model.IPSourceRecord) []model.IPSourceRecord {
-	out := make([]model.IPSourceRecord, 0, len(sources))
-	for _, s := range sources {
-		if s.Present {
-			out = append(out, s)
-		}
-	}
-	for i := 1; i < len(out); i++ {
-		j := i
-		for j > 0 && model.Rank(out[j-1].Meta.Source) > model.Rank(out[j].Meta.Source) {
-			out[j-1], out[j] = out[j], out[j-1]
-			j--
-		}
-	}
-	return out
 }
 
 // ipStatus unions status values across sources, mirroring the domain

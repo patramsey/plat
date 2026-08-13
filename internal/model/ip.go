@@ -99,3 +99,8 @@ type IPSourceRecord struct {
 	RedactedFields map[string]bool
 	Redactions     []RedactionNotice
 }
+
+// See the SourceRecord versions in record.go for why these exist and why
+// IsPresent is not called Present.
+func (r IPSourceRecord) IsPresent() bool    { return r.Present }
+func (r IPSourceRecord) SourceID() SourceID { return r.Meta.Source }

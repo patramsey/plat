@@ -17,7 +17,7 @@ func MergeASN(sources []model.ASNSourceRecord) model.ASNRecord {
 		rec.Sources = append(rec.Sources, s.Meta)
 	}
 
-	present := presentSortedASN(sources)
+	present := presentSorted(sources)
 	st := &mergeState{}
 
 	str := func(field string, get func(model.ASNSourceRecord) string) model.Field[string] {
@@ -56,23 +56,6 @@ func MergeASN(sources []model.ASNSourceRecord) model.ASNRecord {
 	rec.Conflicts = st.conflicts
 	rec.Redacted = st.redactions
 	return rec
-}
-
-func presentSortedASN(sources []model.ASNSourceRecord) []model.ASNSourceRecord {
-	out := make([]model.ASNSourceRecord, 0, len(sources))
-	for _, s := range sources {
-		if s.Present {
-			out = append(out, s)
-		}
-	}
-	for i := 1; i < len(out); i++ {
-		j := i
-		for j > 0 && model.Rank(out[j-1].Meta.Source) > model.Rank(out[j].Meta.Source) {
-			out[j-1], out[j] = out[j], out[j-1]
-			j--
-		}
-	}
-	return out
 }
 
 // asnStatus unions status values across sources, mirroring the domain

@@ -155,3 +155,13 @@ type SourceRecord struct {
 	RedactedFields map[string]bool
 	Redactions     []RedactionNotice
 }
+
+// IsPresent and SourceID expose the two fields every source-record type
+// shares, so merge's generic helpers can reach them. Go generics cannot
+// read struct fields through a type parameter, only methods.
+//
+// Named IsPresent rather than Present because Present is already a field
+// on this struct; a method may not share a name with a field of the same
+// type.
+func (r SourceRecord) IsPresent() bool    { return r.Present }
+func (r SourceRecord) SourceID() SourceID { return r.Meta.Source }

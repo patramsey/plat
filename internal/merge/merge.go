@@ -53,16 +53,29 @@ type mergeState struct {
 	redactions []model.RedactionNotice
 }
 
-func presentSorted(sources []model.SourceRecord) []model.SourceRecord {
-	out := make([]model.SourceRecord, 0, len(sources))
+// presentable is the consumer-side interface presentSorted needs: a
+// source record that knows whether it carried data and which source it
+// came from. Declared here rather than in model because model has no use
+// for it -- the Go idiom is that the consumer declares the interface.
+type presentable interface {
+	IsPresent() bool
+	SourceID() model.SourceID
+}
+
+// presentSorted drops absent source records and orders the rest by merge
+// precedence. The insertion sort is preserved from the three per-type
+// copies this replaced: it is stable, and the ordering it produces is
+// load-bearing for every downstream merge decision.
+func presentSorted[T presentable](sources []T) []T {
+	out := make([]T, 0, len(sources))
 	for _, s := range sources {
-		if s.Present {
+		if s.IsPresent() {
 			out = append(out, s)
 		}
 	}
 	for i := 1; i < len(out); i++ {
 		j := i
-		for j > 0 && model.Rank(out[j-1].Meta.Source) > model.Rank(out[j].Meta.Source) {
+		for j > 0 && model.Rank(out[j-1].SourceID()) > model.Rank(out[j].SourceID()) {
 			out[j-1], out[j] = out[j], out[j-1]
 			j--
 		}
