@@ -1,8 +1,6 @@
 package merge
 
 import (
-	"sort"
-
 	"github.com/patramsey/plat/internal/model"
 )
 
@@ -51,7 +49,7 @@ func MergeIP(sources []model.IPSourceRecord) model.IPRecord {
 	rec.Registered = st.timestamp(model.FieldIPRegistered, regCands)
 	rec.Updated = st.timestamp(model.FieldIPUpdated, updCands)
 
-	rec.Status = ipStatus(present)
+	rec.Status = statusUnion(present)
 
 	for _, s := range present {
 		st.redactions = append(st.redactions, s.Redactions...)
@@ -59,32 +57,4 @@ func MergeIP(sources []model.IPSourceRecord) model.IPRecord {
 	rec.Conflicts = st.conflicts
 	rec.Redacted = st.redactions
 	return rec
-}
-
-// ipStatus unions status values across sources, mirroring the domain
-// status() helper's union-not-conflict policy.
-func ipStatus(present []model.IPSourceRecord) model.Field[[]string] {
-	seen := map[string]bool{}
-	var order []string
-	var contributors []model.SourceID
-	for _, s := range present {
-		if len(s.Status) == 0 {
-			continue
-		}
-		contributors = append(contributors, s.Meta.Source)
-		for _, st := range s.Status {
-			if st == "" || seen[st] {
-				continue
-			}
-			seen[st] = true
-			order = append(order, st)
-		}
-	}
-	if len(contributors) == 0 {
-		return model.Field[[]string]{}
-	}
-	// Sorted last for the same reason as domain status() in merge.go:
-	// deterministic output regardless of upstream ordering.
-	sort.Strings(order)
-	return model.Field[[]string]{Value: order, Sources: contributors}
 }

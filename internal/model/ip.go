@@ -104,3 +104,10 @@ type IPSourceRecord struct {
 // IsPresent is not called Present.
 func (r IPSourceRecord) IsPresent() bool    { return r.Present }
 func (r IPSourceRecord) SourceID() SourceID { return r.Meta.Source }
+
+// Statuses exposes Status for merge's statusUnion generic. Named
+// Statuses rather than Status because Status is already a field on this
+// struct. SourceRecord deliberately does NOT get this method: domain
+// status merging applies an EPP-specific step that must not be shared
+// (see mergeState.status in internal/merge/merge.go).
+func (r IPSourceRecord) Statuses() []string { return r.Status }

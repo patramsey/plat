@@ -99,3 +99,7 @@ type ASNSourceRecord struct {
 // IsPresent is not called Present.
 func (r ASNSourceRecord) IsPresent() bool    { return r.Present }
 func (r ASNSourceRecord) SourceID() SourceID { return r.Meta.Source }
+
+// See the IPSourceRecord version in ip.go. SourceRecord deliberately
+// does not get this method.
+func (r ASNSourceRecord) Statuses() []string { return r.Status }

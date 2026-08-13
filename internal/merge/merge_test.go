@@ -939,3 +939,46 @@ func TestMerge_LifecycleNilForMalformedDomain(t *testing.T) {
 		})
 	}
 }
+
+// TestStatusAsymmetry_EPPDropIsDomainOnly pins the deliberate difference
+// between domain status merging and RIR status merging, in both
+// directions.
+//
+// Domain status drops a bare EPP status when a client-/server-prefixed
+// variant of the same status is present -- "transferProhibited" is
+// redundant next to "clientTransferProhibited". RIR statuses have no such
+// convention, so IP and ASN must keep every distinct string.
+//
+// Without the second half of this test, unifying all three status
+// functions would look correct and silently apply an EPP rule to RIR
+// data. Without the first half, it would silently regress the domain
+// drop step.
+func TestStatusAsymmetry_EPPDropIsDomainOnly(t *testing.T) {
+	meta := model.SourceResult{Source: model.SourceRegistryRDAP}
+	epp := []string{"clientTransferProhibited", "transferProhibited"}
+
+	t.Run("domain drops the redundant bare status", func(t *testing.T) {
+		var st mergeState
+		got := st.status([]model.SourceRecord{{Meta: meta, Present: true, Status: epp}})
+		want := []string{"clientTransferProhibited"}
+		if !slices.Equal(got.Value, want) {
+			t.Errorf("domain status = %q, want %q (bare transferProhibited is redundant)", got.Value, want)
+		}
+	})
+
+	t.Run("ip keeps both strings", func(t *testing.T) {
+		got := statusUnion([]model.IPSourceRecord{{Meta: meta, Present: true, Status: epp}})
+		want := []string{"clientTransferProhibited", "transferProhibited"}
+		if !slices.Equal(got.Value, want) {
+			t.Errorf("ip status = %q, want %q -- the EPP drop rule must not reach RIR data", got.Value, want)
+		}
+	})
+
+	t.Run("asn keeps both strings", func(t *testing.T) {
+		got := statusUnion([]model.ASNSourceRecord{{Meta: meta, Present: true, Status: epp}})
+		want := []string{"clientTransferProhibited", "transferProhibited"}
+		if !slices.Equal(got.Value, want) {
+			t.Errorf("asn status = %q, want %q -- the EPP drop rule must not reach RIR data", got.Value, want)
+		}
+	})
+}
