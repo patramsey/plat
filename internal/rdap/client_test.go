@@ -767,3 +767,32 @@ func TestRetryAfter(t *testing.T) {
 		})
 	}
 }
+
+// TestIP_WrongObjectClassIsMalformed pins the objectClassName check for a
+// second decode target. The domain equivalent already exists above; after
+// the fetchAt consolidation both run through one shared rejection path, so
+// covering only one type would leave that path single-exercised.
+func TestIP_WrongObjectClassIsMalformed(t *testing.T) {
+	body := `{"objectClassName":"domain","ldhName":"EXAMPLE.COM"}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.IP(context.Background(), srv.URL, netip.MustParseAddr("8.8.8.8"))
+	if err == nil {
+		t.Fatal("expected an error when objectClassName is not \"ip network\"")
+	}
+	var mre *MalformedResponseError
+	if !errors.As(err, &mre) {
+		t.Fatalf("err = %T (%v), want *MalformedResponseError", err, err)
+	}
+	if res == nil || string(res.Raw) != body {
+		t.Error("raw body should still be retained when objectClassName is wrong")
+	}
+	if res != nil && res.IPNetwork != nil {
+		t.Error("IPNetwork must stay nil when the class check fails")
+	}
+}
