@@ -3,8 +3,23 @@
 // It deliberately compares values only. Provenance and conflicts are
 // ignored: sources flap, and a rate-limited RIR or a timed-out registrar
 // WHOIS would otherwise produce churn on nearly every field and drown the
-// real signal. As long as some source still supplies a value, a flaky run
-// produces no diff at all.
+// real signal. As long as the remaining sources agree on a field's value,
+// a source dropping out produces no diff for that field.
+//
+// That guarantee has two edge cases, both observed in practice rather
+// than hypothetical. First, when a dropped source was the *only* one
+// supplying a field (e.g. only RDAP carries Status), the field itself
+// disappears, which is a real reportable change (Kind Removed), not
+// noise. Second, when the remaining sources agree on a field's value but
+// not its precision or format -- RDAP's full RFC 3339 timestamps versus
+// WHOIS's date-only ones, for instance -- losing the higher-precedence
+// source can flip the merged value even though nothing about the
+// underlying record changed, and that surfaces as a spurious Changed
+// entry. Neither case is silently miscounted: both still produce an
+// accurate diff of the two merged records as they actually stood, but a
+// user comparing snapshots taken across a flaky lookup should expect
+// values-only diffing to suppress provenance churn, not every
+// consequence of a source dropping out.
 package diff
 
 import (
