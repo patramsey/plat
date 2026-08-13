@@ -129,3 +129,30 @@ func TestCompare_PreservesFieldOrder(t *testing.T) {
 		}
 	}
 }
+
+// TestKindString asserts the display string for every declared Kind value
+// plus the unknown/default branch (a Kind value outside the declared
+// iota range) -- Kind.String's switch has no way to fail other than a
+// typo in one of these five return paths, and nothing elsewhere in this
+// package or in cmd/plat's end-to-end tests forces every branch, since
+// --diff only ever produces well-formed Kind values.
+func TestKindString(t *testing.T) {
+	tests := []struct {
+		name string
+		k    Kind
+		want string
+	}{
+		{"Changed", Changed, "changed"},
+		{"Added", Added, "added"},
+		{"Removed", Removed, "removed"},
+		{"ListChanged", ListChanged, "listChanged"},
+		{"unknown value falls through to the default branch", Kind(99), "unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.k.String(); got != tt.want {
+				t.Errorf("Kind(%d).String() = %q, want %q", tt.k, got, tt.want)
+			}
+		})
+	}
+}

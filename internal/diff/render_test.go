@@ -148,3 +148,91 @@ func TestRenderHuman_WrapsLongNameserverListAtNarrowWidth(t *testing.T) {
 		}
 	}
 }
+
+// TestDescribe tables over every Kind describe distinguishes, including
+// both the scalar and list-valued forms of Added and Removed -- describe
+// is shared by RenderHuman and RenderPlain, so a bug here would silently
+// mis-render both. sampleChanges above only ever exercises the
+// list-valued Added/ListChanged forms and the default Changed case; this
+// fills in the scalar Added/Removed and list-valued Removed branches
+// nothing else here reaches.
+func TestDescribe(t *testing.T) {
+	tests := []struct {
+		name string
+		c    Change
+		want string
+	}{
+		{
+			name: "Changed: scalar before/after",
+			c:    Change{Kind: Changed, Before: "a", After: "b"},
+			want: "a -> b",
+		},
+		{
+			name: "Added: scalar (no AddedItems) uses After",
+			c:    Change{Kind: Added, After: "new-value"},
+			want: "+new-value",
+		},
+		{
+			name: "Added: list form joins AddedItems with +",
+			c:    Change{Kind: Added, AddedItems: []string{"ns1.example.com", "ns2.example.com"}},
+			want: "+ns1.example.com +ns2.example.com",
+		},
+		{
+			name: "Removed: scalar (no RemovedItems) uses Before",
+			c:    Change{Kind: Removed, Before: "old-value"},
+			want: "-old-value",
+		},
+		{
+			name: "Removed: list form joins RemovedItems with -",
+			c:    Change{Kind: Removed, RemovedItems: []string{"ns1.example.com", "ns2.example.com"}},
+			want: "-ns1.example.com -ns2.example.com",
+		},
+		{
+			name: "ListChanged: removed items first, then added items",
+			c:    Change{Kind: ListChanged, RemovedItems: []string{"old.example.com"}, AddedItems: []string{"new1.example.com", "new2.example.com"}},
+			want: "-old.example.com +new1.example.com +new2.example.com",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := describe(tt.c); got != tt.want {
+				t.Errorf("describe(%+v) = %q, want %q", tt.c, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestRenderHuman_NoChanges covers RenderHuman's early-return branch: the
+// styled "name: no changes" line, with no header or change lines
+// following it -- TestRenderHuman_WrapsLongNameserverListAtNarrowWidth
+// above only exercises the with-changes path.
+func TestRenderHuman_NoChanges(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, "example.com", nil, human.NewTheme(false), 80); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	got := buf.String()
+	if !strings.Contains(got, "example.com: no changes") {
+		t.Errorf("output missing %q, got:\n%s", "example.com: no changes", got)
+	}
+}
+
+// TestRenderHuman_WithChanges covers the styled-diff path with a mix of
+// Changed and ListChanged entries: the header line, one "Label: value"
+// line per change, and the trailing "N changed" summary.
+func TestRenderHuman_WithChanges(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, "example.com", sampleChanges(), human.NewTheme(false), 80); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	got := buf.String()
+	if !strings.Contains(got, "example.com") {
+		t.Errorf("output missing the record name, got:\n%s", got)
+	}
+	if !strings.Contains(got, "Expires") || !strings.Contains(got, "2026-08-03") || !strings.Contains(got, "2027-08-03") {
+		t.Errorf("output missing the expires change, got:\n%s", got)
+	}
+	if !strings.Contains(got, "3 changed") {
+		t.Errorf("output missing the change count, got:\n%s", got)
+	}
+}
