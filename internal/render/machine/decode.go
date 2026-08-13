@@ -245,7 +245,7 @@ func domainFields(v *recordView) []Field {
 			}
 			f.Value = strconv.FormatBool(v.DNSSEC.Value)
 		default:
-			continue
+			panic(fmt.Sprintf("machine: unhandled model.FieldOrder entry %q", fd.Key))
 		}
 		out = append(out, f)
 	}
@@ -361,7 +361,7 @@ func ipFields(v *ipRecordView) []Field {
 			}
 			f.Value = s
 		default:
-			continue
+			panic(fmt.Sprintf("machine: unhandled model.IPFieldOrder entry %q", fd.Key))
 		}
 		out = append(out, f)
 	}
@@ -451,7 +451,7 @@ func asnFields(v *asnRecordView) []Field {
 			}
 			f.Value = s
 		default:
-			continue
+			panic(fmt.Sprintf("machine: unhandled model.ASNFieldOrder entry %q", fd.Key))
 		}
 		out = append(out, f)
 	}
