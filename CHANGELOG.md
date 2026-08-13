@@ -6,6 +6,17 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Internal maintenance: the RDAP fetch path and two merge helpers each
+  existed as separate near-identical copies per object type -- three
+  copies of the fetch-and-parse core, three of the source-record filter,
+  and two of the status union. Each is now a single generic. No behavior
+  change: output for a domain, an IP, and an ASN is byte-identical to the
+  previous build across `-o json`. Domain status merging deliberately
+  keeps its own EPP-specific step and is not shared with IP/ASN status,
+  since RIR status strings use no `client`/`server` prefix convention;
+  a test pins that asymmetry in both directions.
+
 ## [0.3.2] - 2026-08-12
 
 ### Fixed
