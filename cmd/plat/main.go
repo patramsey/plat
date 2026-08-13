@@ -379,6 +379,18 @@ func diffObjectType(q domain.Query) string {
 	}
 }
 
+// article returns the indefinite article for an objectType value, so the
+// --diff mismatch message reads "is an ip record" / "is an asn record",
+// not "is a ip record" / "is a asn record".
+func article(objectType string) string {
+	switch objectType {
+	case "ip", "asn":
+		return "an"
+	default:
+		return "a"
+	}
+}
+
 func diffQueryName(q domain.Query) string {
 	switch q.Kind {
 	case domain.KindIPv4, domain.KindIPv6:
@@ -428,7 +440,8 @@ func loadSnapshot(path string, q domain.Query) (machine.Snapshot, error) {
 	wantObjectType := diffObjectType(q)
 	if snap.ObjectType != wantObjectType {
 		return machine.Snapshot{}, usageError{fmt.Errorf(
-			"--diff snapshot is a %s record, but the query is a %s", snap.ObjectType, wantObjectType)}
+			"--diff snapshot is %s %s record, but the query is %s %s",
+			article(snap.ObjectType), snap.ObjectType, article(wantObjectType), wantObjectType)}
 	}
 	if !diffNameMatches(snap, q) {
 		return machine.Snapshot{}, usageError{fmt.Errorf(
