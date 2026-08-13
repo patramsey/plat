@@ -1,8 +1,6 @@
 package merge
 
 import (
-	"sort"
-
 	"github.com/patramsey/plat/internal/model"
 )
 
@@ -17,7 +15,7 @@ func MergeIP(sources []model.IPSourceRecord) model.IPRecord {
 		rec.Sources = append(rec.Sources, s.Meta)
 	}
 
-	present := presentSortedIP(sources)
+	present := presentSorted(sources)
 	st := &mergeState{}
 
 	str := func(field string, get func(model.IPSourceRecord) string) model.Field[string] {
@@ -51,7 +49,7 @@ func MergeIP(sources []model.IPSourceRecord) model.IPRecord {
 	rec.Registered = st.timestamp(model.FieldIPRegistered, regCands)
 	rec.Updated = st.timestamp(model.FieldIPUpdated, updCands)
 
-	rec.Status = ipStatus(present)
+	rec.Status = statusUnion(present)
 
 	for _, s := range present {
 		st.redactions = append(st.redactions, s.Redactions...)
@@ -59,49 +57,4 @@ func MergeIP(sources []model.IPSourceRecord) model.IPRecord {
 	rec.Conflicts = st.conflicts
 	rec.Redacted = st.redactions
 	return rec
-}
-
-func presentSortedIP(sources []model.IPSourceRecord) []model.IPSourceRecord {
-	out := make([]model.IPSourceRecord, 0, len(sources))
-	for _, s := range sources {
-		if s.Present {
-			out = append(out, s)
-		}
-	}
-	for i := 1; i < len(out); i++ {
-		j := i
-		for j > 0 && model.Rank(out[j-1].Meta.Source) > model.Rank(out[j].Meta.Source) {
-			out[j-1], out[j] = out[j], out[j-1]
-			j--
-		}
-	}
-	return out
-}
-
-// ipStatus unions status values across sources, mirroring the domain
-// status() helper's union-not-conflict policy.
-func ipStatus(present []model.IPSourceRecord) model.Field[[]string] {
-	seen := map[string]bool{}
-	var order []string
-	var contributors []model.SourceID
-	for _, s := range present {
-		if len(s.Status) == 0 {
-			continue
-		}
-		contributors = append(contributors, s.Meta.Source)
-		for _, st := range s.Status {
-			if st == "" || seen[st] {
-				continue
-			}
-			seen[st] = true
-			order = append(order, st)
-		}
-	}
-	if len(contributors) == 0 {
-		return model.Field[[]string]{}
-	}
-	// Sorted last for the same reason as domain status() in merge.go:
-	// deterministic output regardless of upstream ordering.
-	sort.Strings(order)
-	return model.Field[[]string]{Value: order, Sources: contributors}
 }

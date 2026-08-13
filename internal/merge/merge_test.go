@@ -861,6 +861,60 @@ func TestMerge_LifecycleNilForIDNGTLD(t *testing.T) {
 	}
 }
 
+// TestPresentSorted_OrdersByRankForEveryObjectType pins that the one
+// generic serves all three source-record types and orders each by
+// model.Rank. Before consolidation these were three separate functions;
+// a type silently dropping out of the generic would otherwise only show
+// up as a merge-precedence bug far downstream.
+func TestPresentSorted_OrdersByRankForEveryObjectType(t *testing.T) {
+	// registry-whois ranks below registrar-rdap, so the input is
+	// deliberately in the wrong order and must come back swapped.
+	lo := model.SourceResult{Source: model.SourceRegistryWHOIS}
+	hi := model.SourceResult{Source: model.SourceRegistrarRDAP}
+
+	t.Run("domain", func(t *testing.T) {
+		got := presentSorted([]model.SourceRecord{
+			{Meta: lo, Present: true},
+			{Meta: hi, Present: true},
+			{Meta: hi, Present: false}, // absent: must be dropped
+		})
+		if len(got) != 2 {
+			t.Fatalf("len = %d, want 2 (the absent record must be dropped)", len(got))
+		}
+		if got[0].SourceID() != model.SourceRegistrarRDAP {
+			t.Errorf("got[0] = %q, want registrar-rdap to sort first", got[0].SourceID())
+		}
+	})
+
+	t.Run("ip", func(t *testing.T) {
+		got := presentSorted([]model.IPSourceRecord{
+			{Meta: lo, Present: true},
+			{Meta: hi, Present: true},
+			{Meta: hi, Present: false},
+		})
+		if len(got) != 2 {
+			t.Fatalf("len = %d, want 2 (the absent record must be dropped)", len(got))
+		}
+		if got[0].SourceID() != model.SourceRegistrarRDAP {
+			t.Errorf("got[0] = %q, want registrar-rdap to sort first", got[0].SourceID())
+		}
+	})
+
+	t.Run("asn", func(t *testing.T) {
+		got := presentSorted([]model.ASNSourceRecord{
+			{Meta: lo, Present: true},
+			{Meta: hi, Present: true},
+			{Meta: hi, Present: false},
+		})
+		if len(got) != 2 {
+			t.Fatalf("len = %d, want 2 (the absent record must be dropped)", len(got))
+		}
+		if got[0].SourceID() != model.SourceRegistrarRDAP {
+			t.Errorf("got[0] = %q, want registrar-rdap to sort first", got[0].SourceID())
+		}
+	})
+}
+
 func TestMerge_LifecycleNilForMalformedDomain(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -884,4 +938,47 @@ func TestMerge_LifecycleNilForMalformedDomain(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestStatusAsymmetry_EPPDropIsDomainOnly pins the deliberate difference
+// between domain status merging and RIR status merging, in both
+// directions.
+//
+// Domain status drops a bare EPP status when a client-/server-prefixed
+// variant of the same status is present -- "transferProhibited" is
+// redundant next to "clientTransferProhibited". RIR statuses have no such
+// convention, so IP and ASN must keep every distinct string.
+//
+// Without the second half of this test, unifying all three status
+// functions would look correct and silently apply an EPP rule to RIR
+// data. Without the first half, it would silently regress the domain
+// drop step.
+func TestStatusAsymmetry_EPPDropIsDomainOnly(t *testing.T) {
+	meta := model.SourceResult{Source: model.SourceRegistryRDAP}
+	epp := []string{"clientTransferProhibited", "transferProhibited"}
+
+	t.Run("domain drops the redundant bare status", func(t *testing.T) {
+		var st mergeState
+		got := st.status([]model.SourceRecord{{Meta: meta, Present: true, Status: epp}})
+		want := []string{"clientTransferProhibited"}
+		if !slices.Equal(got.Value, want) {
+			t.Errorf("domain status = %q, want %q (bare transferProhibited is redundant)", got.Value, want)
+		}
+	})
+
+	t.Run("ip keeps both strings", func(t *testing.T) {
+		got := statusUnion([]model.IPSourceRecord{{Meta: meta, Present: true, Status: epp}})
+		want := []string{"clientTransferProhibited", "transferProhibited"}
+		if !slices.Equal(got.Value, want) {
+			t.Errorf("ip status = %q, want %q -- the EPP drop rule must not reach RIR data", got.Value, want)
+		}
+	})
+
+	t.Run("asn keeps both strings", func(t *testing.T) {
+		got := statusUnion([]model.ASNSourceRecord{{Meta: meta, Present: true, Status: epp}})
+		want := []string{"clientTransferProhibited", "transferProhibited"}
+		if !slices.Equal(got.Value, want) {
+			t.Errorf("asn status = %q, want %q -- the EPP drop rule must not reach RIR data", got.Value, want)
+		}
+	})
 }

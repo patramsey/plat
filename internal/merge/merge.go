@@ -53,21 +53,80 @@ type mergeState struct {
 	redactions []model.RedactionNotice
 }
 
-func presentSorted(sources []model.SourceRecord) []model.SourceRecord {
-	out := make([]model.SourceRecord, 0, len(sources))
+// presentable is the consumer-side interface presentSorted needs: a
+// source record that knows whether it carried data and which source it
+// came from. Declared here rather than in model because model has no use
+// for it -- the Go idiom is that the consumer declares the interface.
+type presentable interface {
+	IsPresent() bool
+	SourceID() model.SourceID
+}
+
+// presentSorted drops absent source records and orders the rest by merge
+// precedence. The insertion sort is preserved from the three per-type
+// copies this replaced: it is stable, and the ordering it produces is
+// load-bearing for every downstream merge decision.
+func presentSorted[T presentable](sources []T) []T {
+	out := make([]T, 0, len(sources))
 	for _, s := range sources {
-		if s.Present {
+		if s.IsPresent() {
 			out = append(out, s)
 		}
 	}
 	for i := 1; i < len(out); i++ {
 		j := i
-		for j > 0 && model.Rank(out[j-1].Meta.Source) > model.Rank(out[j].Meta.Source) {
+		for j > 0 && model.Rank(out[j-1].SourceID()) > model.Rank(out[j].SourceID()) {
 			out[j-1], out[j] = out[j], out[j-1]
 			j--
 		}
 	}
 	return out
+}
+
+// statusSource is what statusUnion needs. It deliberately does NOT embed
+// presentable: statusUnion receives an already-filtered slice and never
+// reads IsPresent, and an interface should require only what it uses.
+type statusSource interface {
+	SourceID() model.SourceID
+	Statuses() []string
+}
+
+// statusUnion merges RIR status strings across sources, deduplicating and
+// sorting for deterministic output.
+//
+// It serves IP and ASN only. Domain status is NOT merged here: it needs
+// dropRedundantBareStatuses, which removes a bare EPP status when a
+// client-/server-prefixed variant is present. That encodes gTLD registry
+// vocabulary; RIR statuses carry no such convention and are passed
+// through unchanged (see the Status field comment in model/ip.go).
+// Sharing one function would either drop that step for domains or apply
+// an EPP rule to RIR data. model.SourceRecord has no Statuses method, so
+// passing a domain record here is a compile error rather than a silent
+// behavior change.
+func statusUnion[T statusSource](present []T) model.Field[[]string] {
+	seen := map[string]bool{}
+	var order []string
+	var contributors []model.SourceID
+	for _, s := range present {
+		if len(s.Statuses()) == 0 {
+			continue
+		}
+		contributors = append(contributors, s.SourceID())
+		for _, st := range s.Statuses() {
+			if st == "" || seen[st] {
+				continue
+			}
+			seen[st] = true
+			order = append(order, st)
+		}
+	}
+	if len(contributors) == 0 {
+		return model.Field[[]string]{}
+	}
+	// Sorted last for the same reason as domain status() below:
+	// deterministic output regardless of upstream ordering.
+	sort.Strings(order)
+	return model.Field[[]string]{Value: order, Sources: contributors}
 }
 
 type scalarCandidate struct {

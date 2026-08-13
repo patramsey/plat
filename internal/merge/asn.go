@@ -1,8 +1,6 @@
 package merge
 
 import (
-	"sort"
-
 	"github.com/patramsey/plat/internal/model"
 )
 
@@ -17,7 +15,7 @@ func MergeASN(sources []model.ASNSourceRecord) model.ASNRecord {
 		rec.Sources = append(rec.Sources, s.Meta)
 	}
 
-	present := presentSortedASN(sources)
+	present := presentSorted(sources)
 	st := &mergeState{}
 
 	str := func(field string, get func(model.ASNSourceRecord) string) model.Field[string] {
@@ -48,7 +46,7 @@ func MergeASN(sources []model.ASNSourceRecord) model.ASNRecord {
 	rec.Registered = st.timestamp(model.FieldASNRegistered, regCands)
 	rec.Updated = st.timestamp(model.FieldASNUpdated, updCands)
 
-	rec.Status = asnStatus(present)
+	rec.Status = statusUnion(present)
 
 	for _, s := range present {
 		st.redactions = append(st.redactions, s.Redactions...)
@@ -56,50 +54,4 @@ func MergeASN(sources []model.ASNSourceRecord) model.ASNRecord {
 	rec.Conflicts = st.conflicts
 	rec.Redacted = st.redactions
 	return rec
-}
-
-func presentSortedASN(sources []model.ASNSourceRecord) []model.ASNSourceRecord {
-	out := make([]model.ASNSourceRecord, 0, len(sources))
-	for _, s := range sources {
-		if s.Present {
-			out = append(out, s)
-		}
-	}
-	for i := 1; i < len(out); i++ {
-		j := i
-		for j > 0 && model.Rank(out[j-1].Meta.Source) > model.Rank(out[j].Meta.Source) {
-			out[j-1], out[j] = out[j], out[j-1]
-			j--
-		}
-	}
-	return out
-}
-
-// asnStatus unions status values across sources, mirroring the domain
-// status() helper's union-not-conflict policy (and ipStatus's identical
-// reasoning for IP networks).
-func asnStatus(present []model.ASNSourceRecord) model.Field[[]string] {
-	seen := map[string]bool{}
-	var order []string
-	var contributors []model.SourceID
-	for _, s := range present {
-		if len(s.Status) == 0 {
-			continue
-		}
-		contributors = append(contributors, s.Meta.Source)
-		for _, st := range s.Status {
-			if st == "" || seen[st] {
-				continue
-			}
-			seen[st] = true
-			order = append(order, st)
-		}
-	}
-	if len(contributors) == 0 {
-		return model.Field[[]string]{}
-	}
-	// Sorted last for the same reason as domain status() in merge.go:
-	// deterministic output regardless of upstream ordering.
-	sort.Strings(order)
-	return model.Field[[]string]{Value: order, Sources: contributors}
 }

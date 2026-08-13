@@ -72,7 +72,7 @@ func TestMergeIP_RDAPWinsOnConflict(t *testing.T) {
 }
 
 // TestMergeIP_StatusIsSortedRegardlessOfInputOrder covers issue #49's
-// deterministic-ordering fix for ipStatus's union, which shares the
+// deterministic-ordering fix for statusUnion's union, which shares the
 // identical append-union shape as domain nameservers/status.
 func TestMergeIP_StatusIsSortedRegardlessOfInputOrder(t *testing.T) {
 	want := []string{"active", "allocated", "reassigned"}

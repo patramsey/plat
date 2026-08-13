@@ -54,6 +54,18 @@ type Result struct {
 	MediaTypeConformant bool
 }
 
+// rdapObject is satisfied by every RDAP response type this package
+// decodes. It exists because Go generics cannot read struct fields
+// through a type parameter -- only methods -- so fetchAt reaches each
+// response's objectClassName through this instead of the field directly.
+type rdapObject interface {
+	objectClass() string
+}
+
+func (d DomainResponse) objectClass() string    { return d.ObjectClassName }
+func (n IPNetworkResponse) objectClass() string { return n.ObjectClassName }
+func (a ASNResponse) objectClass() string       { return a.ObjectClassName }
+
 // Client is a minimal RDAP client for a single registry domain query.
 type Client struct {
 	HTTP      *http.Client
@@ -196,11 +208,20 @@ func (c *Client) DomainURL(ctx context.Context, rawURL string) (*Result, error) 
 	return c.domainAt(ctx, rawURL)
 }
 
-// domainAt is the shared fetch-and-parse core for both Domain and
-// DomainURL — every existing behavior of Domain (429 retry, 404 handling,
-// malformed-response tolerance, the objectClassName check) lives here
-// unchanged from before this method was extracted.
-func (c *Client) domainAt(ctx context.Context, reqURL string) (*Result, error) {
+// fetchAt is the shared fetch-and-parse core behind Domain, IP, and ASN:
+// one 429 retry honoring Retry-After, 404 mapped to ErrDomainNotFound with
+// the Result still populated, rdapError title decoding for other 4xx/5xx,
+// and MalformedResponseError for anything that isn't a JSON object of the
+// expected objectClassName.
+//
+// A free function rather than a method on *Client because Go does not
+// allow type parameters on methods.
+func fetchAt[T rdapObject](
+	c *Client,
+	ctx context.Context,
+	reqURL, wantClass string,
+	assign func(*Result, *T),
+) (*Result, error) {
 	resp, err := c.do(ctx, reqURL)
 	if err != nil {
 		return nil, err
@@ -252,15 +273,15 @@ func (c *Client) domainAt(ctx context.Context, reqURL string) (*Result, error) {
 		}
 	}
 
-	var domain DomainResponse
-	if err := json.Unmarshal(trimmed, &domain); err != nil {
+	var obj T
+	if err := json.Unmarshal(trimmed, &obj); err != nil {
 		return result, &MalformedResponseError{
 			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
 			Snippet: snippet(resp.Body), Err: err,
 		}
 	}
 
-	if domain.ObjectClassName != "domain" {
+	if obj.objectClass() != wantClass {
 		var rerr rdapError
 		if json.Unmarshal(trimmed, &rerr) == nil && rerr.ErrorCode != 0 {
 			return result, fmt.Errorf("rdap: %s returned errorCode %d: %s", reqURL, rerr.ErrorCode, rerr.Title)
@@ -271,8 +292,15 @@ func (c *Client) domainAt(ctx context.Context, reqURL string) (*Result, error) {
 		}
 	}
 
-	result.Domain = &domain
+	assign(result, &obj)
 	return result, nil
+}
+
+// domainAt fetches and decodes a domain object via fetchAt. Used by both
+// Domain and DomainURL.
+func (c *Client) domainAt(ctx context.Context, reqURL string) (*Result, error) {
+	return fetchAt(c, ctx, reqURL, "domain",
+		func(r *Result, d *DomainResponse) { r.Domain = d })
 }
 
 // IP queries baseURL for the given address's network object. baseURL is
@@ -286,83 +314,10 @@ func (c *Client) IP(ctx context.Context, baseURL string, addr netip.Addr) (*Resu
 	return c.ipAt(ctx, reqURL)
 }
 
-// ipAt is the shared fetch-and-parse core for IP queries -- a sibling of
-// domainAt with the same 429 retry, 404 handling, and malformed-response
-// tolerance, differing only in the decode target, the objectClassName
-// check, and which Result field gets populated.
+// ipAt fetches and decodes an IP network object via fetchAt.
 func (c *Client) ipAt(ctx context.Context, reqURL string) (*Result, error) {
-	resp, err := c.do(ctx, reqURL)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode == http.StatusTooManyRequests {
-		select {
-		case <-time.After(retryAfter(resp.Header)):
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-		resp, err = c.do(ctx, reqURL)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	mediaType, _, _ := mime.ParseMediaType(contentType)
-	conformant := mediaType == "application/rdap+json"
-
-	result := &Result{
-		Raw:                 resp.Body,
-		StatusCode:          resp.StatusCode,
-		ContentType:         contentType,
-		MediaTypeConformant: conformant,
-	}
-
-	if resp.StatusCode == http.StatusNotFound {
-		return result, ErrDomainNotFound
-	}
-
-	if resp.StatusCode >= 400 {
-		var rerr rdapError
-		if json.Unmarshal(bytes.TrimSpace(resp.Body), &rerr) == nil && rerr.Title != "" {
-			return result, fmt.Errorf("rdap: %s returned %d: %s", reqURL, resp.StatusCode, rerr.Title)
-		}
-		return result, &MalformedResponseError{
-			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
-			Snippet: snippet(resp.Body),
-		}
-	}
-
-	trimmed := bytes.TrimSpace(resp.Body)
-	if len(trimmed) == 0 || trimmed[0] != '{' {
-		return result, &MalformedResponseError{
-			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
-			Snippet: snippet(resp.Body),
-		}
-	}
-
-	var ipNetwork IPNetworkResponse
-	if err := json.Unmarshal(trimmed, &ipNetwork); err != nil {
-		return result, &MalformedResponseError{
-			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
-			Snippet: snippet(resp.Body), Err: err,
-		}
-	}
-
-	if ipNetwork.ObjectClassName != "ip network" {
-		var rerr rdapError
-		if json.Unmarshal(trimmed, &rerr) == nil && rerr.ErrorCode != 0 {
-			return result, fmt.Errorf("rdap: %s returned errorCode %d: %s", reqURL, rerr.ErrorCode, rerr.Title)
-		}
-		return result, &MalformedResponseError{
-			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
-			Snippet: snippet(resp.Body),
-		}
-	}
-
-	result.IPNetwork = &ipNetwork
-	return result, nil
+	return fetchAt(c, ctx, reqURL, "ip network",
+		func(r *Result, n *IPNetworkResponse) { r.IPNetwork = n })
 }
 
 // ASN queries baseURL for the given autonomous system number's autnum
@@ -376,81 +331,8 @@ func (c *Client) ASN(ctx context.Context, baseURL string, asn uint32) (*Result, 
 	return c.asnAt(ctx, reqURL)
 }
 
-// asnAt is the shared fetch-and-parse core for ASN queries -- a sibling of
-// domainAt and ipAt with the same 429 retry, 404 handling, and
-// malformed-response tolerance, differing only in the decode target, the
-// objectClassName check, and which Result field gets populated.
+// asnAt fetches and decodes an autnum object via fetchAt.
 func (c *Client) asnAt(ctx context.Context, reqURL string) (*Result, error) {
-	resp, err := c.do(ctx, reqURL)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode == http.StatusTooManyRequests {
-		select {
-		case <-time.After(retryAfter(resp.Header)):
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-		resp, err = c.do(ctx, reqURL)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	mediaType, _, _ := mime.ParseMediaType(contentType)
-	conformant := mediaType == "application/rdap+json"
-
-	result := &Result{
-		Raw:                 resp.Body,
-		StatusCode:          resp.StatusCode,
-		ContentType:         contentType,
-		MediaTypeConformant: conformant,
-	}
-
-	if resp.StatusCode == http.StatusNotFound {
-		return result, ErrDomainNotFound
-	}
-
-	if resp.StatusCode >= 400 {
-		var rerr rdapError
-		if json.Unmarshal(bytes.TrimSpace(resp.Body), &rerr) == nil && rerr.Title != "" {
-			return result, fmt.Errorf("rdap: %s returned %d: %s", reqURL, resp.StatusCode, rerr.Title)
-		}
-		return result, &MalformedResponseError{
-			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
-			Snippet: snippet(resp.Body),
-		}
-	}
-
-	trimmed := bytes.TrimSpace(resp.Body)
-	if len(trimmed) == 0 || trimmed[0] != '{' {
-		return result, &MalformedResponseError{
-			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
-			Snippet: snippet(resp.Body),
-		}
-	}
-
-	var asnResp ASNResponse
-	if err := json.Unmarshal(trimmed, &asnResp); err != nil {
-		return result, &MalformedResponseError{
-			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
-			Snippet: snippet(resp.Body), Err: err,
-		}
-	}
-
-	if asnResp.ObjectClassName != "autnum" {
-		var rerr rdapError
-		if json.Unmarshal(trimmed, &rerr) == nil && rerr.ErrorCode != 0 {
-			return result, fmt.Errorf("rdap: %s returned errorCode %d: %s", reqURL, rerr.ErrorCode, rerr.Title)
-		}
-		return result, &MalformedResponseError{
-			URL: reqURL, StatusCode: resp.StatusCode, ContentType: contentType,
-			Snippet: snippet(resp.Body),
-		}
-	}
-
-	result.ASN = &asnResp
-	return result, nil
+	return fetchAt(c, ctx, reqURL, "autnum",
+		func(r *Result, a *ASNResponse) { r.ASN = a })
 }

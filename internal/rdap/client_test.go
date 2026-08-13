@@ -767,3 +767,33 @@ func TestRetryAfter(t *testing.T) {
 		})
 	}
 }
+
+// TestIP_WrongObjectClassIsMalformed overlaps TestClient_IP_WrongObjectClassName
+// (above): both hit the same *MalformedResponseError, non-nil Result, and
+// nil-IPNetwork assertions. It's kept for the one assertion the older test
+// doesn't make — that res.Raw still retains the exact response body when the
+// objectClassName check fails.
+func TestIP_WrongObjectClassIsMalformed(t *testing.T) {
+	body := `{"objectClassName":"domain","ldhName":"EXAMPLE.COM"}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	c := &Client{}
+	res, err := c.IP(context.Background(), srv.URL, netip.MustParseAddr("8.8.8.8"))
+	if err == nil {
+		t.Fatal("expected an error when objectClassName is not \"ip network\"")
+	}
+	var mre *MalformedResponseError
+	if !errors.As(err, &mre) {
+		t.Fatalf("err = %T (%v), want *MalformedResponseError", err, err)
+	}
+	if res == nil || string(res.Raw) != body {
+		t.Error("raw body should still be retained when objectClassName is wrong")
+	}
+	if res != nil && res.IPNetwork != nil {
+		t.Error("IPNetwork must stay nil when the class check fails")
+	}
+}
