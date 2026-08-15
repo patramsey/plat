@@ -19,8 +19,8 @@ func TestIANACache_CachesAfterFirstResolve(t *testing.T) {
 		return Hop{Server: "whois.verisign-grs.com"}
 	}
 
-	first := c.resolve("com", query)
-	second := c.resolve("com", query)
+	first, _ := c.resolve("com", query)
+	second, _ := c.resolve("com", query)
 
 	if calls != 1 {
 		t.Errorf("query called %d times, want 1 -- the second resolve should have hit the cache", calls)
@@ -35,8 +35,8 @@ func TestIANACache_CachesAfterFirstResolve(t *testing.T) {
 // for a .org lookup.
 func TestIANACache_DifferentTLDsResolveIndependently(t *testing.T) {
 	c := NewIANACache()
-	com := c.resolve("com", func() Hop { return Hop{Server: "whois.verisign-grs.com"} })
-	org := c.resolve("org", func() Hop { return Hop{Server: "whois.pir.org"} })
+	com, _ := c.resolve("com", func() Hop { return Hop{Server: "whois.verisign-grs.com"} })
+	org, _ := c.resolve("org", func() Hop { return Hop{Server: "whois.pir.org"} })
 
 	if com.Server == org.Server {
 		t.Fatalf("com and org resolved to the same server %q -- cache is not keyed per tld", com.Server)
@@ -72,7 +72,7 @@ func TestIANACache_SingleFlightsConcurrentSameTLD(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			results[i] = c.resolve("com", query)
+			results[i], _ = c.resolve("com", query)
 		}(i)
 	}
 
@@ -94,13 +94,13 @@ func TestIANACache_SingleFlightsConcurrentSameTLD(t *testing.T) {
 	}
 }
 
-// TestIANACache_CachesFailureToo pins a deliberate design choice: a hop
-// that came back with an error is cached too, not just a successful one.
-// Re-querying an already-failing IANA server for every subsequent
-// same-TLD name in the run would recreate the bottleneck the cache exists
-// to remove, and a repeated failure is itself useful information for the
-// rest of the run.
-func TestIANACache_CachesFailureToo(t *testing.T) {
+// TestIANACache_DoesNotCacheFailures pins the deliberate design choice
+// that only a SUCCESSFUL hop is cached. Caching a failure would let one
+// transient IANA error poison that TLD for every remaining name in the
+// run: a single dropped connection would cost the whole run its .com
+// WHOIS chains rather than costing one name. Before the cache existed
+// each name retried independently, and not caching failures keeps that.
+func TestIANACache_DoesNotCacheFailures(t *testing.T) {
 	c := NewIANACache()
 	var calls int32
 	sentinel := errors.New("dial failed")
@@ -109,13 +109,73 @@ func TestIANACache_CachesFailureToo(t *testing.T) {
 		return Hop{Err: sentinel}
 	}
 
-	first := c.resolve("net", query)
-	second := c.resolve("net", query)
+	first, _ := c.resolve("net", query)
+	second, _ := c.resolve("net", query)
 
-	if calls != 1 {
-		t.Errorf("query called %d times, want 1 -- a failed hop should still be cached", calls)
+	if calls != 2 {
+		t.Errorf("query called %d times, want 2 -- a failed hop must not be cached, so the next name retries", calls)
 	}
 	if first.Err == nil || second.Err == nil {
-		t.Fatalf("expected both resolves to return the cached error, got first.Err=%v second.Err=%v", first.Err, second.Err)
+		t.Fatalf("expected both resolves to return the error, got first.Err=%v second.Err=%v", first.Err, second.Err)
+	}
+
+	// And a later success still populates the cache normally.
+	c.resolve("net", func() Hop { return Hop{Server: "whois.verisign-grs.com"} }) //nolint:errcheck // return value is asserted via the next resolve
+	hop, _ := c.resolve("net", func() Hop {
+		t.Error("resolve queried again after a successful hop was cached")
+		return Hop{}
+	})
+	if hop.Server != "whois.verisign-grs.com" {
+		t.Errorf("hop.Server = %q, want the cached success", hop.Server)
+	}
+}
+
+// TestIANACache_ReportsBlockedTimeOnlyForInheritedFetches pins the
+// duration resolve reports alongside the hop. A caller that ran the fetch
+// itself did the network work and is told it blocked for zero; a caller
+// that merely waited for someone else's in-flight fetch did no network
+// work at all and is told how long it waited, so ianaHop can credit that
+// time back to its chain budget instead of letting another name's pacing
+// slot eat this name's network budget.
+func TestIANACache_ReportsBlockedTimeOnlyForInheritedFetches(t *testing.T) {
+	c := NewIANACache()
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+
+	var winnerBlocked time.Duration
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, winnerBlocked = c.resolve("com", func() Hop {
+			close(started)
+			<-release
+			return Hop{Server: "whois.verisign-grs.com"}
+		})
+	}()
+
+	// Once the fetch is under way the cache is still cold, so this
+	// caller cannot take the fast path and must join the singleflight --
+	// making it deterministically the one that inherits the result.
+	<-started
+	const held = 50 * time.Millisecond
+	go func() {
+		time.Sleep(held)
+		close(release)
+	}()
+	hop, blocked := c.resolve("com", func() Hop {
+		t.Error("the inheriting caller ran its own fetch")
+		return Hop{}
+	})
+	<-done
+
+	if hop.Server != "whois.verisign-grs.com" {
+		t.Errorf("inherited hop.Server = %q, want whois.verisign-grs.com", hop.Server)
+	}
+	if blocked < held {
+		t.Errorf("inheriting caller reported blocked=%v, want at least %v -- that wait is what ianaHop credits back", blocked, held)
+	}
+	if winnerBlocked != 0 {
+		t.Errorf("fetching caller reported blocked=%v, want 0 -- it spent that time on the wire, not waiting", winnerBlocked)
 	}
 }

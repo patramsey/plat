@@ -27,31 +27,46 @@ func (c *Client) hop(ctx context.Context, server, queryDomain, tld string) Hop {
 	return h
 }
 
+// beginChain returns ctx carrying a fresh whole-chain network budget when
+// c.ChainTimeout is set, and ctx untouched otherwise (the standalone
+// case, where each hop is bounded only by c.Timeout). Every entry point
+// that chases a referral chain calls this exactly once, so the budget is
+// per-Lookup rather than per-Client -- a Client stays reentrant and safe
+// to share.
+func (c *Client) beginChain(ctx context.Context) context.Context {
+	if c.ChainTimeout <= 0 {
+		return ctx
+	}
+	return withChain(ctx, c.ChainTimeout)
+}
+
 // ianaHop resolves tld's registry WHOIS server via the IANA hop, going
 // through c.IANACache when set so a run's concurrent same-TLD lookups
-// share one IANA query instead of one each (see IANACache's doc comment
-// and C1b in the fix-wave review this addresses).
+// share one IANA query instead of one each (see IANACache's doc comment).
 //
-// With no cache (the single-lookup case), this is exactly c.hop under
-// ctx, same as every other hop -- Acquire's own redirect to pacingCtx
-// (inside query) already keeps the pacing wait off ctx's deadline; the
-// actual dial+read still counts against it, preserving the documented
-// "total wall time across IANA -> registry -> registrar never exceeds
-// timeout" invariant unchanged.
+// A caller that loses the race to another name's in-flight fetch blocks
+// until that fetch returns and then inherits its result, having done no
+// network work of its own -- so that block, exactly like a pacing wait,
+// is credited back to this caller's chain budget rather than charged
+// against it. Without that, an unlucky same-TLD name could spend its
+// entire budget waiting on the winner's pacing slot and then fail its
+// registry hop, which is the same defect as charging pacing directly,
+// one indirection removed.
 //
-// With a cache, the fetch behind a cache miss runs under c.pacingCtx
-// instead: because one caller's query result can be handed to every other
-// concurrent same-TLD caller (via IANACache's singleflight), it must not
-// be bound by any single one of their per-chain deadlines -- only by the
-// run's own cancellation, same reasoning as Acquire's redirect.
+// The winning caller runs the fetch under its own ctx, budget included.
+// Every caller reaches its IANA hop as the FIRST hop of its own chain, so
+// the winner always has the full ChainTimeout available here -- being
+// bound by its own budget is therefore no tighter than the plain per-hop
+// Timeout it would otherwise get.
 func (c *Client) ianaHop(ctx context.Context, tld string) Hop {
 	if c.IANACache == nil {
 		return c.hop(ctx, c.ianaServer(), tld, "")
 	}
-	fetchCtx := c.pacingCtx(ctx)
-	return c.IANACache.resolve(tld, func() Hop {
-		return c.hop(fetchCtx, c.ianaServer(), tld, "")
+	hop, blocked := c.IANACache.resolve(tld, func() Hop {
+		return c.hop(ctx, c.ianaServer(), tld, "")
 	})
+	creditChain(ctx, blocked)
+	return hop
 }
 
 // QueryServer performs a single WHOIS query against server for name, with
@@ -74,6 +89,7 @@ func (c *Client) QueryServer(ctx context.Context, server string, name domain.Nam
 // a `Registrar WHOIS Server:` line. It returns a non-nil error only if
 // every attempted hop failed.
 func (c *Client) Lookup(ctx context.Context, name domain.Name) (*Result, error) {
+	ctx = c.beginChain(ctx)
 	result := &Result{Domain: name.Punycode}
 
 	// IANA's whois.iana.org response is always plain key: value text,
@@ -111,6 +127,7 @@ func (c *Client) Lookup(ctx context.Context, name domain.Name) (*Result, error) 
 // RIR. Verified against live infrastructure -- whois.iana.org answers an
 // IP query with a "refer:" line pointing at the holding RIR.
 func (c *Client) LookupIP(ctx context.Context, addr netip.Addr) (*Result, error) {
+	ctx = c.beginChain(ctx)
 	q := addr.String()
 	result := &Result{Domain: q}
 
@@ -157,6 +174,7 @@ func (c *Client) ipHop(ctx context.Context, server, query string) Hop {
 // each answer that form directly (ARIN's plain numeric form without the
 // prefix, e.g. "15169", returns no match at all).
 func (c *Client) LookupASN(ctx context.Context, asn uint32) (*Result, error) {
+	ctx = c.beginChain(ctx)
 	q := "AS" + strconv.FormatUint(uint64(asn), 10)
 	result := &Result{Domain: q}
 

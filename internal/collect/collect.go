@@ -20,7 +20,19 @@ type Options struct {
 	// registry response advertises one.
 	NoFollow bool
 	// Timeout bounds each individual fetch (registry RDAP, registrar
-	// RDAP, and the whole WHOIS chain).
+	// RDAP) and, for the WHOIS chain, the total time that chain spends
+	// TALKING TO SERVERS across its IANA -> registry -> registrar hops.
+	//
+	// Time the WHOIS chain spends deliberately idle is excluded from that
+	// budget: when Limiter is set, a pacing wait is credited back, as is
+	// a wait on another name's in-flight IANACache fetch. A bulk run's
+	// limiter spaces queries to one server by a full second, so with a
+	// plain wall-clock budget the Nth name to want a busy server would
+	// reach its dial already out of time and lose that source silently.
+	// Wall time across the chain can therefore exceed Timeout by however
+	// long it sat waiting its turn; time on the wire cannot. With no
+	// Limiter and no IANACache -- a single lookup -- there is nothing to
+	// credit and the two readings coincide exactly.
 	Timeout time.Duration
 	// Sources restricts which of the four possible sources Collect
 	// includes in its output. nil (the zero value) means all four are
@@ -102,13 +114,11 @@ func Collect(ctx context.Context, name domain.Name, registryBaseURL string, whoi
 	wg.Wait()
 
 	if opts.allows(model.SourceRegistrarWHOIS) && registrarPort43 != "" && !hasSource(whoisOut, model.SourceRegistrarWHOIS) {
-		// ctx here is Collect's own parameter -- nothing above has
-		// wrapped it in an additional context.WithTimeout the way
-		// collectWHOIS does for its own chain, so it already is the
-		// pre-timeout context pacing needs. Set explicitly (rather than
-		// relying on Client.pacingCtx's ctx fallback) so this stays
-		// correct even if that changes later.
-		whoisClient := &whois.Client{Timeout: opts.Timeout, Limiter: opts.Limiter, PacingCtx: ctx}
+		// No ChainTimeout: this is a single direct query, not a referral
+		// chain, so opts.Timeout as the per-hop bound is the whole story.
+		// Any pacing wait ahead of it happens before that per-hop
+		// deadline is taken, so it costs this query nothing either.
+		whoisClient := &whois.Client{Timeout: opts.Timeout, Limiter: opts.Limiter}
 		hop := whoisClient.QueryServer(ctx, registrarPort43, name)
 		whoisOut = append(whoisOut, fromHop(model.SourceRegistrarWHOIS, hop))
 	}
@@ -165,24 +175,18 @@ func collectWHOIS(ctx context.Context, name domain.Name, whoisIANAServer string,
 		timeout = 5 * time.Second // matches whois.Client.timeout()'s own default
 	}
 	// Bound the WHOIS chain as a whole, not just each hop — see
-	// Options.Timeout's doc comment. whois.Client still applies its own
-	// per-hop context.WithTimeout inside query(), but nested inside this
-	// outer deadline (context.WithTimeout always takes the earlier of two
-	// nested deadlines), so a hop's own budget only ever shrinks as
-	// earlier hops spend it, and the total wall time across
-	// IANA -> registry -> registrar never exceeds timeout.
-	//
-	// pacingCtx is captured before that wrap, deliberately: it carries
-	// this call's cancellation but not the chain deadline about to be
-	// applied below, so a Limiter pacing wait is never charged against
-	// the same budget as the actual network hops (C1 in the fix-wave
-	// review this addresses -- see whois.Client.PacingCtx's doc comment
-	// for the full failure mode this avoids).
-	pacingCtx := ctx
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter, PacingCtx: pacingCtx, IANACache: opts.IANACache}
+	// Options.Timeout's doc comment. ChainTimeout, rather than wrapping
+	// ctx here in a context.WithTimeout: a context deadline is pure wall
+	// clock and cannot be pushed out once set, so an outer deadline would
+	// charge the chain for the seconds a bulk run's Limiter deliberately
+	// idles it before each dial. whois.Client carries the budget itself
+	// instead, shortening each hop's own timeout to what remains and
+	// crediting deliberate idling back — so the timeout bounds the time
+	// the chain spends on the wire, which is the thing it exists to
+	// bound. With no Limiter and no IANACache (a single lookup) nothing
+	// is ever credited and this behaves exactly like the outer deadline
+	// it replaces.
+	whoisClient := &whois.Client{Timeout: timeout, ChainTimeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter, IANACache: opts.IANACache}
 	wResult, _ := whoisClient.Lookup(ctx, name)
 	for _, sr := range FromWHOIS(wResult) {
 		if opts.allows(sr.Meta.Source) {

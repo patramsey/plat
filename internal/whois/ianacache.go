@@ -2,6 +2,7 @@ package whois
 
 import (
 	"sync"
+	"time"
 
 	"golang.org/x/sync/singleflight"
 )
@@ -39,18 +40,34 @@ func NewIANACache() *IANACache {
 // at all. Every later caller, including ones that lost the singleflight
 // race, is served the cached result without touching the network again.
 //
-// Both a successful and a failed hop are cached. A repeated IANA failure
-// is itself useful information for the rest of the run, and re-querying
-// an already-failing IANA server for every subsequent same-TLD name would
-// recreate the very bottleneck this cache exists to remove.
-func (c *IANACache) resolve(tld string, query func() Hop) Hop {
+// Only a SUCCESSFUL hop is cached. Caching a failure would let one
+// transient IANA error -- a dropped connection, a rate-limit, a truncated
+// reply -- poison that TLD for every remaining name in the run, turning a
+// blip that used to cost one name its WHOIS chain into one that costs
+// every same-TLD name theirs. Before this cache existed each name
+// retried independently; not caching failures keeps that. The
+// singleflight still applies to a failing fetch, so concurrent callers
+// share one attempt rather than stampeding; it is only later names that
+// get a fresh try.
+//
+// resolve also reports how long the caller spent BLOCKED on another
+// caller's in-flight fetch: zero for a cache hit and zero for the caller
+// that ran the fetch itself, and the full wait for one that merely
+// inherited the result. A blocked caller did no network work of its own,
+// so ianaHop credits that time back to its chain budget -- see ianaHop.
+func (c *IANACache) resolve(tld string, query func() Hop) (Hop, time.Duration) {
 	c.mu.RLock()
 	hop, ok := c.hops[tld]
 	c.mu.RUnlock()
 	if ok {
-		return hop
+		return hop, 0
 	}
 
+	start := time.Now()
+	// Set inside the closure below, which singleflight runs synchronously
+	// on the winning caller's own goroutine -- so this stays a plain
+	// local read/written by one goroutine, never shared.
+	var ranFetch bool
 	v, _, _ := c.group.Do(tld, func() (any, error) {
 		c.mu.RLock()
 		hop, ok := c.hops[tld]
@@ -59,12 +76,19 @@ func (c *IANACache) resolve(tld string, query func() Hop) Hop {
 			return hop, nil
 		}
 
+		ranFetch = true
 		h := query()
 
-		c.mu.Lock()
-		c.hops[tld] = h
-		c.mu.Unlock()
+		if h.Err == nil {
+			c.mu.Lock()
+			c.hops[tld] = h
+			c.mu.Unlock()
+		}
 		return h, nil
 	})
-	return v.(Hop) //nolint:errcheck // the Do closure above never returns an error
+	hop = v.(Hop) //nolint:errcheck // the Do closure above never returns an error
+	if ranFetch {
+		return hop, 0
+	}
+	return hop, time.Since(start)
 }
