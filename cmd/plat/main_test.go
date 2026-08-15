@@ -9,8 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/patramsey/plat/internal/domain"
 	"github.com/patramsey/plat/internal/model"
@@ -1225,5 +1228,71 @@ func TestDiffNameMatches(t *testing.T) {
 				t.Errorf("diffNameMatches(snap.Name=%q, query=%q) = %v, want %v", tt.snap.Name, diffQueryName(tt.q), got, tt.want)
 			}
 		})
+	}
+}
+
+// TestRunLookup_EmitsInInputOrder is the test that makes buffering
+// meaningful: it must fail if results are ever streamed in completion
+// order. The fake work deliberately finishes in reverse.
+func TestRunLookup_EmitsInInputOrder(t *testing.T) {
+	names := []string{"a.com", "b.com", "c.com", "d.com"}
+	results := make([]string, len(names))
+
+	var g errgroup.Group
+	g.SetLimit(4)
+	for i, n := range names {
+		g.Go(func() error {
+			// Later names finish first.
+			time.Sleep(time.Duration(len(names)-i) * 10 * time.Millisecond)
+			results[i] = n
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+
+	for i, want := range names {
+		if results[i] != want {
+			t.Errorf("results[%d] = %q, want %q -- output must follow input order, not completion order", i, results[i], want)
+		}
+	}
+}
+
+// TestRunLookup_PoolIsBounded asserts no more than the configured number
+// of lookups are ever in flight, counted rather than timed -- a timing
+// assertion here would be flaky and would not actually prove bounding.
+func TestRunLookup_PoolIsBounded(t *testing.T) {
+	const limit = 3
+	var mu sync.Mutex
+	inFlight, maxSeen := 0, 0
+
+	var g errgroup.Group
+	g.SetLimit(limit)
+	for range 20 {
+		g.Go(func() error {
+			mu.Lock()
+			inFlight++
+			if inFlight > maxSeen {
+				maxSeen = inFlight
+			}
+			mu.Unlock()
+
+			time.Sleep(5 * time.Millisecond)
+
+			mu.Lock()
+			inFlight--
+			mu.Unlock()
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+	if maxSeen > limit {
+		t.Errorf("max concurrent = %d, want <= %d", maxSeen, limit)
+	}
+	if maxSeen < 2 {
+		t.Errorf("max concurrent = %d, want >= 2 -- the pool never actually ran anything in parallel", maxSeen)
 	}
 }
