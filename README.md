@@ -166,7 +166,9 @@ plat example.com --no-follow
 # instead of the full view -- ignored for -o json/ndjson
 plat example.com -q
 
-# Adjust the per-source timeout (default 5s)
+# Adjust the per-source timeout (default 5s). It bounds time spent
+# talking to a server: in a bulk run, the time a name spends waiting its
+# turn for a paced WHOIS server is not charged against it.
 plat example.com --timeout 10s
 
 # Show the per-source diagnostic block: which sources were attempted,

@@ -223,7 +223,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 		return usageError{err}
 	})
 	root.Flags().BoolVar(&refreshBootstrap, "refresh-bootstrap", false, "force a fresh fetch of the IANA RDAP bootstrap file")
-	root.Flags().DurationVar(&timeout, "timeout", 5*time.Second, "per-source timeout for bootstrap, RDAP, and WHOIS lookups")
+	root.Flags().DurationVar(&timeout, "timeout", 5*time.Second, "per-source timeout for bootstrap, RDAP, and WHOIS lookups; bounds time spent talking to a server, not time a bulk run spends waiting its turn")
 	root.Flags().StringVarP(&output, "output", "o", "", "output format: human, plain, json, ndjson (default: auto-detect from terminal)")
 	root.Flags().BoolVar(&raw, "raw", false, "include raw source payloads (json/ndjson only)")
 	root.Flags().StringVar(&sourceFilter, "source", "", "restrict to one source: rdap, whois, registry, registrar")
