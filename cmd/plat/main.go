@@ -140,6 +140,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var quiet bool
 	var noColorFlag bool
 	var diffPath string
+	var filePath string
 
 	root := &cobra.Command{
 		Use:           "plat <domain|ip|asn> [domain|ip|asn...]",
@@ -151,6 +152,15 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 				// --version is a valid zero-arg invocation -- skip the
 				// no-args-shows-help path below entirely; RunE handles
 				// printing and returns before runLookup is ever reached.
+				return nil
+			}
+			if filePath != "" {
+				// --file supplies the name list in place of positional
+				// args -- "plat --file names.txt" with zero cliArgs is
+				// the flag's primary use case, not a bare invocation
+				// asking for help. runLookup does its own validation
+				// (mutual exclusivity with positional args, file-open,
+				// and empty-list errors) once RunE resolves the list.
 				return nil
 			}
 			if len(cliArgs) < 1 {
@@ -184,6 +194,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 				Quiet:            quiet,
 				NoColor:          noColorFlag,
 				DiffPath:         diffPath,
+				FilePath:         filePath,
 			}, ui)
 		},
 	}
@@ -211,6 +222,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	root.Flags().BoolVarP(&quiet, "quiet", "q", false, "print a one-line summary per domain (lock status, expiry, conflict count) instead of the full view -- ignored for -o json/ndjson")
 	root.Flags().BoolVar(&noColorFlag, "no-color", false, "disable color output (same effect as the NO_COLOR env var)")
 	root.Flags().StringVar(&diffPath, "diff", "", "compare the lookup against a saved -o json snapshot; exits 4 if anything changed")
+	root.Flags().StringVar(&filePath, "file", "", "read names from a file, one per line (- for stdin); blank lines and # comments are skipped")
 
 	// `completion` is a real subcommand (M7, cobra's built-in generator);
 	// man pages are a build-time-only artifact (M7's gendocs, not a
@@ -261,6 +273,11 @@ type lookupOptions struct {
 	// was not passed -- the zero value for every existing caller, so no
 	// prior behavior changes when it's unset.
 	DiffPath string
+	// FilePath is the --file flag's value: a path to a file of names, one
+	// per line ("-" for stdin), read in place of positional domain args.
+	// Empty means --file was not passed -- the zero value for every
+	// existing caller, so no prior behavior changes when it's unset.
+	FilePath string
 	// whoisIANAServer overrides the WHOIS server lookupOne queries first
 	// to resolve a TLD's registry server (see collect.Collect's
 	// whoisIANAServer parameter). Unexported and unset by every real flag
@@ -282,6 +299,29 @@ func effectiveNoColor(ui uiConfig, noColorFlag bool) bool {
 // bootstrap resolver once, then loops domains sequentially — each
 // domain's own outcome (0/1/2/3) is tracked and the worst wins overall.
 func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, opts lookupOptions, ui uiConfig) error {
+	if opts.FilePath != "" {
+		if len(domains) > 0 {
+			return usageError{fmt.Errorf("--file and names on the command line are mutually exclusive")}
+		}
+		var r io.Reader = os.Stdin
+		if opts.FilePath != "-" {
+			f, err := os.Open(opts.FilePath) //nolint:gosec // a user-supplied path is the point of the flag
+			if err != nil {
+				return usageError{fmt.Errorf("--file: %w", err)}
+			}
+			defer func() { _ = f.Close() }()
+			r = f
+		}
+		names, err := readNameList(r)
+		if err != nil {
+			return usageError{err}
+		}
+		if len(names) == 0 {
+			return usageError{fmt.Errorf("--file: no names found in %s", opts.FilePath)}
+		}
+		domains = names
+	}
+
 	format, err := render.Select(opts.Output, render.IsTerminal(os.Stdout), effectiveNoColor(ui, opts.NoColor))
 	if err != nil {
 		return usageError{err}
