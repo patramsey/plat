@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,12 +16,14 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/patramsey/plat/internal/bootstrap"
 	"github.com/patramsey/plat/internal/domain"
 	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/render"
 	"github.com/patramsey/plat/internal/render/human"
 	"github.com/patramsey/plat/internal/render/machine"
+	"github.com/patramsey/plat/internal/whois"
 )
 
 func TestExitCode(t *testing.T) {
@@ -1294,5 +1297,105 @@ func TestRunLookup_PoolIsBounded(t *testing.T) {
 	}
 	if maxSeen < 2 {
 		t.Errorf("max concurrent = %d, want >= 2 -- the pool never actually ran anything in parallel", maxSeen)
+	}
+}
+
+// TestRunLookup_EndToEnd_EmitsInInputOrder is what TestRunLookup_EmitsInInputOrder
+// above does NOT prove: that runLookup itself -- not just the errgroup
+// primitive it's built on -- emits in input order rather than completion
+// order. It drives the real path (runLookup, not lookupOne directly) through
+// two names that reach the render step, using the fake-WHOIS-listener
+// pattern from lookupone_test.go, with "slow.com" listed first but rigged
+// to finish decisively later than "fast.net" (listed second). If runLookup
+// ever regressed to flushing in completion order, "Fast Registrar" would
+// appear before "Slow Registrar" in stdout.
+//
+// Both names share one fake IANA server (as runLookup's own single
+// opts.whoisIANAServer override -- and real whois.iana.org in
+// production -- always does for every name in a run), so runLookup's own
+// per-run HostLimiter (whois.NewHostLimiter(whois.DefaultWHOISInterval),
+// built automatically for any run of more than one name) paces both
+// names' IANA hop against that one shared host. Because that pacing picks
+// whichever goroutine reaches Acquire first essentially at random, the
+// *other* one absorbs a wait of up to one full DefaultWHOISInterval before
+// its registry hop even starts -- so the artificial gap between the two
+// names' registry-hop response times has to be decisively larger than
+// DefaultWHOISInterval, not just larger than zero, or this test would
+// pass or fail depending on which goroutine happened to win that race
+// rather than on whether output order is actually correct. slow.com and
+// fast.net get separate fake registry WHOIS servers precisely so that,
+// unlike the shared IANA hop, their registry hops are on different hosts
+// and never pace against each other (whois.HostLimiter's whole point --
+// see its doc comment) -- only slow.com's registry response carries the
+// deliberate delay. See the worked-through timing below.
+func TestRunLookup_EndToEnd_EmitsInInputOrder(t *testing.T) {
+	// slowDelay must exceed whois.DefaultWHOISInterval by a decisive
+	// margin. Worked through for both possible outcomes of the shared-IANA-
+	// host race (each name's IANA-hop wait is either ~0 or ~1
+	// DefaultWHOISInterval, and every other hop below is on a private,
+	// unshared host so it never adds pacing wait of its own):
+	//
+	//   race won by fast.net: fast.net total ~= 0 (no IANA wait, no
+	//     registry delay). slow.com total ~= 0 (no IANA wait) + slowDelay.
+	//     fast.net finishes first as long as slowDelay > 0.
+	//   race won by slow.com: slow.com total ~= 0 (no IANA wait) +
+	//     slowDelay. fast.net total ~= 1 DefaultWHOISInterval (lost the
+	//     race) + 0 (no registry delay). fast.net finishes first only if
+	//     slowDelay > ~1 DefaultWHOISInterval.
+	//
+	// So the binding constraint is the second case: slowDelay must clear
+	// one full DefaultWHOISInterval with margin to spare for scheduling
+	// jitter. 3x gives a 2x-interval cushion either way.
+	const slowDelay = 3 * whois.DefaultWHOISInterval
+
+	// No RDAP coverage for either TLD -- degrades to WHOIS-only, same as
+	// TestLookupOne_WHOISOnlyDegradedMode, so this test's only variable is
+	// the WHOIS timing, not RDAP/WHOIS merge behavior.
+	resolver := bootstrap.NewResolver(map[string]string{})
+
+	slowRegistryAddr := startFakeWHOISListener(t, func(query string) string {
+		time.Sleep(slowDelay)
+		return "Domain Name: SLOW.COM\nRegistrar: Slow Registrar, Inc.\n"
+	})
+	fastRegistryAddr := startFakeWHOISListener(t, func(query string) string {
+		return "Domain Name: FAST.NET\nRegistrar: Fast Registrar, Inc.\n"
+	})
+	// One shared IANA server for both names -- see the doc comment above
+	// for why that's deliberate, not an oversight. Dispatches on the TLD
+	// each name's IANA hop queries with (name.TLD, per
+	// internal/whois/referral.go's Lookup), which is exactly why slow.com
+	// and fast.net need to differ in TLD, not just in second-level label.
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		switch strings.TrimSpace(query) {
+		case "com":
+			return "refer: " + slowRegistryAddr + "\n"
+		case "net":
+			return "refer: " + fastRegistryAddr + "\n"
+		default:
+			t.Errorf("unexpected IANA query %q", query)
+			return ""
+		}
+	})
+
+	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{
+		whoisIANAServer: ianaAddr,
+		NoFollow:        true,
+		Concurrency:     2, // must be >= 2 for the two lookups to genuinely overlap
+	}
+	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"slow.com", "fast.net"}, opts, nil, render.FormatPlain, uiConfig{}, resolver)
+	if err != nil {
+		t.Fatalf("runLookupPool: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+
+	out := stdout.String()
+	slowIdx := strings.Index(out, "Slow Registrar")
+	fastIdx := strings.Index(out, "Fast Registrar")
+	if slowIdx == -1 || fastIdx == -1 {
+		t.Fatalf("stdout missing one or both registrar names, got:\n%s", out)
+	}
+	if slowIdx > fastIdx {
+		t.Errorf("output has fast.net's record before slow.com's, but slow.com was listed first on the command line -- "+
+			"output must follow input order, not completion order (fast.net finished first by design). got:\n%s", out)
 	}
 }

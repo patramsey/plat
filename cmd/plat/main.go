@@ -385,6 +385,21 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 		return fmt.Errorf("resolving RDAP bootstrap: %w", err)
 	}
 
+	return runLookupPool(ctx, stdout, stderr, domains, opts, sources, format, ui, resolver)
+}
+
+// runLookupPool builds the bounded worker pool (opts.Concurrency workers)
+// and flushes results to stdout in input order, never completion order.
+// Split out of runLookup so tests can drive this, the actual pool/ordering
+// logic, directly against an already-resolved *bootstrap.Resolver (e.g.
+// one built via bootstrap.NewResolver against a fake RDAP server, exactly
+// like every lookupOne test in lookupone_test.go already does) instead of
+// going through runLookup's real bootstrap.Load fetch/cache/embedded
+// chain, which always hits the network or the embedded snapshot and can't
+// be pointed at a hermetic fake. This is the same "escape hatch for
+// tests" shape as lookupOptions.whoisIANAServer on the WHOIS side --
+// runLookup's real behavior is unchanged, this only names the seam.
+func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []string, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, resolver *bootstrap.Resolver) error {
 	// One limiter shared by every worker, so pacing is per WHOIS server
 	// across the whole run rather than per lookup. A single name needs no
 	// pacing at all -- keyed on the name count, not on whether --file was
