@@ -12,12 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/patramsey/plat/internal/bootstrap"
 	"github.com/patramsey/plat/internal/domain"
@@ -1237,77 +1234,11 @@ func TestDiffNameMatches(t *testing.T) {
 	}
 }
 
-// TestRunLookup_EmitsInInputOrder is the test that makes buffering
-// meaningful: it must fail if results are ever streamed in completion
-// order. The fake work deliberately finishes in reverse.
-func TestRunLookup_EmitsInInputOrder(t *testing.T) {
-	names := []string{"a.com", "b.com", "c.com", "d.com"}
-	results := make([]string, len(names))
-
-	var g errgroup.Group
-	g.SetLimit(4)
-	for i, n := range names {
-		g.Go(func() error {
-			// Later names finish first.
-			time.Sleep(time.Duration(len(names)-i) * 10 * time.Millisecond)
-			results[i] = n
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		t.Fatalf("Wait: %v", err)
-	}
-
-	for i, want := range names {
-		if results[i] != want {
-			t.Errorf("results[%d] = %q, want %q -- output must follow input order, not completion order", i, results[i], want)
-		}
-	}
-}
-
-// TestRunLookup_PoolIsBounded asserts no more than the configured number
-// of lookups are ever in flight, counted rather than timed -- a timing
-// assertion here would be flaky and would not actually prove bounding.
-func TestRunLookup_PoolIsBounded(t *testing.T) {
-	const limit = 3
-	var mu sync.Mutex
-	inFlight, maxSeen := 0, 0
-
-	var g errgroup.Group
-	g.SetLimit(limit)
-	for range 20 {
-		g.Go(func() error {
-			mu.Lock()
-			inFlight++
-			if inFlight > maxSeen {
-				maxSeen = inFlight
-			}
-			mu.Unlock()
-
-			time.Sleep(5 * time.Millisecond)
-
-			mu.Lock()
-			inFlight--
-			mu.Unlock()
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		t.Fatalf("Wait: %v", err)
-	}
-	if maxSeen > limit {
-		t.Errorf("max concurrent = %d, want <= %d", maxSeen, limit)
-	}
-	if maxSeen < 2 {
-		t.Errorf("max concurrent = %d, want >= 2 -- the pool never actually ran anything in parallel", maxSeen)
-	}
-}
-
 // TestRunLookupPool_BoundsRealLookupOneConcurrency is I2's pool-bounding
-// test: unlike TestRunLookup_PoolIsBounded above (which drives a
-// standalone errgroup, never calling into plat's own code at all -- proven
-// by mutation: making runLookupPool's g.SetLimit(opts.Concurrency) inert
-// still left that test, and 186 others, passing), this drives
+// test. It replaced a TestRunLookup_PoolIsBounded that constructed its own
+// errgroup and never called into plat's own code at all -- proven inert by
+// mutation: making runLookupPool's g.SetLimit(opts.Concurrency) a no-op
+// still left that test, and 186 others, passing. This one drives
 // runLookupPool itself and counts how many lookupOne calls are
 // simultaneously mid-flight, via a real RDAP server every worker queries.
 //
@@ -1419,9 +1350,10 @@ func TestRunLookup_ConcurrencyOneIsValid(t *testing.T) {
 	}
 }
 
-// TestRunLookup_EndToEnd_EmitsInInputOrder is what TestRunLookup_EmitsInInputOrder
-// above does NOT prove: that runLookup itself -- not just the errgroup
-// primitive it's built on -- emits in input order rather than completion
+// TestRunLookup_EndToEnd_EmitsInInputOrder proves what its since-deleted
+// predecessor TestRunLookup_EmitsInInputOrder did NOT: that runLookup
+// itself -- not just the errgroup primitive it's built on, which was all
+// that test ever exercised -- emits in input order rather than completion
 // order. It drives the real path (runLookup, not lookupOne directly) through
 // two names that reach the render step, using the fake-WHOIS-listener
 // pattern from lookupone_test.go, with "slow.com" listed first but rigged

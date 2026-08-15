@@ -91,3 +91,70 @@ func TestRunFunc_ReevaluatesMessage(t *testing.T) {
 		}
 	}
 }
+
+// TestRunFunc_RepaintsFullWidthWhenTheMessageShrinks covers draw's
+// shrink-padding, which had no test at all: reverting
+// `lineLen = len(line) + len(pad)` to `lineLen = len(line)` left the whole
+// suite green.
+//
+// The property is that every frame repaints at least as many columns as
+// the widest frame drawn so far, and that the final clear blanks that
+// full width. Tracking only the current line's own length instead looks
+// harmless -- each draw still pads to the width of the draw before it, so
+// in a terminal nobody else is writing to, the columns beyond have
+// already been blanked by an earlier frame. That reasoning is exactly
+// what does not hold here: runLookupPool drives this spinner on the same
+// stderr row that every worker's error diagnostics write to, so a frame
+// that repaints only part of the row can leave another writer's tail
+// standing next to the counter.
+//
+// The message shrinks after the first frame, which is what makes the two
+// versions diverge: the first frame is wide, and every frame after it
+// must still be padded out to that width rather than settling down to
+// the short message's own.
+func TestRunFunc_RepaintsFullWidthWhenTheMessageShrinks(t *testing.T) {
+	const long = "looking up... 1/10 (resolving a rather long name)"
+	const short = "9/10"
+
+	var calls atomic.Int64
+	var buf bytes.Buffer
+	RunFunc(&buf, func() string {
+		if calls.Add(1) == 1 {
+			return long
+		}
+		return short
+	}, func() {
+		// Long enough for the initial draw plus at least two ticks --
+		// the divergence only shows from the second shortened frame on.
+		time.Sleep(3*interval + interval/2)
+	})
+
+	out := buf.String()
+	if !strings.HasSuffix(out, "\r") {
+		t.Fatalf("expected output to end with a bare carriage return, got: %q", out)
+	}
+	// "\r" + line1 + "\r" + line2 ... + "\r" + clear + "\r" splits into a
+	// leading empty element, one element per drawn line, the clear, and a
+	// trailing empty element.
+	parts := strings.Split(out[:len(out)-1], "\r")
+	if len(parts) < 5 {
+		t.Fatalf("expected at least three draws plus a clear, got %d segments: %q", len(parts)-1, out)
+	}
+	lines, cleared := parts[1:len(parts)-1], parts[len(parts)-1]
+
+	widest := 0
+	for i, line := range lines {
+		if len(line) < widest {
+			t.Errorf("frame %d repainted %d columns after an earlier frame drew %d -- a shrinking message must stay padded to the widest line drawn so far, got %q", i, len(line), widest, line)
+		}
+		if len(line) > widest {
+			widest = len(line)
+		}
+	}
+	if strings.TrimSpace(cleared) != "" {
+		t.Errorf("final clear wrote non-blank text: %q", cleared)
+	}
+	if len(cleared) < widest {
+		t.Errorf("final clear blanked %d columns, want at least %d (the widest line drawn)", len(cleared), widest)
+	}
+}
