@@ -106,6 +106,21 @@ plat example.com
 # Multiple domains in one invocation
 plat example.com example.org
 
+# Bulk mode: read names from a file, one per line -- blank lines and
+# # comments are skipped -- or from stdin with -
+plat --file names.txt
+cat names.txt | plat --file -
+
+# Names are looked up concurrently (--concurrency, default 4; also
+# applies to names given on the command line), but results are always
+# emitted in input order regardless of which lookup finishes first, so
+# two runs of the same list produce identical output. WHOIS queries are
+# paced per server -- including referral hops to registrar servers -- so
+# a large single-TLD list cannot hammer one server. A long bulk run also
+# prints a "looking up... N/total" progress counter to stderr (TTY only;
+# suppressed for piped/redirected output and for -o json/ndjson).
+plat --file names.txt --concurrency 8 -o ndjson > results.ndjson
+
 # IP-address lookup — the netblock and its holding organization, from
 # the RIR's RDAP + WHOIS, merged the same way (see "IP Lookups" below)
 plat 8.8.8.8

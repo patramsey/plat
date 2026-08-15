@@ -2,8 +2,11 @@ package spinner
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestRun_ExecutesWorkAndReturns(t *testing.T) {
@@ -62,5 +65,29 @@ func TestRun_ClearsItsLineOnCompletion(t *testing.T) {
 	cleared := out[lastCR+1 : len(out)-1]
 	if strings.TrimSpace(cleared) != "" {
 		t.Errorf("expected only blank padding between the last draw and the final clear, got: %q", cleared)
+	}
+}
+
+// TestRunFunc_ReevaluatesMessage pins that the message function is called
+// per frame rather than once. Without this, a counter would render its
+// starting value for the whole run and look frozen.
+func TestRunFunc_ReevaluatesMessage(t *testing.T) {
+	var n atomic.Int64
+	var buf bytes.Buffer
+
+	RunFunc(&buf, func() string {
+		return fmt.Sprintf("%d/10", n.Load())
+	}, func() {
+		for i := range 10 {
+			n.Store(int64(i + 1))
+			time.Sleep(interval + interval/2)
+		}
+	})
+
+	out := buf.String()
+	for _, want := range []string{"1/10", "10/10"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output never showed %q -- the message func is not being re-evaluated:\n%q", want, out)
+		}
 	}
 }

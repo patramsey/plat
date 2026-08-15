@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"charm.land/lipgloss/v2"
@@ -301,6 +302,14 @@ type lookupOptions struct {
 	// of this package's own tests, which construct lookupOptions directly
 	// to point it at a fake local listener.
 	whoisIANAServer string
+	// SuppressSpinner disables the three per-name spinners in lookupOne's
+	// domain/IP/ASN branches. Set by runLookupPool when it is driving its
+	// own progress counter over the same stderr line -- without this, a
+	// per-name spinner and the bulk counter would both write \r-prefixed
+	// lines to that line concurrently and produce garbage. False (every
+	// existing caller's zero value) for a single-name run, which has no
+	// counter and keeps its per-name spinner exactly as before.
+	SuppressSpinner bool
 }
 
 // effectiveNoColor reports whether color output should be suppressed:
@@ -426,13 +435,40 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 
 	var g errgroup.Group
 	g.SetLimit(opts.Concurrency)
-	for i, input := range domains {
-		g.Go(func() error {
-			codes[i] = lookupOne(ctx, &bufs[i], syncStderr, resolver, input, opts, sources, format, ui)
-			return nil
-		})
+
+	// The counter is shown only under the same TTY-and-human condition the
+	// per-name spinners use, and only when there is more than one name --
+	// a single name gets no counter and no pool-level spinner at all,
+	// exactly as before this task. When the counter is active, every
+	// worker's per-name spinner must be suppressed (SuppressSpinner):
+	// otherwise a per-name spinner and this counter would both write
+	// \r-prefixed lines to the same stderr row concurrently and produce
+	// garbage.
+	showCounter := ui.StderrTTY && format == render.FormatHuman && len(domains) > 1
+	opts.SuppressSpinner = showCounter
+
+	// done is incremented by every worker after lookupOne returns and read
+	// by the counter's message function, which runs from RunFunc's
+	// animation goroutine -- atomic.Int64 keeps both sides race-free
+	// regardless of whether the counter is actually shown.
+	var done atomic.Int64
+	runPool := func() {
+		for i, input := range domains {
+			g.Go(func() error {
+				codes[i] = lookupOne(ctx, &bufs[i], syncStderr, resolver, input, opts, sources, format, ui)
+				done.Add(1)
+				return nil
+			})
+		}
+		_ = g.Wait() // no worker returns a non-nil error; each records its own exit code
 	}
-	_ = g.Wait() // no worker returns a non-nil error; each records its own exit code
+	if showCounter {
+		spinner.RunFunc(stderr, func() string {
+			return fmt.Sprintf("looking up... %d/%d", done.Load(), len(domains))
+		}, runPool)
+	} else {
+		runPool()
+	}
 
 	worst := 0
 	for i := range domains {
@@ -641,7 +677,7 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, resolver *bo
 	work := func() {
 		records = collect.Collect(ctx, q.Name, baseURL, opts.whoisIANAServer, collectOpts)
 	}
-	if ui.StderrTTY && format == render.FormatHuman {
+	if ui.StderrTTY && format == render.FormatHuman && !opts.SuppressSpinner {
 		spinner.Run(stderr, "looking up "+q.Name.Punycode+"...", work)
 	} else {
 		work()
@@ -686,7 +722,7 @@ func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, resolver *bootst
 	work := func() {
 		records = collect.CollectIP(ctx, q.IP, baseURL, opts.whoisIANAServer, collectOpts)
 	}
-	if ui.StderrTTY && format == render.FormatHuman {
+	if ui.StderrTTY && format == render.FormatHuman && !opts.SuppressSpinner {
 		spinner.Run(stderr, "looking up "+q.Input+"...", work)
 	} else {
 		work()
@@ -731,7 +767,7 @@ func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, resolver *boots
 	work := func() {
 		records = collect.CollectASN(ctx, q.ASN, baseURL, opts.whoisIANAServer, collectOpts)
 	}
-	if ui.StderrTTY && format == render.FormatHuman {
+	if ui.StderrTTY && format == render.FormatHuman && !opts.SuppressSpinner {
 		spinner.Run(stderr, "looking up "+q.Input+"...", work)
 	} else {
 		work()
