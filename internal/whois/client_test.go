@@ -426,6 +426,52 @@ func TestClient_NilLimiterIsSafe(t *testing.T) {
 	}
 }
 
+// TestClient_LookupAcquiresLimiterForEveryHop drives a full three-hop
+// IANA -> registry -> registrar referral chain (mirroring
+// TestClient_ReferralChasing's setup) with a Limiter set, and proves the
+// choke-point placement inside query -- not just a single direct call to
+// it -- actually covers every hop Lookup makes. Asserting only the count
+// would also pass if the same server were paced three times instead of
+// three distinct servers once each, so this checks the recorded servers
+// slice itself, in order.
+func TestClient_LookupAcquiresLimiterForEveryHop(t *testing.T) {
+	registrarAddr := startListener(t, func(query string) string {
+		return "Domain Name: example.com\nRegistrant Organization: Example Corp\nRegistrar: Example Registrar, Inc.\n"
+	})
+
+	registryAddr := startListener(t, func(query string) string {
+		return fmt.Sprintf("Domain Name: EXAMPLE.COM\nRegistrar WHOIS Server: %s\nRegistrar: Example Registrar, Inc.\n", registrarAddr)
+	})
+
+	ianaAddr := startListener(t, func(query string) string {
+		return fmt.Sprintf("whois:        %s\ndomain:       COM\n", registryAddr)
+	})
+
+	f := &fakeLimiter{}
+	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second, Limiter: f}
+	q, err := domain.Normalize("example.com")
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	result, err := c.Lookup(context.Background(), q.Name)
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if len(result.Hops) != 3 {
+		t.Fatalf("Hops = %d, want 3", len(result.Hops))
+	}
+
+	want := []string{ianaAddr, registryAddr, registrarAddr}
+	if len(f.servers) != len(want) {
+		t.Fatalf("limiter acquired %d times, want %d (one per hop): got %v", len(f.servers), len(want), f.servers)
+	}
+	for i, server := range want {
+		if f.servers[i] != server {
+			t.Errorf("limiter acquisition %d = %q, want %q (distinct server per hop, in order)", i, f.servers[i], server)
+		}
+	}
+}
+
 func TestLookupASN_FollowsIANAReferral(t *testing.T) {
 	var rirReceived string
 	rirAddr := startListener(t, func(q string) string {
