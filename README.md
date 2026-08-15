@@ -117,8 +117,9 @@ cat names.txt | plat --file -
 # two runs of the same list produce identical output. WHOIS queries are
 # paced per server -- including referral hops to registrar servers -- so
 # a large single-TLD list cannot hammer one server. A long bulk run also
-# prints a "looking up... N/total" progress counter to stderr (TTY only;
-# suppressed for piped/redirected output and for -o json/ndjson).
+# prints a "looking up... N/total" progress counter to stderr when stderr
+# is a terminal and output is the default human format (suppressed for
+# piped/redirected output and for -o plain/json/ndjson).
 plat --file names.txt --concurrency 8 -o ndjson > results.ndjson
 
 # IP-address lookup — the netblock and its holding organization, from

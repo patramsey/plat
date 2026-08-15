@@ -514,9 +514,11 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 // lookupOne performs one domain's normalize -> collect -> merge ->
 // render-or-report flow and returns that domain's exit code (0/2/1/3;
 // 2 only for a per-domain normalize failure). Collect runs behind a
-// spinner (on stderr) only when stderr is a real terminal and the output
-// format is FormatHuman — never for Plain/JSON/NDJSON, and never when
-// stderr is redirected even if stdout is a terminal.
+// spinner (on stderr) only when stderr is a real terminal, the output
+// format is FormatHuman, and opts.SuppressSpinner is false — never for
+// Plain/JSON/NDJSON, never when stderr is redirected even if stdout is a
+// terminal, and never when runLookupPool's own bulk-run progress counter
+// is already driving that stderr line (SuppressSpinner).
 func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, input string, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
 	q, err := domain.Normalize(input)
 	if err != nil {

@@ -63,7 +63,7 @@ func RunFunc(w io.Writer, message func() string, work func()) {
 		if n := lineLen - len(line); n > 0 {
 			pad = strings.Repeat(" ", n)
 		}
-		lineLen = len(line)
+		lineLen = len(line) + len(pad)
 		_, _ = fmt.Fprint(w, "\r"+line+pad)
 	}
 
