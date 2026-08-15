@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1297,6 +1300,122 @@ func TestRunLookup_PoolIsBounded(t *testing.T) {
 	}
 	if maxSeen < 2 {
 		t.Errorf("max concurrent = %d, want >= 2 -- the pool never actually ran anything in parallel", maxSeen)
+	}
+}
+
+// TestRunLookupPool_BoundsRealLookupOneConcurrency is I2's pool-bounding
+// test: unlike TestRunLookup_PoolIsBounded above (which drives a
+// standalone errgroup, never calling into plat's own code at all -- proven
+// by mutation: making runLookupPool's g.SetLimit(opts.Concurrency) inert
+// still left that test, and 186 others, passing), this drives
+// runLookupPool itself and counts how many lookupOne calls are
+// simultaneously mid-flight, via a real RDAP server every worker queries.
+//
+// This deliberately goes through RDAP, not WHOIS: every name shares one
+// registry (one bootstrap.NewResolver entry, one httptest.Server), but
+// WHOIS's own per-server HostLimiter/IANACache (the C1 fix elsewhere in
+// this change) would otherwise serialize or cache away the very
+// concurrency this test needs to observe -- a shared WHOIS listener is
+// not a clean proxy for pool concurrency once pacing and caching are
+// correctly in place. RDAP has no such pacing, so each of numDomains
+// names makes exactly one concurrent-safe-to-observe HTTP request
+// (sources restricted to registry-rdap only, NoFollow skips the
+// registrar hop) and the handler's in-flight counter directly reflects
+// how many lookupOne calls the pool let run at once. If
+// g.SetLimit(opts.Concurrency) is ever made inert, maxInFlight blows past
+// concurrency (approaching len(domains)) and this test fails.
+func TestRunLookupPool_BoundsRealLookupOneConcurrency(t *testing.T) {
+	const numDomains = 8
+	const concurrency = 3
+	const hopDelay = 60 * time.Millisecond
+
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+
+	var inFlight, maxInFlight int32
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&inFlight, 1)
+		for {
+			cur := atomic.LoadInt32(&maxInFlight)
+			if n <= cur || atomic.CompareAndSwapInt32(&maxInFlight, cur, n) {
+				break
+			}
+		}
+		time.Sleep(hopDelay)
+		atomic.AddInt32(&inFlight, -1)
+
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixture)
+	}))
+	defer rdapSrv.Close()
+
+	domains := make([]string, numDomains)
+	for i := range domains {
+		domains[i] = fmt.Sprintf("name%d.com", i)
+	}
+
+	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
+	opts := lookupOptions{NoFollow: true, Concurrency: concurrency}
+	sources := []model.SourceID{model.SourceRegistryRDAP}
+	var stdout, stderr bytes.Buffer
+	if err := runLookupPool(context.Background(), &stdout, &stderr, domains, opts, sources, render.FormatPlain, uiConfig{}, resolver); err != nil {
+		t.Fatalf("runLookupPool: %v\nstderr:\n%s", err, stderr.String())
+	}
+
+	got := atomic.LoadInt32(&maxInFlight)
+	if got > concurrency {
+		t.Errorf("max concurrent lookups = %d, want <= %d (opts.Concurrency)", got, concurrency)
+	}
+	if got < 2 {
+		t.Errorf("max concurrent lookups = %d, want >= 2 -- the pool never actually overlapped anything", got)
+	}
+}
+
+// TestRunLookup_ConcurrencyMustBeAtLeastOne is I2's usage-error coverage
+// for the "< 1" guard in runLookup: 0 and negative values must be
+// rejected as a usage error (exit 2, a message naming --concurrency)
+// before any bootstrap/network work happens -- proven by mutation:
+// breaking the guard (e.g. widening it to "< 0") left 187 tests passing.
+// The guard runs before runLookup's bootstrap.Load call, so this needs no
+// fake resolver or network access to stay hermetic.
+func TestRunLookup_ConcurrencyMustBeAtLeastOne(t *testing.T) {
+	for _, c := range []int{0, -1, -5} {
+		t.Run(fmt.Sprintf("concurrency=%d", c), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			err := runLookup(context.Background(), &stdout, &stderr, []string{"example.com"}, lookupOptions{Concurrency: c}, uiConfig{})
+			var uErr usageError
+			if !errors.As(err, &uErr) {
+				t.Fatalf("runLookup with --concurrency %d returned %v (%T), want a usageError", c, err, err)
+			}
+			if !strings.Contains(uErr.Error(), "--concurrency must be at least 1") {
+				t.Errorf("usageError = %q, want it to name --concurrency and the minimum", uErr.Error())
+			}
+		})
+	}
+}
+
+// TestRunLookup_ConcurrencyOneIsValid is the other half of the "< 1"
+// guard: exactly 1 must NOT be rejected. runLookup necessarily proceeds
+// past the guard into bootstrap.Load (there is no seam in runLookup
+// itself to skip it, unlike runLookupPool's tests elsewhere in this
+// file) -- a tiny Timeout keeps any real network attempt bounded, and
+// Load's own documented fetch/cache/embedded-fallback chain means it
+// still succeeds offline. The domain itself ("also-bad", single-label)
+// then fails domain.Normalize before any further network call, so the
+// only thing this test actually waits on is that bounded bootstrap
+// attempt, not a real WHOIS/RDAP round trip. What's asserted is narrow
+// and precise: whatever runLookup returns, it must not be the
+// "--concurrency must be at least 1" usage error the guard produces for
+// 0 or negative.
+func TestRunLookup_ConcurrencyOneIsValid(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	err := runLookup(context.Background(), &stdout, &stderr, []string{"also-bad"}, lookupOptions{Concurrency: 1, Timeout: 10 * time.Millisecond}, uiConfig{})
+	var uErr usageError
+	if errors.As(err, &uErr) && strings.Contains(uErr.Error(), "--concurrency") {
+		t.Errorf("runLookup with --concurrency 1 was rejected as a usage error: %v", err)
 	}
 }
 
