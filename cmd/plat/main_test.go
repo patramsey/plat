@@ -1399,3 +1399,44 @@ func TestRunLookup_EndToEnd_EmitsInInputOrder(t *testing.T) {
 			"output must follow input order, not completion order (fast.net finished first by design). got:\n%s", out)
 	}
 }
+
+// TestRunLookup_CounterBranch_ConcurrentWithErrorDoesNotRace is a
+// regression test for a real defect: runLookupPool's progress counter was
+// briefly wired to write to raw stderr via spinner.RunFunc, while every
+// worker's own diagnostics (reportLookupError, reached whenever a name
+// fails -- not-found, a normalize failure, a total lookup failure, or -v
+// output) already go through syncStderr, the syncWriter built in Task 4
+// precisely to serialize concurrent writes to the one shared stderr
+// (main.go's syncWriter doc comment explains why). Writing to raw stderr
+// from the counter's animation goroutine while a worker writes through
+// syncStderr concurrently is a data race -- caught reliably under -race --
+// and even without -race, glues the error text onto the counter's
+// in-progress \r line with no reset.
+//
+// No prior committed test drove this branch at all: showCounter requires
+// ui.StderrTTY && format == render.FormatHuman && len(domains) > 1, which
+// the one direct runLookupPool test (TestRunLookup_EndToEnd_EmitsInInputOrder,
+// above) never hits -- it uses FormatPlain and the zero-value uiConfig
+// (StderrTTY: false). So "go test -race" was not actually exercising this
+// code path before this test existed.
+//
+// "localhost" and "also-bad" both fail domain.Normalize before any network
+// call (single-label input, same as TestRun_AcceptsMultipleDomainArgs),
+// so every worker hits reportLookupError immediately and repeatedly
+// relative to the counter's own animation ticks -- maximizing the chance
+// any unsynchronized write gets caught, and keeping the test hermetic and
+// fast (no fake WHOIS/RDAP servers needed).
+func TestRunLookup_CounterBranch_ConcurrentWithErrorDoesNotRace(t *testing.T) {
+	resolver := bootstrap.NewResolver(map[string]string{})
+	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{Concurrency: 2}
+
+	err := runLookupPool(context.Background(), &stdout, &stderr,
+		[]string{"localhost", "also-bad"}, opts, nil, render.FormatHuman,
+		uiConfig{StderrTTY: true}, resolver)
+
+	var sig exitSignal
+	if err != nil && !errors.As(err, &sig) {
+		t.Fatalf("runLookupPool: unexpected error type %v\nstderr:\n%s", err, stderr.String())
+	}
+}

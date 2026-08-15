@@ -463,7 +463,13 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 		_ = g.Wait() // no worker returns a non-nil error; each records its own exit code
 	}
 	if showCounter {
-		spinner.RunFunc(stderr, func() string {
+		// syncStderr, not raw stderr: every worker's diagnostics
+		// (reportLookupError, reached whenever a name errors) already
+		// write through syncStderr concurrently with this animation
+		// goroutine. Writing to raw stderr here races with those writes
+		// and, even without -race, glues error text onto the counter's
+		// in-progress line with no \r reset.
+		spinner.RunFunc(syncStderr, func() string {
 			return fmt.Sprintf("looking up... %d/%d", done.Load(), len(domains))
 		}, runPool)
 	} else {
