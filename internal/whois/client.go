@@ -18,6 +18,10 @@ type Client struct {
 	Timeout time.Duration
 	// Dialer is used to open each TCP connection. Defaults to &net.Dialer{}.
 	Dialer *net.Dialer
+	// Limiter paces outbound queries per server. nil means no pacing,
+	// which is correct for a single lookup: one query to one server
+	// needs no throttle. Bulk runs set it so every worker shares one.
+	Limiter Limiter
 }
 
 func (c *Client) ianaServer() string {
@@ -46,6 +50,12 @@ func (c *Client) dialer() *net.Dialer {
 // query for domain, and read the response to EOF. Bounded to 1 MiB to
 // defend against a runaway or hostile server.
 func (c *Client) query(ctx context.Context, server, domain string) (string, error) {
+	if c.Limiter != nil {
+		if err := c.Limiter.Acquire(ctx, server); err != nil {
+			return "", fmt.Errorf("whois: pacing %s: %w", server, err)
+		}
+	}
+
 	addr := server
 	if _, _, err := net.SplitHostPort(server); err != nil {
 		addr = net.JoinHostPort(server, "43")

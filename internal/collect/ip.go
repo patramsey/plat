@@ -79,7 +79,7 @@ func collectIPWHOIS(ctx context.Context, addr netip.Addr, whoisIANAServer string
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer}
+	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter}
 	result, _ := whoisClient.LookupIP(ctx, addr)
 	return fromIPWHOIS(result)
 }

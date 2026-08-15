@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/netip"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -377,6 +378,51 @@ func TestLookupIP_FollowsIANAReferral(t *testing.T) {
 	}
 	if last.IPFields.NetName != "GOGL" {
 		t.Errorf("NetName = %q, want GOGL", last.IPFields.NetName)
+	}
+}
+
+// fakeLimiter records the servers it was asked to pace, in order.
+type fakeLimiter struct {
+	mu      sync.Mutex
+	servers []string
+}
+
+func (f *fakeLimiter) Acquire(_ context.Context, server string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.servers = append(f.servers, server)
+	return nil
+}
+
+// TestClient_QueryAcquiresLimiterForEveryServer pins that pacing happens
+// at the query choke point, so every WHOIS contact is covered -- including
+// referral hops to a registrar's server, which nothing at the call site
+// has to remember to request.
+func TestClient_QueryAcquiresLimiterForEveryServer(t *testing.T) {
+	addr := startListener(t, func(string) string { return "Domain Name: EXAMPLE.COM\r\n" })
+
+	f := &fakeLimiter{}
+	c := &Client{Timeout: 2 * time.Second, Limiter: f}
+
+	if _, err := c.query(context.Background(), addr, "example.com"); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if len(f.servers) != 1 {
+		t.Fatalf("limiter acquired %d times, want 1", len(f.servers))
+	}
+	if f.servers[0] != addr {
+		t.Errorf("limiter acquired for %q, want %q", f.servers[0], addr)
+	}
+}
+
+// TestClient_NilLimiterIsSafe pins that a single lookup -- which passes no
+// limiter -- still works. A nil Limiter must mean "no pacing", not a panic.
+func TestClient_NilLimiterIsSafe(t *testing.T) {
+	addr := startListener(t, func(string) string { return "Domain Name: EXAMPLE.COM\r\n" })
+
+	c := &Client{Timeout: 2 * time.Second} // Limiter deliberately unset
+	if _, err := c.query(context.Background(), addr, "example.com"); err != nil {
+		t.Fatalf("query with nil Limiter: %v", err)
 	}
 }
 

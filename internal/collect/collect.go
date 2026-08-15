@@ -32,6 +32,9 @@ type Options struct {
 	// happens when needed to reach an allowed downstream source, but
 	// its own SourceRecord is only emitted if it is itself allowed.
 	Sources []model.SourceID
+	// Limiter paces outbound WHOIS queries per server, shared across
+	// every concurrent lookup in a bulk run. nil means no pacing.
+	Limiter whois.Limiter
 }
 
 func (o Options) allows(id model.SourceID) bool {
@@ -94,7 +97,7 @@ func Collect(ctx context.Context, name domain.Name, registryBaseURL string, whoi
 	wg.Wait()
 
 	if opts.allows(model.SourceRegistrarWHOIS) && registrarPort43 != "" && !hasSource(whoisOut, model.SourceRegistrarWHOIS) {
-		whoisClient := &whois.Client{Timeout: opts.Timeout}
+		whoisClient := &whois.Client{Timeout: opts.Timeout, Limiter: opts.Limiter}
 		hop := whoisClient.QueryServer(ctx, registrarPort43, name)
 		whoisOut = append(whoisOut, fromHop(model.SourceRegistrarWHOIS, hop))
 	}
@@ -160,7 +163,7 @@ func collectWHOIS(ctx context.Context, name domain.Name, whoisIANAServer string,
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer}
+	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter}
 	wResult, _ := whoisClient.Lookup(ctx, name)
 	for _, sr := range FromWHOIS(wResult) {
 		if opts.allows(sr.Meta.Source) {

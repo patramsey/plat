@@ -78,7 +78,7 @@ func collectASNWHOIS(ctx context.Context, asn uint32, whoisIANAServer string, op
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer}
+	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter}
 	result, _ := whoisClient.LookupASN(ctx, asn)
 	return fromASNWHOIS(result)
 }
