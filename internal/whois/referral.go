@@ -27,6 +27,33 @@ func (c *Client) hop(ctx context.Context, server, queryDomain, tld string) Hop {
 	return h
 }
 
+// ianaHop resolves tld's registry WHOIS server via the IANA hop, going
+// through c.IANACache when set so a run's concurrent same-TLD lookups
+// share one IANA query instead of one each (see IANACache's doc comment
+// and C1b in the fix-wave review this addresses).
+//
+// With no cache (the single-lookup case), this is exactly c.hop under
+// ctx, same as every other hop -- Acquire's own redirect to pacingCtx
+// (inside query) already keeps the pacing wait off ctx's deadline; the
+// actual dial+read still counts against it, preserving the documented
+// "total wall time across IANA -> registry -> registrar never exceeds
+// timeout" invariant unchanged.
+//
+// With a cache, the fetch behind a cache miss runs under c.pacingCtx
+// instead: because one caller's query result can be handed to every other
+// concurrent same-TLD caller (via IANACache's singleflight), it must not
+// be bound by any single one of their per-chain deadlines -- only by the
+// run's own cancellation, same reasoning as Acquire's redirect.
+func (c *Client) ianaHop(ctx context.Context, tld string) Hop {
+	if c.IANACache == nil {
+		return c.hop(ctx, c.ianaServer(), tld, "")
+	}
+	fetchCtx := c.pacingCtx(ctx)
+	return c.IANACache.resolve(tld, func() Hop {
+		return c.hop(fetchCtx, c.ianaServer(), tld, "")
+	})
+}
+
 // QueryServer performs a single WHOIS query against server for name, with
 // no IANA/registry referral chasing — for a caller that already knows
 // which server to query directly (e.g. a registrar WHOIS server
@@ -53,7 +80,7 @@ func (c *Client) Lookup(ctx context.Context, name domain.Name) (*Result, error) 
 	// regardless of the queried TLD's own template dialect (e.g. brackets
 	// for .jp). Parse it with the default/kv template, not name.TLD, or
 	// the refer: line can go unmatched and truncate the referral chain.
-	ianaHop := c.hop(ctx, c.ianaServer(), name.TLD, "")
+	ianaHop := c.ianaHop(ctx, name.TLD)
 	result.Hops = append(result.Hops, ianaHop)
 
 	if ianaHop.Err == nil && ianaHop.Fields.Refer != "" {

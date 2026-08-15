@@ -35,6 +35,11 @@ type Options struct {
 	// Limiter paces outbound WHOIS queries per server, shared across
 	// every concurrent lookup in a bulk run. nil means no pacing.
 	Limiter whois.Limiter
+	// IANACache caches the WHOIS-server-per-TLD mapping resolved from
+	// the IANA hop, shared across every concurrent lookup in a bulk run
+	// (see whois.IANACache's doc comment). nil means no caching, which
+	// is correct for a single lookup.
+	IANACache *whois.IANACache
 }
 
 func (o Options) allows(id model.SourceID) bool {
@@ -97,7 +102,13 @@ func Collect(ctx context.Context, name domain.Name, registryBaseURL string, whoi
 	wg.Wait()
 
 	if opts.allows(model.SourceRegistrarWHOIS) && registrarPort43 != "" && !hasSource(whoisOut, model.SourceRegistrarWHOIS) {
-		whoisClient := &whois.Client{Timeout: opts.Timeout, Limiter: opts.Limiter}
+		// ctx here is Collect's own parameter -- nothing above has
+		// wrapped it in an additional context.WithTimeout the way
+		// collectWHOIS does for its own chain, so it already is the
+		// pre-timeout context pacing needs. Set explicitly (rather than
+		// relying on Client.pacingCtx's ctx fallback) so this stays
+		// correct even if that changes later.
+		whoisClient := &whois.Client{Timeout: opts.Timeout, Limiter: opts.Limiter, PacingCtx: ctx}
 		hop := whoisClient.QueryServer(ctx, registrarPort43, name)
 		whoisOut = append(whoisOut, fromHop(model.SourceRegistrarWHOIS, hop))
 	}
@@ -160,10 +171,18 @@ func collectWHOIS(ctx context.Context, name domain.Name, whoisIANAServer string,
 	// nested deadlines), so a hop's own budget only ever shrinks as
 	// earlier hops spend it, and the total wall time across
 	// IANA -> registry -> registrar never exceeds timeout.
+	//
+	// pacingCtx is captured before that wrap, deliberately: it carries
+	// this call's cancellation but not the chain deadline about to be
+	// applied below, so a Limiter pacing wait is never charged against
+	// the same budget as the actual network hops (C1 in the fix-wave
+	// review this addresses -- see whois.Client.PacingCtx's doc comment
+	// for the full failure mode this avoids).
+	pacingCtx := ctx
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter}
+	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter, PacingCtx: pacingCtx, IANACache: opts.IANACache}
 	wResult, _ := whoisClient.Lookup(ctx, name)
 	for _, sr := range FromWHOIS(wResult) {
 		if opts.allows(sr.Meta.Source) {

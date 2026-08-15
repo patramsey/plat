@@ -8,11 +8,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/patramsey/plat/internal/domain"
 	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/whois"
 )
 
 func startWHOISListener(t *testing.T, respond func(query string) string) string {
@@ -735,5 +738,118 @@ func TestCollect_WHOISTimeoutBoundsWholeChainNotEachHop(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("expected a registry-whois SourceRecord (even a failed one) in the results")
+	}
+}
+
+// startLoopingWHOISListener is startWHOISListener plus an Accept loop (so
+// it can serve more than one connection, needed by tests that share one
+// fake server across several concurrent Collect calls) and an optional
+// atomic hit counter.
+func startLoopingWHOISListener(t *testing.T, hits *int32, respond func(query string) string) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			if hits != nil {
+				atomic.AddInt32(hits, 1)
+			}
+			go func() {
+				defer func() { _ = conn.Close() }()
+				buf := make([]byte, 4096)
+				n, _ := conn.Read(buf)
+				query := strings.TrimRight(string(buf[:n]), "\r\n")
+				_, _ = conn.Write([]byte(respond(query)))
+			}()
+		}
+	}()
+	return ln.Addr().String()
+}
+
+// TestCollect_BulkSharedLimiterAndIANACacheAllRetainRegistryWHOIS is C1's
+// end-to-end regression test at the collect level: four names split
+// across two TLDs run Collect concurrently, sharing one whois.HostLimiter
+// and one whois.IANACache exactly the way runLookupPool wires a real bulk
+// run (main.go). Before this fix (C1a: pacing waits charged against the
+// per-name chain deadline; C1b: every name re-querying IANA even though
+// the TLD->server mapping is constant for the run), the shared IANA host
+// alone would pace four names to slots 0/200/400/600ms against a 600ms
+// chain deadline, timing at least one of them out before it sent a byte
+// -- silently losing registry-whois with exit code still 0, exactly the
+// live defect this review caught. With both fixes: IANACache means at
+// most one real IANA query per TLD (two here), so pacing on that shared
+// host tops out at 200ms; per-TLD registry-host pacing (two names each)
+// also tops out at 200ms; both fit comfortably inside the 600ms budget.
+func TestCollect_BulkSharedLimiterAndIANACacheAllRetainRegistryWHOIS(t *testing.T) {
+	const interval = 200 * time.Millisecond
+	const timeout = 600 * time.Millisecond
+
+	comRegistry := startLoopingWHOISListener(t, nil, func(query string) string {
+		return "Domain Name: " + strings.ToUpper(query) + "\nRegistrar: Example Registrar, Inc.\n"
+	})
+	orgRegistry := startLoopingWHOISListener(t, nil, func(query string) string {
+		return "Domain Name: " + strings.ToUpper(query) + "\nRegistrar: Example Registrar, Inc.\n"
+	})
+
+	var ianaHits int32
+	ianaAddr := startLoopingWHOISListener(t, &ianaHits, func(query string) string {
+		switch strings.TrimSpace(query) {
+		case "com":
+			return "refer: " + comRegistry + "\n"
+		case "org":
+			return "refer: " + orgRegistry + "\n"
+		default:
+			t.Errorf("unexpected IANA query %q", query)
+			return ""
+		}
+	})
+
+	names := []string{"one.com", "two.com", "three.org", "four.org"}
+	opts := Options{
+		Timeout:   timeout,
+		Limiter:   whois.NewHostLimiter(interval),
+		IANACache: whois.NewIANACache(),
+	}
+
+	results := make([][]model.SourceRecord, len(names))
+	var wg sync.WaitGroup
+	for i, n := range names {
+		wg.Add(1)
+		go func(i int, n string) {
+			defer wg.Done()
+			q, err := domain.Normalize(n)
+			if err != nil {
+				t.Errorf("normalize %s: %v", n, err)
+				return
+			}
+			results[i] = Collect(context.Background(), q.Name, "", ianaAddr, opts)
+		}(i, n)
+	}
+	wg.Wait()
+
+	if got := atomic.LoadInt32(&ianaHits); got > 2 {
+		t.Errorf("IANA listener hit %d times for 4 names across 2 TLDs, want <= 2 (one per TLD, thanks to IANACache) -- caching isn't sharing hits across names", got)
+	}
+
+	for i, n := range names {
+		var found bool
+		for _, s := range results[i] {
+			if s.Meta.Source == model.SourceRegistryWHOIS {
+				found = true
+				if !s.Meta.OK {
+					t.Errorf("%s: registry-whois failed: %s -- a pacing wait must have been charged against this name's own chain deadline", n, s.Meta.Err)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("%s: no registry-whois source in results", n)
+		}
 	}
 }

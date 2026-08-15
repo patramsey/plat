@@ -76,10 +76,15 @@ func collectIPWHOIS(ctx context.Context, addr netip.Addr, whoisIANAServer string
 	if timeout <= 0 {
 		timeout = 5 * time.Second // matches whois.Client.timeout()'s own default
 	}
+	// See collect.go's collectWHOIS for why pacingCtx is captured before
+	// the WithTimeout wrap below (C1 in the fix-wave review this
+	// addresses): a Limiter pacing wait must not be charged against the
+	// same whole-chain deadline as the actual network hops.
+	pacingCtx := ctx
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter}
+	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter, PacingCtx: pacingCtx}
 	result, _ := whoisClient.LookupIP(ctx, addr)
 	return fromIPWHOIS(result)
 }

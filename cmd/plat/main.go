@@ -295,6 +295,14 @@ type lookupOptions struct {
 	// one) rather than by a flag -- every collect.Options construction
 	// site below must forward it.
 	Limiter whois.Limiter
+	// IANACache caches the WHOIS-server-per-TLD mapping resolved from
+	// the IANA hop, shared by every worker in the pool the same way
+	// Limiter is (nil for a single name, a real *whois.IANACache for
+	// more than one). Only lookupOneDomain's collect.Options forwards
+	// it -- lookupOneIP/lookupOneASN's WHOIS chains resolve IANA by
+	// address/AS number, not by TLD, so there is no cache key for them
+	// to share here.
+	IANACache *whois.IANACache
 	// whoisIANAServer overrides the WHOIS server lookupOne queries first
 	// to resolve a TLD's registry server (see collect.Collect's
 	// whoisIANAServer parameter). Unexported and unset by every real flag
@@ -414,10 +422,13 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 	// pacing at all -- keyed on the name count, not on whether --file was
 	// used, so a one-name file behaves exactly like a positional name.
 	var limiter whois.Limiter
+	var ianaCache *whois.IANACache
 	if len(domains) > 1 {
 		limiter = whois.NewHostLimiter(whois.DefaultWHOISInterval)
+		ianaCache = whois.NewIANACache()
 	}
 	opts.Limiter = limiter
+	opts.IANACache = ianaCache
 
 	// Each name renders into its own buffer; buffers are flushed in input
 	// order after every worker finishes, so output never depends on
@@ -677,7 +688,7 @@ func diffRender(w io.Writer, format render.Format, prior machine.Snapshot, encod
 // a signature shape with lookupOneIP.
 func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
 	baseURL, _ := resolver.BaseURL(q.Name.TLD) // "" is fine — Collect degrades to WHOIS-only
-	collectOpts := collect.Options{NoFollow: opts.NoFollow, Timeout: opts.Timeout, Sources: sources, Limiter: opts.Limiter}
+	collectOpts := collect.Options{NoFollow: opts.NoFollow, Timeout: opts.Timeout, Sources: sources, Limiter: opts.Limiter, IANACache: opts.IANACache}
 
 	var records []model.SourceRecord
 	work := func() {
