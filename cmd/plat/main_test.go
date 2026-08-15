@@ -1519,6 +1519,161 @@ func TestRunLookup_EndToEnd_EmitsInInputOrder(t *testing.T) {
 	}
 }
 
+// TestRunLookup_FileAndPositionalAreSourceIndependent is I3's
+// source-independence test: a one-name --file and the same name given
+// positionally must produce byte-identical output and take the same
+// path. Both go through the full runLookup (not runLookupPool directly),
+// since --file's own read-and-mutual-exclusivity handling lives there,
+// before the two forms converge on the same []string domains. Both
+// invocations restrict --source to whois (parseSourceFilter's "whois")
+// so real bootstrap RDAP coverage for whatever TLD is in play can never
+// cause a real registry RDAP call regardless of the embedded/fetched
+// bootstrap data -- the only real-network exposure left is runLookup's
+// own bootstrap.Load fetch attempt for the bootstrap file itself, bounded
+// by a short Timeout and falling back to the embedded snapshot exactly
+// like TestRunLookup_ConcurrencyOneIsValid already relies on elsewhere in
+// this file. Both runs get their own len==1 domains list, so
+// runLookupPool's own count-based limiter/cache wiring (nil for one name)
+// treats them identically too -- the doc comment on that wiring in
+// runLookupPool explicitly promises "a one-name file behaves exactly like
+// a positional name."
+func TestRunLookup_FileAndPositionalAreSourceIndependent(t *testing.T) {
+	registryAddr := startFakeWHOISListener(t, func(string) string {
+		return "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
+	})
+	ianaAddr := startFakeWHOISListener(t, func(string) string {
+		return "refer: " + registryAddr + "\n"
+	})
+
+	baseOpts := lookupOptions{
+		whoisIANAServer: ianaAddr,
+		NoFollow:        true,
+		SourceFilter:    "whois",
+		Concurrency:     1,
+		Timeout:         2 * time.Second,
+	}
+
+	runOnce := func(opts lookupOptions, domains []string) (stdout, stderr string, err error) {
+		var outBuf, errBuf bytes.Buffer
+		err = runLookup(context.Background(), &outBuf, &errBuf, domains, opts, uiConfig{})
+		return outBuf.String(), errBuf.String(), err
+	}
+
+	posOut, posErr, posRunErr := runOnce(baseOpts, []string{"example.com"})
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "names.txt")
+	if err := os.WriteFile(filePath, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatalf("writing name file: %v", err)
+	}
+	fileOpts := baseOpts
+	fileOpts.FilePath = filePath
+	fileOut, fileErr, fileRunErr := runOnce(fileOpts, nil)
+
+	if (posRunErr == nil) != (fileRunErr == nil) {
+		t.Fatalf("positional err=%v, file err=%v -- both forms of the same single name must produce the same outcome", posRunErr, fileRunErr)
+	}
+	if posOut != fileOut {
+		t.Errorf("stdout differs between positional and --file for the same name:\npositional:\n%s\nfile:\n%s", posOut, fileOut)
+	}
+	if posErr != fileErr {
+		t.Errorf("stderr differs between positional and --file for the same name:\npositional:\n%s\nfile:\n%s", posErr, fileErr)
+	}
+	if posOut == "" {
+		t.Fatal("both runs produced empty stdout -- this test would trivially pass without actually exercising the lookup; something upstream broke")
+	}
+}
+
+// TestRun_FileWithJSONAndMultipleNamesIsUsageError is I3's second
+// required gap: -o json supports exactly one domain (TestRun_
+// MultiDomainJSONIsUsageError already pins that for positional args) but
+// nothing before this test drove the same rule through --file's own
+// name-list expansion. The check (runLookup, right after --file is read
+// into domains) runs before bootstrap.Load, so this stays hermetic --
+// no fake WHOIS/RDAP server needed, same as TestRun_ReservedIPRejectedAtExit2.
+func TestRun_FileWithJSONAndMultipleNamesIsUsageError(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "names.txt")
+	if err := os.WriteFile(filePath, []byte("a.com\nb.com\n"), 0o600); err != nil {
+		t.Fatalf("writing name file: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	got := run([]string{"-o", "json", "--file", filePath}, &stdout, &stderr, uiConfig{})
+	if got != 2 {
+		t.Errorf("run with --file (2 names) and -o json exit code = %d, want 2 (-o json supports exactly one domain)", got)
+	}
+}
+
+// TestRunLookupPool_FailingNameDoesNotAbortSurvivors is I3's third
+// required gap: TestRun_AcceptsMultipleDomainArgs uses two invalid names,
+// so it never actually proves a valid name's own result survives
+// alongside a failing one -- both of its names fail identically, and the
+// test only ever inspects the aggregate exit code. This drives
+// runLookupPool with one name that fails domain.Normalize immediately
+// (no network, exit 2) and one that completes a real WHOIS lookup, and
+// asserts both halves: the aggregate exit code is still the failing
+// name's worse code (2), AND the surviving name's own data actually
+// reached stdout rather than being dropped or blanked out by the other
+// worker's failure.
+func TestRunLookupPool_FailingNameDoesNotAbortSurvivors(t *testing.T) {
+	registryAddr := startFakeWHOISListener(t, func(string) string {
+		return "Domain Name: GOOD.COM\nRegistrar: Good Registrar, Inc.\n"
+	})
+	ianaAddr := startFakeWHOISListener(t, func(string) string {
+		return "refer: " + registryAddr + "\n"
+	})
+	resolver := bootstrap.NewResolver(map[string]string{})
+
+	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true, Concurrency: 2}
+	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"also-bad", "good.com"}, opts, nil, render.FormatPlain, uiConfig{}, resolver)
+
+	var sig exitSignal
+	if !errors.As(err, &sig) || sig.code != 2 {
+		t.Fatalf("runLookupPool err = %v, want exitSignal{2} (the failing name's code, worst across the two)", err)
+	}
+	if !strings.Contains(stdout.String(), "Good Registrar") {
+		t.Errorf("stdout missing good.com's registrar despite it succeeding -- a failing name must not suppress a surviving name's output. stdout:\n%s", stdout.String())
+	}
+}
+
+// TestRunLookup_FileDashReadsFromStdin exercises "--file -" through the
+// real run()/runLookup path, substituting the package-level stdin var
+// (main.go) for a fixed io.Reader instead of the real os.Stdin -- the
+// smallest seam that makes this path testable at all, since os.Stdin
+// itself can't be pointed at test-controlled content without a subprocess.
+// Restricted to --source whois for the same reason as
+// TestRunLookup_FileAndPositionalAreSourceIndependent above.
+func TestRunLookup_FileDashReadsFromStdin(t *testing.T) {
+	registryAddr := startFakeWHOISListener(t, func(string) string {
+		return "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
+	})
+	ianaAddr := startFakeWHOISListener(t, func(string) string {
+		return "refer: " + registryAddr + "\n"
+	})
+
+	old := stdin
+	stdin = strings.NewReader("example.com\n")
+	t.Cleanup(func() { stdin = old })
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	err := runLookup(context.Background(), &stdoutBuf, &stderrBuf, nil, lookupOptions{
+		FilePath:        "-",
+		whoisIANAServer: ianaAddr,
+		NoFollow:        true,
+		SourceFilter:    "whois",
+		Concurrency:     1,
+		Timeout:         2 * time.Second,
+	}, uiConfig{})
+	if err != nil {
+		t.Fatalf("runLookup: %v\nstderr: %s", err, stderrBuf.String())
+	}
+	if !strings.Contains(stdoutBuf.String(), "Example Registrar") {
+		t.Errorf("stdout missing the WHOIS-sourced registrar read via --file -, got:\n%s", stdoutBuf.String())
+	}
+}
+
 // TestRunLookup_CounterBranch_ConcurrentWithErrorDoesNotRace is a
 // regression test for a real defect: runLookupPool's progress counter was
 // briefly wired to write to raw stderr via spinner.RunFunc, while every

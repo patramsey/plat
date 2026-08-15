@@ -48,6 +48,12 @@ var (
 	builtBy = "unknown"
 )
 
+// stdin is runLookup's source for "--file -". A package-level var, not a
+// direct os.Stdin reference, purely so tests can substitute a fixed
+// io.Reader and drive that path through run()/runLookup like any other
+// input -- production code never reassigns it.
+var stdin io.Reader = os.Stdin
+
 // versionInfo holds the build metadata plat was compiled with. Shared by
 // the version subcommand and the root --version flag so their default
 // (non-JSON, non-full) output can never drift out of sync with each
@@ -357,7 +363,7 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 		if len(domains) > 0 {
 			return usageError{fmt.Errorf("--file and names on the command line are mutually exclusive")}
 		}
-		var r io.Reader = os.Stdin
+		r := stdin
 		if opts.FilePath != "-" {
 			f, err := os.Open(opts.FilePath) //nolint:gosec // a user-supplied path is the point of the flag
 			if err != nil {
