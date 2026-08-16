@@ -136,7 +136,16 @@ func TestClient_ChainTimeoutStillBoundsNetworkTimeAcrossHops(t *testing.T) {
 	result, _ := c.Lookup(context.Background(), q.Name)
 	elapsed := time.Since(start)
 
-	if elapsed > 2*time.Second {
+	// 600ms sits between two measured behaviors. A correct run lands at
+	// ~400ms: the chain deadline is anchored to this test's start and
+	// never moves, so the registry hop's wait stays put even under
+	// scheduler jitter. Making hop credit its own network time back (not
+	// just idle time -- the bug this test guards against) re-extends that
+	// deadline by the IANA hop's latency each time, landing at ~650ms
+	// instead; that floor rises further under load rather than drifting
+	// down toward 400ms. 600ms leaves headroom above the correct case for
+	// a loaded machine while still sitting below the mutant's floor.
+	if elapsed > 600*time.Millisecond {
 		t.Fatalf("Lookup took %v -- the registry hop was bounded by Timeout, not by what was left of ChainTimeout", elapsed)
 	}
 	if len(result.Hops) != 2 {
