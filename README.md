@@ -116,7 +116,11 @@ cat names.txt | plat --file -
 # emitted in input order regardless of which lookup finishes first, so
 # two runs of the same list produce identical output. WHOIS queries are
 # paced per server -- including referral hops to registrar servers -- so
-# a large single-TLD list cannot hammer one server. A long bulk run also
+# a large single-TLD list cannot hammer one server. That per-server pace
+# (1 query/second) is a floor on wall time no --timeout can raise: a
+# 300-name single-TLD list takes at least 300s regardless of --timeout,
+# while a mixed-TLD list of the same size finishes faster since the
+# floor applies per server, not per run. A long bulk run also
 # prints a "looking up... N/total" progress counter to stderr when stderr
 # is a terminal and output is the default human format (suppressed for
 # piped/redirected output and for -o plain/json/ndjson).
