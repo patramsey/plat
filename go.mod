@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	charm.land/lipgloss/v2 v2.0.5
-	github.com/charmbracelet/x/ansi v0.11.7
+	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/net v0.57.0
 	golang.org/x/term v0.45.0
