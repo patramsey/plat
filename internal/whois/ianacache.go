@@ -9,13 +9,22 @@ import (
 
 // IANACache caches the WHOIS-server-per-TLD mapping learned from the IANA
 // referral hop (the "refer:" line in whois.iana.org's reply), shared
-// across every concurrent lookup in a bulk run. Every name's first hop
-// resolves its TLD's registry WHOIS server this way, and that mapping is
-// constant per TLD for the lifetime of a run -- asking IANA once per name
-// buys no politeness and just recreates, one name at a time, the exact
-// bottleneck a shared HostLimiter is meant to relieve. nil (Client's zero
-// value) means no caching, which is correct for a single lookup: one
-// query to IANA needs no cache.
+// across every concurrent lookup that uses it. Every name's first hop
+// resolves its TLD's registry WHOIS server this way, and asking IANA once
+// per name buys no politeness and just recreates, one name at a time, the
+// exact bottleneck a shared HostLimiter is meant to relieve.
+//
+// Entries never expire -- there is no TTL or invalidation. That was a
+// reasonable simplification when the only production caller was the CLI,
+// which builds one Client and exits at the end of a single run. It no
+// longer is: a plat.Client always builds an IANACache (see plat.New), and
+// a library consumer that keeps one Client alive across a long-running
+// process -- exactly what New's own doc recommends for a program doing
+// many lookups -- gets a mapping that is cached for that process's entire
+// lifetime, not "a run". If IANA ever changes a TLD's registry WHOIS
+// server, a long-lived Client will not notice. nil (the zero value) means
+// no caching, which is still correct for a use that builds no Client at
+// all.
 //
 // The cache is shared by every worker in a bulk run, so it must be
 // race-safe -- see IANACache's own -race-covered tests.

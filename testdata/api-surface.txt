@@ -1,0 +1,42 @@
+# Every exported identifier of package plat. See TestPublicAPISurface.
+# Adding a line here commits that name to the public API permanently --
+# it cannot be un-exported without breaking consumers. Removing or
+# renaming one is a breaking change. Review additions accordingly.
+func New
+func NewASNResolver
+func NewIPResolver
+func NewResolver
+method Client.Lookup
+method Kind.String
+type ASNRecord
+type Client
+type Conflict
+type Field
+type IPRecord
+type Kind
+type LifecycleInfo
+type LifecycleStage
+type Options
+type OrgInfo
+type Record
+type RedactionNotice
+type RegistrarInfo
+type Resolver
+type Result
+type SourceID
+type SourceResult
+type TimeValue
+value ErrInvalidInput
+value ErrLookupFailed
+value ErrNotFound
+value KindASN
+value KindDomain
+value KindIP
+value LifecycleAutoRenewGrace
+value LifecyclePendingDelete
+value LifecyclePendingRestore
+value LifecycleRedemptionGrace
+value SourceRegistrarRDAP
+value SourceRegistrarWHOIS
+value SourceRegistryRDAP
+value SourceRegistryWHOIS

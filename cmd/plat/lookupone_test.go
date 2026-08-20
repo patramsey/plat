@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/patramsey/plat"
 	"github.com/patramsey/plat/internal/bootstrap"
 	"github.com/patramsey/plat/internal/render"
 )
@@ -43,6 +44,28 @@ func startFakeWHOISListener(t *testing.T, respond func(query string) string) str
 	return ln.Addr().String()
 }
 
+// newTestClient builds the single *plat.Client lookupOne now takes,
+// wiring it the way runLookup wires the real one: the fake resolver
+// stands in for the IANA bootstrap fetch, and the timeout, source
+// filter, --no-follow and WHOIS-IANA test hook the call's lookupOptions
+// carry go onto the client, since that is where the lookup itself now
+// reads them from. Passing the same lookupOptions value to both keeps
+// the two from drifting apart.
+func newTestClient(t *testing.T, resolver *plat.Resolver, opts lookupOptions, sources []plat.SourceID) *plat.Client {
+	t.Helper()
+	client, err := plat.New(context.Background(), plat.Options{
+		Resolver:        resolver,
+		Timeout:         opts.Timeout,
+		Sources:         sources,
+		NoFollow:        opts.NoFollow,
+		WHOISIANAServer: opts.whoisIANAServer,
+	})
+	if err != nil {
+		t.Fatalf("plat.New: %v", err)
+	}
+	return client
+}
+
 func TestLookupOne_HappyPath_RDAPAndWHOIS(t *testing.T) {
 	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
 	if err != nil {
@@ -65,10 +88,12 @@ func TestLookupOne_HappyPath_RDAPAndWHOIS(t *testing.T) {
 	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "example.com",
-		lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true},
-		nil, render.FormatJSON, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "example.com",
+		opts,
+		render.FormatJSON, uiConfig{},
 	)
 
 	if code != 0 {
@@ -96,10 +121,12 @@ func TestLookupOne_WHOISOnlyDegradedMode(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "example.com",
-		lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true},
-		nil, render.FormatJSON, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "example.com",
+		opts,
+		render.FormatJSON, uiConfig{},
 	)
 
 	if code != 0 {
@@ -134,10 +161,12 @@ func TestLookupOne_NotFound_ExitCode1(t *testing.T) {
 	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "example.com",
-		lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true},
-		nil, render.FormatPlain, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "example.com",
+		opts,
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 1 {
@@ -155,10 +184,12 @@ func TestLookupOne_FailurePath_ExitCode3(t *testing.T) {
 	resolver := bootstrap.NewResolver(map[string]string{"com": "http://127.0.0.1:1/unreachable"})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: "127.0.0.1:1", NoFollow: true, Timeout: time.Second}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "example.com",
-		lookupOptions{whoisIANAServer: "127.0.0.1:1", NoFollow: true, Timeout: time.Second},
-		nil, render.FormatPlain, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "example.com",
+		opts,
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 3 {
@@ -204,9 +235,10 @@ func TestLookupOne_Diff(t *testing.T) {
 	// exactly what a user would have saved via `plat example.com -o json
 	// > before.json`.
 	var baseline, baselineErr bytes.Buffer
+	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
-		context.Background(), &baseline, &baselineErr, resolver, "example.com",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		context.Background(), &baseline, &baselineErr, client, "example.com",
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -221,9 +253,10 @@ func TestLookupOne_Diff(t *testing.T) {
 		opts := baseOpts
 		opts.DiffPath = snapPath
 		var stdout, stderr bytes.Buffer
+		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
-			context.Background(), &stdout, &stderr, resolver, "example.com",
-			opts, nil, render.FormatPlain, uiConfig{},
+			context.Background(), &stdout, &stderr, client, "example.com",
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 0 {
 			t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -246,9 +279,10 @@ func TestLookupOne_Diff(t *testing.T) {
 		opts := baseOpts
 		opts.DiffPath = mutatedPath
 		var stdout, stderr bytes.Buffer
+		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
-			context.Background(), &stdout, &stderr, resolver, "example.com",
-			opts, nil, render.FormatPlain, uiConfig{},
+			context.Background(), &stdout, &stderr, client, "example.com",
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 4 {
 			t.Errorf("exit code = %d, want 4\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -294,9 +328,10 @@ func TestLookupOne_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	baseOpts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
 
 	var baseline, baselineErr bytes.Buffer
+	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
-		context.Background(), &baseline, &baselineErr, resolver, "example.com",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		context.Background(), &baseline, &baselineErr, client, "example.com",
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -309,9 +344,10 @@ func TestLookupOne_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	opts := baseOpts
 	opts.DiffPath = snapPath
 	var stderr bytes.Buffer
+	client = newTestClient(t, resolver, opts, nil)
 	code = lookupOne(
-		context.Background(), errWriter{}, &stderr, resolver, "example.com",
-		opts, nil, render.FormatPlain, uiConfig{},
+		context.Background(), errWriter{}, &stderr, client, "example.com",
+		opts, render.FormatPlain, uiConfig{},
 	)
 	if code != 3 {
 		t.Errorf("exit code = %d, want 3\nstderr: %s", code, stderr.String())
@@ -347,10 +383,12 @@ func TestLookupOne_SpinnerBranch_HumanFormat(t *testing.T) {
 	// checks to route work() through spinner.Run instead of calling it
 	// directly -- this is the one branch none of the other tests in this
 	// file exercise.
+	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "example.com",
-		lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true},
-		nil, render.FormatHuman, uiConfig{StderrTTY: true},
+		context.Background(), &stdout, &stderr, client, "example.com",
+		opts,
+		render.FormatHuman, uiConfig{StderrTTY: true},
 	)
 
 	if code != 0 {
@@ -401,10 +439,12 @@ func TestLookupOne_IP_HappyPath_RDAPAndWHOIS(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "8.8.8.8",
-		lookupOptions{whoisIANAServer: ianaAddr},
-		nil, render.FormatPlain, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "8.8.8.8",
+		opts,
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 0 {
@@ -433,10 +473,12 @@ func TestLookupOne_IP_WHOISOnlyDegradedMode(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "8.8.8.8",
-		lookupOptions{whoisIANAServer: ianaAddr},
-		nil, render.FormatPlain, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "8.8.8.8",
+		opts,
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 0 {
@@ -473,10 +515,12 @@ func TestLookupOne_IP_NotFound_ExitCode1(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "8.8.8.8",
-		lookupOptions{whoisIANAServer: ianaAddr},
-		nil, render.FormatPlain, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "8.8.8.8",
+		opts,
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 1 {
@@ -496,10 +540,12 @@ func TestLookupOne_IP_FailurePath_ExitCode3(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: "127.0.0.1:1", Timeout: time.Second}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "8.8.8.8",
-		lookupOptions{whoisIANAServer: "127.0.0.1:1", Timeout: time.Second},
-		nil, render.FormatPlain, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "8.8.8.8",
+		opts,
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 3 {
@@ -530,10 +576,12 @@ func TestLookupOne_IP_JSONOutput_ObjectTypeIsIP(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "8.8.8.8",
-		lookupOptions{whoisIANAServer: ianaAddr},
-		nil, render.FormatJSON, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "8.8.8.8",
+		opts,
+		render.FormatJSON, uiConfig{},
 	)
 
 	if code != 0 {
@@ -577,9 +625,10 @@ func TestLookupOne_IP_Diff(t *testing.T) {
 	// Produce a baseline -o json snapshot from a fresh lookup, exactly
 	// what a user would have saved via `plat 8.8.8.8 -o json > before.json`.
 	var baseline, baselineErr bytes.Buffer
+	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
-		context.Background(), &baseline, &baselineErr, resolver, "8.8.8.8",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		context.Background(), &baseline, &baselineErr, client, "8.8.8.8",
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -594,9 +643,10 @@ func TestLookupOne_IP_Diff(t *testing.T) {
 		opts := baseOpts
 		opts.DiffPath = snapPath
 		var stdout, stderr bytes.Buffer
+		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
-			context.Background(), &stdout, &stderr, resolver, "8.8.8.8",
-			opts, nil, render.FormatPlain, uiConfig{},
+			context.Background(), &stdout, &stderr, client, "8.8.8.8",
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 0 {
 			t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -619,9 +669,10 @@ func TestLookupOne_IP_Diff(t *testing.T) {
 		opts := baseOpts
 		opts.DiffPath = mutatedPath
 		var stdout, stderr bytes.Buffer
+		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
-			context.Background(), &stdout, &stderr, resolver, "8.8.8.8",
-			opts, nil, render.FormatPlain, uiConfig{},
+			context.Background(), &stdout, &stderr, client, "8.8.8.8",
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 4 {
 			t.Errorf("exit code = %d, want 4\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -661,10 +712,12 @@ func TestLookupOne_IP_SpinnerBranch_HumanFormat(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "8.8.8.8",
-		lookupOptions{whoisIANAServer: ianaAddr},
-		nil, render.FormatHuman, uiConfig{StderrTTY: true},
+		context.Background(), &stdout, &stderr, client, "8.8.8.8",
+		opts,
+		render.FormatHuman, uiConfig{StderrTTY: true},
 	)
 
 	if code != 0 {
@@ -702,9 +755,10 @@ func TestLookupOne_IP_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
 
 	var baseline, baselineErr bytes.Buffer
+	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
-		context.Background(), &baseline, &baselineErr, resolver, "8.8.8.8",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		context.Background(), &baseline, &baselineErr, client, "8.8.8.8",
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -717,9 +771,10 @@ func TestLookupOne_IP_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	opts := baseOpts
 	opts.DiffPath = snapPath
 	var stderr bytes.Buffer
+	client = newTestClient(t, resolver, opts, nil)
 	code = lookupOne(
-		context.Background(), errWriter{}, &stderr, resolver, "8.8.8.8",
-		opts, nil, render.FormatPlain, uiConfig{},
+		context.Background(), errWriter{}, &stderr, client, "8.8.8.8",
+		opts, render.FormatPlain, uiConfig{},
 	)
 	if code != 3 {
 		t.Errorf("exit code = %d, want 3\nstderr: %s", code, stderr.String())
@@ -763,10 +818,12 @@ func TestLookupOne_ASN_HappyPath_RDAPAndWHOIS(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "AS15169",
-		lookupOptions{whoisIANAServer: ianaAddr},
-		nil, render.FormatPlain, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "AS15169",
+		opts,
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 0 {
@@ -795,10 +852,12 @@ func TestLookupOne_ASN_WHOISOnlyDegradedMode(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "AS15169",
-		lookupOptions{whoisIANAServer: ianaAddr},
-		nil, render.FormatPlain, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "AS15169",
+		opts,
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 0 {
@@ -835,10 +894,12 @@ func TestLookupOne_ASN_NotFound_ExitCode1(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "AS15169",
-		lookupOptions{whoisIANAServer: ianaAddr},
-		nil, render.FormatPlain, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "AS15169",
+		opts,
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 1 {
@@ -858,10 +919,12 @@ func TestLookupOne_ASN_FailurePath_ExitCode3(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: "127.0.0.1:1", Timeout: time.Second}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "AS15169",
-		lookupOptions{whoisIANAServer: "127.0.0.1:1", Timeout: time.Second},
-		nil, render.FormatPlain, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "AS15169",
+		opts,
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 3 {
@@ -892,10 +955,12 @@ func TestLookupOne_ASN_JSONOutput_ObjectTypeIsASN(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "AS15169",
-		lookupOptions{whoisIANAServer: ianaAddr},
-		nil, render.FormatJSON, uiConfig{},
+		context.Background(), &stdout, &stderr, client, "AS15169",
+		opts,
+		render.FormatJSON, uiConfig{},
 	)
 
 	if code != 0 {
@@ -936,9 +1001,10 @@ func TestLookupOne_ASN_Diff(t *testing.T) {
 	// Produce a baseline -o json snapshot from a fresh lookup, exactly
 	// what a user would have saved via `plat AS15169 -o json > before.json`.
 	var baseline, baselineErr bytes.Buffer
+	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
-		context.Background(), &baseline, &baselineErr, resolver, "AS15169",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		context.Background(), &baseline, &baselineErr, client, "AS15169",
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -953,9 +1019,10 @@ func TestLookupOne_ASN_Diff(t *testing.T) {
 		opts := baseOpts
 		opts.DiffPath = snapPath
 		var stdout, stderr bytes.Buffer
+		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
-			context.Background(), &stdout, &stderr, resolver, "AS15169",
-			opts, nil, render.FormatPlain, uiConfig{},
+			context.Background(), &stdout, &stderr, client, "AS15169",
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 0 {
 			t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -978,9 +1045,10 @@ func TestLookupOne_ASN_Diff(t *testing.T) {
 		opts := baseOpts
 		opts.DiffPath = mutatedPath
 		var stdout, stderr bytes.Buffer
+		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
-			context.Background(), &stdout, &stderr, resolver, "AS15169",
-			opts, nil, render.FormatPlain, uiConfig{},
+			context.Background(), &stdout, &stderr, client, "AS15169",
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 4 {
 			t.Errorf("exit code = %d, want 4\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -1018,9 +1086,10 @@ func TestLookupOne_ASN_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
 
 	var baseline, baselineErr bytes.Buffer
+	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
-		context.Background(), &baseline, &baselineErr, resolver, "AS15169",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		context.Background(), &baseline, &baselineErr, client, "AS15169",
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -1033,9 +1102,10 @@ func TestLookupOne_ASN_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	opts := baseOpts
 	opts.DiffPath = snapPath
 	var stderr bytes.Buffer
+	client = newTestClient(t, resolver, opts, nil)
 	code = lookupOne(
-		context.Background(), errWriter{}, &stderr, resolver, "AS15169",
-		opts, nil, render.FormatPlain, uiConfig{},
+		context.Background(), errWriter{}, &stderr, client, "AS15169",
+		opts, render.FormatPlain, uiConfig{},
 	)
 	if code != 3 {
 		t.Errorf("exit code = %d, want 3\nstderr: %s", code, stderr.String())
@@ -1070,10 +1140,12 @@ func TestLookupOne_ASN_SpinnerBranch_HumanFormat(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), &stdout, &stderr, resolver, "AS15169",
-		lookupOptions{whoisIANAServer: ianaAddr},
-		nil, render.FormatHuman, uiConfig{StderrTTY: true},
+		context.Background(), &stdout, &stderr, client, "AS15169",
+		opts,
+		render.FormatHuman, uiConfig{StderrTTY: true},
 	)
 
 	if code != 0 {
@@ -1125,10 +1197,12 @@ func TestLookupOne_ASN_RenderErrorPath_ExitCode3(t *testing.T) {
 	})
 
 	var stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr, Quiet: true}
+	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
-		context.Background(), errWriter{}, &stderr, resolver, "AS15169",
-		lookupOptions{whoisIANAServer: ianaAddr, Quiet: true},
-		nil, render.FormatPlain, uiConfig{},
+		context.Background(), errWriter{}, &stderr, client, "AS15169",
+		opts,
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 3 {

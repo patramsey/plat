@@ -2,6 +2,7 @@ package collect
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"slices"
 	"strings"
@@ -30,9 +31,13 @@ type Options struct {
 	// plain wall-clock budget the Nth name to want a busy server would
 	// reach its dial already out of time and lose that source silently.
 	// Wall time across the chain can therefore exceed Timeout by however
-	// long it sat waiting its turn; time on the wire cannot. With no
-	// Limiter and no IANACache -- a single lookup -- there is nothing to
-	// credit and the two readings coincide exactly.
+	// long it sat waiting its turn; time on the wire cannot. With neither
+	// a Limiter nor an IANACache there is nothing to credit and the two
+	// readings coincide exactly. The plat CLI turns pacing off for a
+	// single-name run (it has no one to be polite to and would otherwise
+	// pay a full interval when a registry refers the registrar query back
+	// to the IANA host), so a lone lookup arrives here with an IANACache
+	// but no Limiter -- nothing waits, so nothing is credited either.
 	Timeout time.Duration
 	// Sources restricts which of the four possible sources Collect
 	// includes in its output. nil (the zero value) means all four are
@@ -52,6 +57,11 @@ type Options struct {
 	// (see whois.IANACache's doc comment). nil means no caching, which
 	// is correct for a single lookup.
 	IANACache *whois.IANACache
+	// HTTPClient is the client used for RDAP requests. nil means
+	// http.DefaultClient. Exposed so a library consumer can supply their
+	// own transport -- for a proxy, custom timeouts, or instrumentation
+	// -- without plat owning a second HTTP stack.
+	HTTPClient *http.Client
 }
 
 func (o Options) allows(id model.SourceID) bool {
@@ -146,7 +156,7 @@ func collectRDAP(ctx context.Context, name domain.Name, registryBaseURL string, 
 	var out []model.SourceRecord
 	var registrarPort43 string
 
-	rdapClient := &rdap.Client{Timeout: opts.Timeout}
+	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient}
 	start := time.Now()
 	result, err := rdapClient.Domain(ctx, registryBaseURL, name.Punycode)
 	if opts.allows(model.SourceRegistryRDAP) {
@@ -183,9 +193,10 @@ func collectWHOIS(ctx context.Context, name domain.Name, whoisIANAServer string,
 	// instead, shortening each hop's own timeout to what remains and
 	// crediting deliberate idling back — so the timeout bounds the time
 	// the chain spends on the wire, which is the thing it exists to
-	// bound. With no Limiter and no IANACache (a single lookup) nothing
-	// is ever credited and this behaves exactly like the outer deadline
-	// it replaces.
+	// bound. With no Limiter nothing is ever paced, so the only thing
+	// left to credit is a wait on another name's in-flight IANACache
+	// fetch -- and with neither (a lone lookup through the library's
+	// defaults) this behaves exactly like the outer deadline it replaces.
 	whoisClient := &whois.Client{Timeout: timeout, ChainTimeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter, IANACache: opts.IANACache}
 	wResult, _ := whoisClient.Lookup(ctx, name)
 	for _, sr := range FromWHOIS(wResult) {

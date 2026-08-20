@@ -7,9 +7,14 @@ import (
 )
 
 // DefaultWHOISInterval is the minimum gap between two queries to the same
-// WHOIS server. It is deliberately not user-tunable: the limit exists to
-// keep the caller's IP from being blocked, and the failure mode of
-// setting it too high is invisible until it happens and painful to undo.
+// WHOIS server, used whenever a caller doesn't set one explicitly. The
+// limit exists to keep the caller's IP from being blocked, and the
+// failure mode of setting it too high is invisible until it happens and
+// painful to undo -- which is why the default deliberately doesn't
+// require tuning to be safe. It is tunable, though: plat.Options.WHOISInterval
+// lets a library consumer override it in either direction, with no floor
+// enforced, so a consumer that lowers it takes on the ban risk this
+// default is sized to avoid.
 const DefaultWHOISInterval = time.Second
 
 // Limiter paces outbound WHOIS queries. Acquire blocks until a query to

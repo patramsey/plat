@@ -48,7 +48,7 @@ func CollectIP(ctx context.Context, addr netip.Addr, baseURL, whoisIANAServer st
 }
 
 func collectIPRDAP(ctx context.Context, addr netip.Addr, baseURL string, opts Options) []model.IPSourceRecord {
-	rdapClient := &rdap.Client{Timeout: opts.Timeout}
+	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient}
 	start := time.Now()
 	result, err := rdapClient.IP(ctx, baseURL, addr)
 

@@ -41,26 +41,46 @@ type Resolver struct {
 }
 
 // NewResolver builds a Resolver directly from a TLD -> RDAP base URL map,
-// bypassing Load's fetch/cache/embedded-fallback chain entirely. Load
-// remains the only production entry point; this exists so other packages'
-// tests can point a Resolver at a fake RDAP server without hitting the
-// real network or the real IANA bootstrap file.
+// bypassing Load's fetch/cache/embedded-fallback chain entirely. It is
+// re-exported as public API (plat.NewResolver) for production use, in
+// addition to letting other packages' tests point a Resolver at a fake
+// RDAP server without hitting the real network or the real IANA
+// bootstrap file.
+//
+// The Resolver this returns covers domain lookups ONLY: byPrefix and
+// byASNRange are left nil, so IPBaseURL and ASNBaseURL always report "no
+// coverage" on it. A lookup made with it for an IP address or ASN falls
+// back to WHOIS-only, silently -- there is no combining constructor that
+// covers more than one object kind. See NewIPResolver and NewASNResolver
+// for the other two.
 func NewResolver(byTLD map[string]string) *Resolver {
 	return &Resolver{byTLD: byTLD}
 }
 
 // NewIPResolver builds a Resolver from an IP-prefix -> RDAP base URL map,
-// bypassing Load's fetch/cache/embedded-fallback chain. Load remains the
-// only production entry point; this exists so other packages' tests can
-// point a Resolver at a fake RDAP server without touching the network.
+// bypassing Load's fetch/cache/embedded-fallback chain. It is re-exported
+// as public API (plat.NewIPResolver) for production use, in addition to
+// letting other packages' tests point a Resolver at a fake RDAP server
+// without touching the network.
+//
+// The Resolver this returns covers IP lookups ONLY: byTLD and
+// byASNRange are left nil, so BaseURL and ASNBaseURL always report "no
+// coverage" on it. A domain or ASN lookup made with it falls back to
+// WHOIS-only, silently.
 func NewIPResolver(prefixes map[netip.Prefix]string) *Resolver {
 	return &Resolver{byPrefix: prefixes}
 }
 
 // NewASNResolver builds a Resolver from an ASN-range -> RDAP base URL
-// map, bypassing Load's fetch/cache/embedded-fallback chain. Load remains
-// the only production entry point; this exists so other packages' tests
-// can point a Resolver at a fake RDAP server without touching the network.
+// map, bypassing Load's fetch/cache/embedded-fallback chain. It is
+// re-exported as public API (plat.NewASNResolver) for production use, in
+// addition to letting other packages' tests point a Resolver at a fake
+// RDAP server without touching the network.
+//
+// The Resolver this returns covers ASN lookups ONLY: byTLD and byPrefix
+// are left nil, so BaseURL and IPBaseURL always report "no coverage" on
+// it. A domain or IP lookup made with it falls back to WHOIS-only,
+// silently.
 func NewASNResolver(ranges map[[2]uint32]string) *Resolver {
 	return &Resolver{byASNRange: ranges}
 }
@@ -202,12 +222,30 @@ type Options struct {
 	Refresh bool
 	// Timeout bounds the network fetch. Defaults to 5s.
 	Timeout time.Duration
+	// CacheDir overrides where bootstrap documents are cached. Empty
+	// means the OS user cache directory plus a "plat" subdirectory --
+	// the location the CLI uses. A caller-supplied directory is used
+	// verbatim, without that subdirectory.
+	CacheDir string
+	// DisableCache stops plat touching the filesystem at all: nothing is
+	// read from or written to a cache, and every load falls through to
+	// the network and then the embedded snapshot. Intended for library
+	// consumers who do not want an embedded dependency writing to their
+	// user's home directory.
+	DisableCache bool
 }
 
 // path returns the cache file path for the named bootstrap document (e.g.
-// "bootstrap.json", "ipv4.json"), or "" if the user cache directory can't
-// be determined.
-func path(name string) string {
+// "bootstrap.json", "ipv4.json"), or "" if caching is disabled or the
+// user cache directory can't be determined. An empty return is the single
+// signal that disables all cache reads and writes in fetchOrEmbedded.
+func path(opts Options, name string) string {
+	if opts.DisableCache {
+		return ""
+	}
+	if opts.CacheDir != "" {
+		return filepath.Join(opts.CacheDir, name)
+	}
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		return ""
@@ -215,8 +253,8 @@ func path(name string) string {
 	return filepath.Join(dir, cacheDirName, name)
 }
 
-func cachePath() (string, bool) {
-	p := path(cacheFileName)
+func cachePath(opts Options) (string, bool) {
+	p := path(opts, cacheFileName)
 	return p, p != ""
 }
 
@@ -250,7 +288,7 @@ func fetchOrEmbedded(ctx context.Context, cachePath, url string, embedded []byte
 	}
 
 	if haveCachePath {
-		if data, err := os.ReadFile(cachePath); err == nil && validBootstrapJSON(data) { //nolint:gosec // cachePath is derived from os.UserCacheDir() + fixed constants, never user input
+		if data, err := os.ReadFile(cachePath); err == nil && validBootstrapJSON(data) { //nolint:gosec // cachePath is a directory (Options.CacheDir, which may be caller-supplied) joined with a fixed filename constant, never a full caller-supplied path
 			return data, nil
 		}
 	}
@@ -277,7 +315,7 @@ func validBootstrapJSON(data []byte) bool {
 // parse any one of them leaves that lookup kind unavailable without
 // affecting the others.
 func Load(ctx context.Context, opts Options) (*Resolver, error) {
-	data, err := fetchOrEmbedded(ctx, path(cacheFileName), bootstrapURL, embedded, opts)
+	data, err := fetchOrEmbedded(ctx, path(opts, cacheFileName), bootstrapURL, embedded, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +333,7 @@ func Load(ctx context.Context, opts Options) (*Resolver, error) {
 		{"ipv4.json", ipv4URL, embeddedIPv4},
 		{"ipv6.json", ipv6URL, embeddedIPv6},
 	} {
-		data, err := fetchOrEmbedded(ctx, path(reg.name), reg.url, reg.embedded, opts)
+		data, err := fetchOrEmbedded(ctx, path(opts, reg.name), reg.url, reg.embedded, opts)
 		if err != nil {
 			continue
 		}
@@ -303,7 +341,7 @@ func Load(ctx context.Context, opts Options) (*Resolver, error) {
 	}
 
 	r.byASNRange = make(map[[2]uint32]string)
-	if data, err := fetchOrEmbedded(ctx, path("asn.json"), asnURL, embeddedASN, opts); err == nil {
+	if data, err := fetchOrEmbedded(ctx, path(opts, "asn.json"), asnURL, embeddedASN, opts); err == nil {
 		_ = parseASNRanges(data, r.byASNRange)
 	}
 
@@ -318,7 +356,7 @@ func readFreshCache(path string) ([]byte, bool) {
 	if time.Since(info.ModTime()) >= cacheTTL {
 		return nil, false
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // path is cachePath(), derived from os.UserCacheDir() + fixed constants, never user input
+	data, err := os.ReadFile(path) //nolint:gosec // path is cachePath(): a directory (Options.CacheDir, which may be caller-supplied) joined with a fixed filename constant, never a full caller-supplied path
 	if err != nil {
 		return nil, false
 	}

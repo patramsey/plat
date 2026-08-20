@@ -66,7 +66,7 @@ func TestNewResolver(t *testing.T) {
 
 func TestLoad_UsesFreshCache(t *testing.T) {
 	withIsolatedCacheDir(t)
-	path, ok := cachePath()
+	path, ok := cachePath(Options{})
 	if !ok {
 		t.Fatal("cachePath() unexpectedly unavailable")
 	}
@@ -92,7 +92,7 @@ func TestLoad_UsesFreshCache(t *testing.T) {
 
 func TestLoad_StaleCacheTriggersFetchFallback(t *testing.T) {
 	withIsolatedCacheDir(t)
-	path, ok := cachePath()
+	path, ok := cachePath(Options{})
 	if !ok {
 		t.Fatal("cachePath() unexpectedly unavailable")
 	}
@@ -159,7 +159,7 @@ func TestLoad_FetchSuccessWritesCache(t *testing.T) {
 	// which only ever runs after a successful fetch — have never actually
 	// executed until this test. Confirm the fetched doc was written to the
 	// cache file.
-	path, ok := cachePath()
+	path, ok := cachePath(Options{})
 	if !ok {
 		t.Fatal("cachePath() unexpectedly unavailable")
 	}
@@ -395,4 +395,103 @@ func TestParseASNRanges(t *testing.T) {
 			t.Errorf("into[{200,300}] = %q, %v; want %q, true", url, ok, "https://rir.example/")
 		}
 	})
+}
+
+func TestLoad_DisableCacheWritesNothing(t *testing.T) {
+	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL, unreachableURL)
+	dir := t.TempDir()
+	_, err := Load(context.Background(), Options{
+		CacheDir:     dir,
+		DisableCache: true,
+		Timeout:      50 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("DisableCache still wrote %d entries: %v", len(entries), entries)
+	}
+}
+
+func TestPath_CacheDirOverridesUserCacheDir(t *testing.T) {
+	got := path(Options{CacheDir: "/tmp/example"}, "bootstrap.json")
+	want := filepath.Join("/tmp/example", "bootstrap.json")
+	if got != want {
+		t.Fatalf("path = %q, want %q", got, want)
+	}
+}
+
+func TestPath_DisableCacheYieldsEmptyPath(t *testing.T) {
+	if got := path(Options{DisableCache: true}, "bootstrap.json"); got != "" {
+		t.Fatalf("path = %q, want \"\" when caching is disabled", got)
+	}
+}
+
+func TestLoad_CacheDirWritesCacheWhenNotDisabled(t *testing.T) {
+	dir := t.TempDir()
+	fakeDoc := []byte(`{"services":[[["testcache"],["https://rdap.example.test/"]]]}`)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fakeDoc)
+	}))
+	defer srv.Close()
+
+	redirectRegistries(t, srv.URL, unreachableURL, unreachableURL, unreachableURL)
+
+	r, err := Load(context.Background(), Options{
+		CacheDir:     dir,
+		DisableCache: false,
+	})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, ok := r.BaseURL("testcache"); !ok {
+		t.Error(`BaseURL("testcache") not found`)
+	}
+
+	// Verify cache file was written to the specified CacheDir.
+	cachePath := filepath.Join(dir, cacheFileName)
+	cached, err := os.ReadFile(cachePath)
+	if err != nil {
+		t.Fatalf("expected cache file to be written to %s, reading it failed: %v", cachePath, err)
+	}
+	if string(cached) != string(fakeDoc) {
+		t.Errorf("cache file content = %q, want %q", cached, fakeDoc)
+	}
+}
+
+func TestLoad_DisableCachePreventsWriteToDir(t *testing.T) {
+	dir := t.TempDir()
+	fakeDoc := []byte(`{"services":[[["testdisable"],["https://rdap.example.test/"]]]}`)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fakeDoc)
+	}))
+	defer srv.Close()
+
+	redirectRegistries(t, srv.URL, unreachableURL, unreachableURL, unreachableURL)
+
+	r, err := Load(context.Background(), Options{
+		CacheDir:     dir,
+		DisableCache: true,
+	})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, ok := r.BaseURL("testdisable"); !ok {
+		t.Error(`BaseURL("testdisable") not found`)
+	}
+
+	// Verify no cache file was written despite successful fetch.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("DisableCache=true still wrote %d entries to directory: %v", len(entries), entries)
+	}
 }
