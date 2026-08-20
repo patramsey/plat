@@ -430,3 +430,68 @@ func TestPath_DisableCacheYieldsEmptyPath(t *testing.T) {
 		t.Fatalf("path = %q, want \"\" when caching is disabled", got)
 	}
 }
+
+func TestLoad_CacheDirWritesCacheWhenNotDisabled(t *testing.T) {
+	dir := t.TempDir()
+	fakeDoc := []byte(`{"services":[[["testcache"],["https://rdap.example.test/"]]]}`)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fakeDoc)
+	}))
+	defer srv.Close()
+
+	redirectRegistries(t, srv.URL, unreachableURL, unreachableURL, unreachableURL)
+
+	r, err := Load(context.Background(), Options{
+		CacheDir:     dir,
+		DisableCache: false,
+	})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, ok := r.BaseURL("testcache"); !ok {
+		t.Error(`BaseURL("testcache") not found`)
+	}
+
+	// Verify cache file was written to the specified CacheDir.
+	cachePath := filepath.Join(dir, cacheFileName)
+	cached, err := os.ReadFile(cachePath)
+	if err != nil {
+		t.Fatalf("expected cache file to be written to %s, reading it failed: %v", cachePath, err)
+	}
+	if string(cached) != string(fakeDoc) {
+		t.Errorf("cache file content = %q, want %q", cached, fakeDoc)
+	}
+}
+
+func TestLoad_DisableCachePreventsWriteToDir(t *testing.T) {
+	dir := t.TempDir()
+	fakeDoc := []byte(`{"services":[[["testdisable"],["https://rdap.example.test/"]]]}`)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fakeDoc)
+	}))
+	defer srv.Close()
+
+	redirectRegistries(t, srv.URL, unreachableURL, unreachableURL, unreachableURL)
+
+	r, err := Load(context.Background(), Options{
+		CacheDir:     dir,
+		DisableCache: true,
+	})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, ok := r.BaseURL("testdisable"); !ok {
+		t.Error(`BaseURL("testdisable") not found`)
+	}
+
+	// Verify no cache file was written despite successful fetch.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("DisableCache=true still wrote %d entries to directory: %v", len(entries), entries)
+	}
+}
