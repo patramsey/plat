@@ -11,10 +11,13 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/term"
 
 	"github.com/patramsey/plat/internal/bootstrap"
@@ -29,6 +32,7 @@ import (
 	"github.com/patramsey/plat/internal/render/machine"
 	"github.com/patramsey/plat/internal/render/plain"
 	"github.com/patramsey/plat/internal/spinner"
+	"github.com/patramsey/plat/internal/whois"
 )
 
 // version, commit, date, and builtBy are overwritten via -ldflags at
@@ -43,6 +47,12 @@ var (
 	date    = "unknown"
 	builtBy = "unknown"
 )
+
+// stdin is runLookup's source for "--file -". A package-level var, not a
+// direct os.Stdin reference, purely so tests can substitute a fixed
+// io.Reader and drive that path through run()/runLookup like any other
+// input -- production code never reassigns it.
+var stdin io.Reader = os.Stdin
 
 // versionInfo holds the build metadata plat was compiled with. Shared by
 // the version subcommand and the root --version flag so their default
@@ -140,6 +150,8 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var quiet bool
 	var noColorFlag bool
 	var diffPath string
+	var filePath string
+	var concurrency int
 
 	root := &cobra.Command{
 		Use:           "plat <domain|ip|asn> [domain|ip|asn...]",
@@ -151,6 +163,15 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 				// --version is a valid zero-arg invocation -- skip the
 				// no-args-shows-help path below entirely; RunE handles
 				// printing and returns before runLookup is ever reached.
+				return nil
+			}
+			if filePath != "" {
+				// --file supplies the name list in place of positional
+				// args -- "plat --file names.txt" with zero cliArgs is
+				// the flag's primary use case, not a bare invocation
+				// asking for help. runLookup does its own validation
+				// (mutual exclusivity with positional args, file-open,
+				// and empty-list errors) once RunE resolves the list.
 				return nil
 			}
 			if len(cliArgs) < 1 {
@@ -184,6 +205,8 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 				Quiet:            quiet,
 				NoColor:          noColorFlag,
 				DiffPath:         diffPath,
+				FilePath:         filePath,
+				Concurrency:      concurrency,
 			}, ui)
 		},
 	}
@@ -200,7 +223,7 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 		return usageError{err}
 	})
 	root.Flags().BoolVar(&refreshBootstrap, "refresh-bootstrap", false, "force a fresh fetch of the IANA RDAP bootstrap file")
-	root.Flags().DurationVar(&timeout, "timeout", 5*time.Second, "per-source timeout for bootstrap, RDAP, and WHOIS lookups")
+	root.Flags().DurationVar(&timeout, "timeout", 5*time.Second, "per-source timeout for bootstrap, RDAP, and WHOIS lookups; bounds time spent talking to a server, not time a bulk run spends waiting its turn")
 	root.Flags().StringVarP(&output, "output", "o", "", "output format: human, plain, json, ndjson (default: auto-detect from terminal)")
 	root.Flags().BoolVar(&raw, "raw", false, "include raw source payloads (json/ndjson only)")
 	root.Flags().StringVar(&sourceFilter, "source", "", "restrict to one source: rdap, whois, registry, registrar")
@@ -211,6 +234,8 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	root.Flags().BoolVarP(&quiet, "quiet", "q", false, "print a one-line summary per domain (lock status, expiry, conflict count) instead of the full view -- ignored for -o json/ndjson")
 	root.Flags().BoolVar(&noColorFlag, "no-color", false, "disable color output (same effect as the NO_COLOR env var)")
 	root.Flags().StringVar(&diffPath, "diff", "", "compare the lookup against a saved -o json snapshot; exits 4 if anything changed")
+	root.Flags().StringVar(&filePath, "file", "", "read names from a file, one per line (- for stdin); blank lines and # comments are skipped")
+	root.Flags().IntVar(&concurrency, "concurrency", 4, "number of names to look up in parallel (1 = sequential)")
 
 	// `completion` is a real subcommand (M7, cobra's built-in generator);
 	// man pages are a build-time-only artifact (M7's gendocs, not a
@@ -261,6 +286,29 @@ type lookupOptions struct {
 	// was not passed -- the zero value for every existing caller, so no
 	// prior behavior changes when it's unset.
 	DiffPath string
+	// FilePath is the --file flag's value: a path to a file of names, one
+	// per line ("-" for stdin), read in place of positional domain args.
+	// Empty means --file was not passed -- the zero value for every
+	// existing caller, so no prior behavior changes when it's unset.
+	FilePath string
+	// Concurrency is the --concurrency flag's value: how many names
+	// runLookup looks up in parallel. Defaults to 4 via the flag
+	// registration; runLookup rejects anything less than 1.
+	Concurrency int
+	// Limiter paces outbound WHOIS queries across the whole run, shared by
+	// every worker in the pool runLookup builds. Set by runLookup itself
+	// (nil for a single name, a real *whois.HostLimiter for more than
+	// one) rather than by a flag -- every collect.Options construction
+	// site below must forward it.
+	Limiter whois.Limiter
+	// IANACache caches the WHOIS-server-per-TLD mapping resolved from
+	// the IANA hop, shared by every worker in the pool the same way
+	// Limiter is (nil for a single name, a real *whois.IANACache for
+	// more than one). Only lookupOneDomain's collect.Options forwards
+	// it -- lookupOneIP/lookupOneASN's WHOIS chains resolve IANA by
+	// address/AS number, not by TLD, so there is no cache key for them
+	// to share here.
+	IANACache *whois.IANACache
 	// whoisIANAServer overrides the WHOIS server lookupOne queries first
 	// to resolve a TLD's registry server (see collect.Collect's
 	// whoisIANAServer parameter). Unexported and unset by every real flag
@@ -268,6 +316,14 @@ type lookupOptions struct {
 	// of this package's own tests, which construct lookupOptions directly
 	// to point it at a fake local listener.
 	whoisIANAServer string
+	// SuppressSpinner disables the three per-name spinners in lookupOne's
+	// domain/IP/ASN branches. Set by runLookupPool when it is driving its
+	// own progress counter over the same stderr line -- without this, a
+	// per-name spinner and the bulk counter would both write \r-prefixed
+	// lines to that line concurrently and produce garbage. False (every
+	// existing caller's zero value) for a single-name run, which has no
+	// counter and keeps its per-name spinner exactly as before.
+	SuppressSpinner bool
 }
 
 // effectiveNoColor reports whether color output should be suppressed:
@@ -278,10 +334,54 @@ func effectiveNoColor(ui uiConfig, noColorFlag bool) bool {
 	return ui.NoColor || noColorFlag
 }
 
+// syncWriter serializes concurrent writes to a shared io.Writer. Only
+// stdout gets a per-name buffer (so it can be flushed in input order);
+// stderr diagnostics have no ordering requirement across names, but the
+// pool's workers still write to the same underlying writer concurrently
+// -- without this, that's a data race (fatal under -race, and simply
+// corrupted output for anything, like *bytes.Buffer, that isn't safe for
+// concurrent use on its own).
+type syncWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (s *syncWriter) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.w.Write(p)
+}
+
 // runLookup validates flags/args once, resolves the output format and
-// bootstrap resolver once, then loops domains sequentially — each
-// domain's own outcome (0/1/2/3) is tracked and the worst wins overall.
+// bootstrap resolver once, then looks domains up through a bounded worker
+// pool (opts.Concurrency workers) — each domain's own outcome (0/1/2/3)
+// is tracked and the worst wins overall. Results are buffered per name
+// and flushed to stdout in input order once every worker finishes, so
+// output never depends on completion order.
 func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, opts lookupOptions, ui uiConfig) error {
+	if opts.FilePath != "" {
+		if len(domains) > 0 {
+			return usageError{fmt.Errorf("--file and names on the command line are mutually exclusive")}
+		}
+		r := stdin
+		if opts.FilePath != "-" {
+			f, err := os.Open(opts.FilePath) //nolint:gosec // a user-supplied path is the point of the flag
+			if err != nil {
+				return usageError{fmt.Errorf("--file: %w", err)}
+			}
+			defer func() { _ = f.Close() }()
+			r = f
+		}
+		names, err := readNameList(r)
+		if err != nil {
+			return usageError{err}
+		}
+		if len(names) == 0 {
+			return usageError{fmt.Errorf("--file: no names found in %s", opts.FilePath)}
+		}
+		domains = names
+	}
+
 	format, err := render.Select(opts.Output, render.IsTerminal(os.Stdout), effectiveNoColor(ui, opts.NoColor))
 	if err != nil {
 		return usageError{err}
@@ -295,6 +395,9 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 	if opts.DiffPath != "" && len(domains) != 1 {
 		return usageError{fmt.Errorf("--diff supports exactly one name")}
 	}
+	if opts.Concurrency < 1 {
+		return usageError{fmt.Errorf("--concurrency must be at least 1")}
+	}
 	sources, err := parseSourceFilter(opts.SourceFilter)
 	if err != nil {
 		return usageError{err}
@@ -305,11 +408,98 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 		return fmt.Errorf("resolving RDAP bootstrap: %w", err)
 	}
 
+	return runLookupPool(ctx, stdout, stderr, domains, opts, sources, format, ui, resolver)
+}
+
+// runLookupPool builds the bounded worker pool (opts.Concurrency workers)
+// and flushes results to stdout in input order, never completion order.
+// Split out of runLookup so tests can drive this, the actual pool/ordering
+// logic, directly against an already-resolved *bootstrap.Resolver (e.g.
+// one built via bootstrap.NewResolver against a fake RDAP server, exactly
+// like every lookupOne test in lookupone_test.go already does) instead of
+// going through runLookup's real bootstrap.Load fetch/cache/embedded
+// chain, which always hits the network or the embedded snapshot and can't
+// be pointed at a hermetic fake. This is the same "escape hatch for
+// tests" shape as lookupOptions.whoisIANAServer on the WHOIS side --
+// runLookup's real behavior is unchanged, this only names the seam.
+func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []string, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, resolver *bootstrap.Resolver) error {
+	// One limiter shared by every worker, so pacing is per WHOIS server
+	// across the whole run rather than per lookup. A single name needs no
+	// pacing at all -- keyed on the name count, not on whether --file was
+	// used, so a one-name file behaves exactly like a positional name.
+	var limiter whois.Limiter
+	var ianaCache *whois.IANACache
+	if len(domains) > 1 {
+		limiter = whois.NewHostLimiter(whois.DefaultWHOISInterval)
+		ianaCache = whois.NewIANACache()
+	}
+	opts.Limiter = limiter
+	opts.IANACache = ianaCache
+
+	// Each name renders into its own buffer; buffers are flushed in input
+	// order after every worker finishes, so output never depends on
+	// completion order.
+	bufs := make([]bytes.Buffer, len(domains))
+	codes := make([]int, len(domains))
+
+	// Workers run concurrently but share this one stderr writer -- unlike
+	// stdout, diagnostics have no input-order requirement, but concurrent
+	// unsynchronized writes to it are still a data race (and, for a
+	// caller-supplied *bytes.Buffer as in tests, unsafe regardless of
+	// ordering). syncStderr serializes those writes without touching
+	// lookupOne's signature.
+	syncStderr := &syncWriter{w: stderr}
+
+	var g errgroup.Group
+	g.SetLimit(opts.Concurrency)
+
+	// The counter is shown only under the same TTY-and-human condition the
+	// per-name spinners use, and only when there is more than one name --
+	// a single name gets no counter and no pool-level spinner at all,
+	// exactly as before this task. When the counter is active, every
+	// worker's per-name spinner must be suppressed (SuppressSpinner):
+	// otherwise a per-name spinner and this counter would both write
+	// \r-prefixed lines to the same stderr row concurrently and produce
+	// garbage.
+	showCounter := ui.StderrTTY && format == render.FormatHuman && len(domains) > 1
+	opts.SuppressSpinner = showCounter
+
+	// done is incremented by every worker after lookupOne returns and read
+	// by the counter's message function, which runs from RunFunc's
+	// animation goroutine -- atomic.Int64 keeps both sides race-free
+	// regardless of whether the counter is actually shown.
+	var done atomic.Int64
+	runPool := func() {
+		for i, input := range domains {
+			g.Go(func() error {
+				codes[i] = lookupOne(ctx, &bufs[i], syncStderr, resolver, input, opts, sources, format, ui)
+				done.Add(1)
+				return nil
+			})
+		}
+		_ = g.Wait() // no worker returns a non-nil error; each records its own exit code
+	}
+	if showCounter {
+		// syncStderr, not raw stderr: every worker's diagnostics
+		// (reportLookupError, reached whenever a name errors) already
+		// write through syncStderr concurrently with this animation
+		// goroutine. Writing to raw stderr here races with those writes
+		// and, even without -race, glues error text onto the counter's
+		// in-progress line with no \r reset.
+		spinner.RunFunc(syncStderr, func() string {
+			return fmt.Sprintf("looking up... %d/%d", done.Load(), len(domains))
+		}, runPool)
+	} else {
+		runPool()
+	}
+
 	worst := 0
-	for i, input := range domains {
-		code := lookupOne(ctx, stdout, stderr, resolver, input, opts, sources, format, ui)
-		if code > worst {
-			worst = code
+	for i := range domains {
+		if _, err := stdout.Write(bufs[i].Bytes()); err != nil {
+			return err
+		}
+		if codes[i] > worst {
+			worst = codes[i]
 		}
 		if !render.IsMachine(format) && i < len(domains)-1 {
 			_, _ = fmt.Fprintln(stdout)
@@ -324,9 +514,11 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 // lookupOne performs one domain's normalize -> collect -> merge ->
 // render-or-report flow and returns that domain's exit code (0/2/1/3;
 // 2 only for a per-domain normalize failure). Collect runs behind a
-// spinner (on stderr) only when stderr is a real terminal and the output
-// format is FormatHuman — never for Plain/JSON/NDJSON, and never when
-// stderr is redirected even if stdout is a terminal.
+// spinner (on stderr) only when stderr is a real terminal, the output
+// format is FormatHuman, and opts.SuppressSpinner is false — never for
+// Plain/JSON/NDJSON, never when stderr is redirected even if stdout is a
+// terminal, and never when runLookupPool's own bulk-run progress counter
+// is already driving that stderr line (SuppressSpinner).
 func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, input string, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
 	q, err := domain.Normalize(input)
 	if err != nil {
@@ -504,13 +696,13 @@ func diffRender(w io.Writer, format render.Format, prior machine.Snapshot, encod
 // a signature shape with lookupOneIP.
 func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
 	baseURL, _ := resolver.BaseURL(q.Name.TLD) // "" is fine — Collect degrades to WHOIS-only
-	collectOpts := collect.Options{NoFollow: opts.NoFollow, Timeout: opts.Timeout, Sources: sources}
+	collectOpts := collect.Options{NoFollow: opts.NoFollow, Timeout: opts.Timeout, Sources: sources, Limiter: opts.Limiter, IANACache: opts.IANACache}
 
 	var records []model.SourceRecord
 	work := func() {
 		records = collect.Collect(ctx, q.Name, baseURL, opts.whoisIANAServer, collectOpts)
 	}
-	if ui.StderrTTY && format == render.FormatHuman {
+	if ui.StderrTTY && format == render.FormatHuman && !opts.SuppressSpinner {
 		spinner.Run(stderr, "looking up "+q.Name.Punycode+"...", work)
 	} else {
 		work()
@@ -549,13 +741,13 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, resolver *bo
 // codes stay consistent between the domain and IP paths.
 func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
 	baseURL, _ := resolver.IPBaseURL(q.IP) // "" is fine — CollectIP degrades to WHOIS-only
-	collectOpts := collect.Options{Timeout: opts.Timeout, Sources: sources}
+	collectOpts := collect.Options{Timeout: opts.Timeout, Sources: sources, Limiter: opts.Limiter}
 
 	var records []model.IPSourceRecord
 	work := func() {
 		records = collect.CollectIP(ctx, q.IP, baseURL, opts.whoisIANAServer, collectOpts)
 	}
-	if ui.StderrTTY && format == render.FormatHuman {
+	if ui.StderrTTY && format == render.FormatHuman && !opts.SuppressSpinner {
 		spinner.Run(stderr, "looking up "+q.Input+"...", work)
 	} else {
 		work()
@@ -594,13 +786,13 @@ func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, resolver *bootst
 // codes stay consistent across the domain, IP, and ASN paths.
 func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
 	baseURL, _ := resolver.ASNBaseURL(q.ASN) // "" is fine -- CollectASN degrades to WHOIS-only
-	collectOpts := collect.Options{Timeout: opts.Timeout, Sources: sources}
+	collectOpts := collect.Options{Timeout: opts.Timeout, Sources: sources, Limiter: opts.Limiter}
 
 	var records []model.ASNSourceRecord
 	work := func() {
 		records = collect.CollectASN(ctx, q.ASN, baseURL, opts.whoisIANAServer, collectOpts)
 	}
-	if ui.StderrTTY && format == render.FormatHuman {
+	if ui.StderrTTY && format == render.FormatHuman && !opts.SuppressSpinner {
 		spinner.Run(stderr, "looking up "+q.Input+"...", work)
 	} else {
 		work()

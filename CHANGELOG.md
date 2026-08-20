@@ -7,6 +7,19 @@ follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `--file <path>` reads names from a file, one per line, with blank lines
+  and `#` comments skipped; `--file -` reads stdin. `--concurrency N`
+  (default 4) controls how many names are looked up in parallel, and
+  applies to names given on the command line too. Results are emitted in
+  input order regardless of which lookups finish first, so two runs of the
+  same list produce identical output. WHOIS queries are paced per server
+  -- including referral hops to registrar servers -- so a large single-TLD
+  list cannot hammer one server; the pace is a fixed conservative interval
+  and is not user-tunable. `--timeout` bounds the time a lookup spends
+  talking to servers, so a name waiting its turn for a paced server is
+  never timed out before it gets to ask -- pacing costs wall time, never
+  a source. A single name is unaffected: no pacing, no pool, no progress
+  output.
 - `--diff <snapshot.json>` compares a fresh lookup against a previously
   saved `-o json` snapshot and reports what changed -- expiry,
   nameservers, status, and every other merged field. Exits 4 when

@@ -2,22 +2,28 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/patramsey/plat/internal/bootstrap"
 	"github.com/patramsey/plat/internal/domain"
 	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/render"
 	"github.com/patramsey/plat/internal/render/human"
 	"github.com/patramsey/plat/internal/render/machine"
+	"github.com/patramsey/plat/internal/whois"
 )
 
 func TestExitCode(t *testing.T) {
@@ -1225,5 +1231,418 @@ func TestDiffNameMatches(t *testing.T) {
 				t.Errorf("diffNameMatches(snap.Name=%q, query=%q) = %v, want %v", tt.snap.Name, diffQueryName(tt.q), got, tt.want)
 			}
 		})
+	}
+}
+
+// TestRunLookupPool_BoundsRealLookupOneConcurrency is I2's pool-bounding
+// test. It replaced a TestRunLookup_PoolIsBounded that constructed its own
+// errgroup and never called into plat's own code at all -- proven inert by
+// mutation: making runLookupPool's g.SetLimit(opts.Concurrency) a no-op
+// still left that test, and 186 others, passing. This one drives
+// runLookupPool itself and counts how many lookupOne calls are
+// simultaneously mid-flight, via a real RDAP server every worker queries.
+//
+// This deliberately goes through RDAP, not WHOIS: every name shares one
+// registry (one bootstrap.NewResolver entry, one httptest.Server), but
+// WHOIS's own per-server HostLimiter/IANACache (the C1 fix elsewhere in
+// this change) would otherwise serialize or cache away the very
+// concurrency this test needs to observe -- a shared WHOIS listener is
+// not a clean proxy for pool concurrency once pacing and caching are
+// correctly in place. RDAP has no such pacing, so each of numDomains
+// names makes exactly one concurrent-safe-to-observe HTTP request
+// (sources restricted to registry-rdap only, NoFollow skips the
+// registrar hop) and the handler's in-flight counter directly reflects
+// how many lookupOne calls the pool let run at once. If
+// g.SetLimit(opts.Concurrency) is ever made inert, maxInFlight blows past
+// concurrency (approaching len(domains)) and this test fails.
+func TestRunLookupPool_BoundsRealLookupOneConcurrency(t *testing.T) {
+	const numDomains = 8
+	const concurrency = 3
+	const hopDelay = 60 * time.Millisecond
+
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+
+	var inFlight, maxInFlight int32
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&inFlight, 1)
+		for {
+			cur := atomic.LoadInt32(&maxInFlight)
+			if n <= cur || atomic.CompareAndSwapInt32(&maxInFlight, cur, n) {
+				break
+			}
+		}
+		time.Sleep(hopDelay)
+		atomic.AddInt32(&inFlight, -1)
+
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixture)
+	}))
+	defer rdapSrv.Close()
+
+	domains := make([]string, numDomains)
+	for i := range domains {
+		domains[i] = fmt.Sprintf("name%d.com", i)
+	}
+
+	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
+	opts := lookupOptions{NoFollow: true, Concurrency: concurrency}
+	sources := []model.SourceID{model.SourceRegistryRDAP}
+	var stdout, stderr bytes.Buffer
+	if err := runLookupPool(context.Background(), &stdout, &stderr, domains, opts, sources, render.FormatPlain, uiConfig{}, resolver); err != nil {
+		t.Fatalf("runLookupPool: %v\nstderr:\n%s", err, stderr.String())
+	}
+
+	got := atomic.LoadInt32(&maxInFlight)
+	if got > concurrency {
+		t.Errorf("max concurrent lookups = %d, want <= %d (opts.Concurrency)", got, concurrency)
+	}
+	if got < 2 {
+		t.Errorf("max concurrent lookups = %d, want >= 2 -- the pool never actually overlapped anything", got)
+	}
+}
+
+// TestRunLookup_ConcurrencyMustBeAtLeastOne is I2's usage-error coverage
+// for the "< 1" guard in runLookup: 0 and negative values must be
+// rejected as a usage error (exit 2, a message naming --concurrency)
+// before any bootstrap/network work happens -- proven by mutation:
+// breaking the guard (e.g. widening it to "< 0") left 187 tests passing.
+// The guard runs before runLookup's bootstrap.Load call, so this needs no
+// fake resolver or network access to stay hermetic.
+func TestRunLookup_ConcurrencyMustBeAtLeastOne(t *testing.T) {
+	for _, c := range []int{0, -1, -5} {
+		t.Run(fmt.Sprintf("concurrency=%d", c), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			err := runLookup(context.Background(), &stdout, &stderr, []string{"example.com"}, lookupOptions{Concurrency: c}, uiConfig{})
+			var uErr usageError
+			if !errors.As(err, &uErr) {
+				t.Fatalf("runLookup with --concurrency %d returned %v (%T), want a usageError", c, err, err)
+			}
+			if !strings.Contains(uErr.Error(), "--concurrency must be at least 1") {
+				t.Errorf("usageError = %q, want it to name --concurrency and the minimum", uErr.Error())
+			}
+		})
+	}
+}
+
+// TestRunLookup_ConcurrencyOneIsValid is the other half of the "< 1"
+// guard: exactly 1 must NOT be rejected. runLookup necessarily proceeds
+// past the guard into bootstrap.Load (there is no seam in runLookup
+// itself to skip it, unlike runLookupPool's tests elsewhere in this
+// file) -- a tiny Timeout keeps any real network attempt bounded, and
+// Load's own documented fetch/cache/embedded-fallback chain means it
+// still succeeds offline. The domain itself ("also-bad", single-label)
+// then fails domain.Normalize before any further network call, so the
+// only thing this test actually waits on is that bounded bootstrap
+// attempt, not a real WHOIS/RDAP round trip. What's asserted is narrow
+// and precise: whatever runLookup returns, it must not be the
+// "--concurrency must be at least 1" usage error the guard produces for
+// 0 or negative.
+func TestRunLookup_ConcurrencyOneIsValid(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	err := runLookup(context.Background(), &stdout, &stderr, []string{"also-bad"}, lookupOptions{Concurrency: 1, Timeout: 10 * time.Millisecond}, uiConfig{})
+	var uErr usageError
+	if errors.As(err, &uErr) && strings.Contains(uErr.Error(), "--concurrency") {
+		t.Errorf("runLookup with --concurrency 1 was rejected as a usage error: %v", err)
+	}
+}
+
+// TestRunLookup_EndToEnd_EmitsInInputOrder proves what its since-deleted
+// predecessor TestRunLookup_EmitsInInputOrder did NOT: that runLookup
+// itself -- not just the errgroup primitive it's built on, which was all
+// that test ever exercised -- emits in input order rather than completion
+// order. It drives the real path (runLookup, not lookupOne directly) through
+// two names that reach the render step, using the fake-WHOIS-listener
+// pattern from lookupone_test.go, with "slow.com" listed first but rigged
+// to finish decisively later than "fast.net" (listed second). If runLookup
+// ever regressed to flushing in completion order, "Fast Registrar" would
+// appear before "Slow Registrar" in stdout.
+//
+// Both names share one fake IANA server (as runLookup's own single
+// opts.whoisIANAServer override -- and real whois.iana.org in
+// production -- always does for every name in a run), so runLookup's own
+// per-run HostLimiter (whois.NewHostLimiter(whois.DefaultWHOISInterval),
+// built automatically for any run of more than one name) paces both
+// names' IANA hop against that one shared host. Because that pacing picks
+// whichever goroutine reaches Acquire first essentially at random, the
+// *other* one absorbs a wait of up to one full DefaultWHOISInterval before
+// its registry hop even starts -- so the artificial gap between the two
+// names' registry-hop response times has to be decisively larger than
+// DefaultWHOISInterval, not just larger than zero, or this test would
+// pass or fail depending on which goroutine happened to win that race
+// rather than on whether output order is actually correct. slow.com and
+// fast.net get separate fake registry WHOIS servers precisely so that,
+// unlike the shared IANA hop, their registry hops are on different hosts
+// and never pace against each other (whois.HostLimiter's whole point --
+// see its doc comment) -- only slow.com's registry response carries the
+// deliberate delay. See the worked-through timing below.
+func TestRunLookup_EndToEnd_EmitsInInputOrder(t *testing.T) {
+	// slowDelay must exceed whois.DefaultWHOISInterval by a decisive
+	// margin. Worked through for both possible outcomes of the shared-IANA-
+	// host race (each name's IANA-hop wait is either ~0 or ~1
+	// DefaultWHOISInterval, and every other hop below is on a private,
+	// unshared host so it never adds pacing wait of its own):
+	//
+	//   race won by fast.net: fast.net total ~= 0 (no IANA wait, no
+	//     registry delay). slow.com total ~= 0 (no IANA wait) + slowDelay.
+	//     fast.net finishes first as long as slowDelay > 0.
+	//   race won by slow.com: slow.com total ~= 0 (no IANA wait) +
+	//     slowDelay. fast.net total ~= 1 DefaultWHOISInterval (lost the
+	//     race) + 0 (no registry delay). fast.net finishes first only if
+	//     slowDelay > ~1 DefaultWHOISInterval.
+	//
+	// So the binding constraint is the second case: slowDelay must clear
+	// one full DefaultWHOISInterval with margin to spare for scheduling
+	// jitter. 3x gives a 2x-interval cushion either way.
+	const slowDelay = 3 * whois.DefaultWHOISInterval
+
+	// No RDAP coverage for either TLD -- degrades to WHOIS-only, same as
+	// TestLookupOne_WHOISOnlyDegradedMode, so this test's only variable is
+	// the WHOIS timing, not RDAP/WHOIS merge behavior.
+	resolver := bootstrap.NewResolver(map[string]string{})
+
+	slowRegistryAddr := startFakeWHOISListener(t, func(query string) string {
+		time.Sleep(slowDelay)
+		return "Domain Name: SLOW.COM\nRegistrar: Slow Registrar, Inc.\n"
+	})
+	fastRegistryAddr := startFakeWHOISListener(t, func(query string) string {
+		return "Domain Name: FAST.NET\nRegistrar: Fast Registrar, Inc.\n"
+	})
+	// One shared IANA server for both names -- see the doc comment above
+	// for why that's deliberate, not an oversight. Dispatches on the TLD
+	// each name's IANA hop queries with (name.TLD, per
+	// internal/whois/referral.go's Lookup), which is exactly why slow.com
+	// and fast.net need to differ in TLD, not just in second-level label.
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		switch strings.TrimSpace(query) {
+		case "com":
+			return "refer: " + slowRegistryAddr + "\n"
+		case "net":
+			return "refer: " + fastRegistryAddr + "\n"
+		default:
+			t.Errorf("unexpected IANA query %q", query)
+			return ""
+		}
+	})
+
+	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{
+		whoisIANAServer: ianaAddr,
+		NoFollow:        true,
+		Concurrency:     2, // must be >= 2 for the two lookups to genuinely overlap
+	}
+	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"slow.com", "fast.net"}, opts, nil, render.FormatPlain, uiConfig{}, resolver)
+	if err != nil {
+		t.Fatalf("runLookupPool: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+
+	out := stdout.String()
+	slowIdx := strings.Index(out, "Slow Registrar")
+	fastIdx := strings.Index(out, "Fast Registrar")
+	if slowIdx == -1 || fastIdx == -1 {
+		t.Fatalf("stdout missing one or both registrar names, got:\n%s", out)
+	}
+	if slowIdx > fastIdx {
+		t.Errorf("output has fast.net's record before slow.com's, but slow.com was listed first on the command line -- "+
+			"output must follow input order, not completion order (fast.net finished first by design). got:\n%s", out)
+	}
+}
+
+// TestRunLookup_FileAndPositionalAreSourceIndependent is I3's
+// source-independence test: a one-name --file and the same name given
+// positionally must produce byte-identical output and take the same
+// path. Both go through the full runLookup (not runLookupPool directly),
+// since --file's own read-and-mutual-exclusivity handling lives there,
+// before the two forms converge on the same []string domains. Both
+// invocations restrict --source to whois (parseSourceFilter's "whois")
+// so real bootstrap RDAP coverage for whatever TLD is in play can never
+// cause a real registry RDAP call regardless of the embedded/fetched
+// bootstrap data -- the only real-network exposure left is runLookup's
+// own bootstrap.Load fetch attempt for the bootstrap file itself, bounded
+// by a short Timeout and falling back to the embedded snapshot exactly
+// like TestRunLookup_ConcurrencyOneIsValid already relies on elsewhere in
+// this file. Both runs get their own len==1 domains list, so
+// runLookupPool's own count-based limiter/cache wiring (nil for one name)
+// treats them identically too -- the doc comment on that wiring in
+// runLookupPool explicitly promises "a one-name file behaves exactly like
+// a positional name."
+func TestRunLookup_FileAndPositionalAreSourceIndependent(t *testing.T) {
+	registryAddr := startFakeWHOISListener(t, func(string) string {
+		return "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
+	})
+	ianaAddr := startFakeWHOISListener(t, func(string) string {
+		return "refer: " + registryAddr + "\n"
+	})
+
+	baseOpts := lookupOptions{
+		whoisIANAServer: ianaAddr,
+		NoFollow:        true,
+		SourceFilter:    "whois",
+		Concurrency:     1,
+		Timeout:         2 * time.Second,
+	}
+
+	runOnce := func(opts lookupOptions, domains []string) (stdout, stderr string, err error) {
+		var outBuf, errBuf bytes.Buffer
+		err = runLookup(context.Background(), &outBuf, &errBuf, domains, opts, uiConfig{})
+		return outBuf.String(), errBuf.String(), err
+	}
+
+	posOut, posErr, posRunErr := runOnce(baseOpts, []string{"example.com"})
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "names.txt")
+	if err := os.WriteFile(filePath, []byte("example.com\n"), 0o600); err != nil {
+		t.Fatalf("writing name file: %v", err)
+	}
+	fileOpts := baseOpts
+	fileOpts.FilePath = filePath
+	fileOut, fileErr, fileRunErr := runOnce(fileOpts, nil)
+
+	if (posRunErr == nil) != (fileRunErr == nil) {
+		t.Fatalf("positional err=%v, file err=%v -- both forms of the same single name must produce the same outcome", posRunErr, fileRunErr)
+	}
+	if posOut != fileOut {
+		t.Errorf("stdout differs between positional and --file for the same name:\npositional:\n%s\nfile:\n%s", posOut, fileOut)
+	}
+	if posErr != fileErr {
+		t.Errorf("stderr differs between positional and --file for the same name:\npositional:\n%s\nfile:\n%s", posErr, fileErr)
+	}
+	if posOut == "" {
+		t.Fatal("both runs produced empty stdout -- this test would trivially pass without actually exercising the lookup; something upstream broke")
+	}
+}
+
+// TestRun_FileWithJSONAndMultipleNamesIsUsageError is I3's second
+// required gap: -o json supports exactly one domain (TestRun_
+// MultiDomainJSONIsUsageError already pins that for positional args) but
+// nothing before this test drove the same rule through --file's own
+// name-list expansion. The check (runLookup, right after --file is read
+// into domains) runs before bootstrap.Load, so this stays hermetic --
+// no fake WHOIS/RDAP server needed, same as TestRun_ReservedIPRejectedAtExit2.
+func TestRun_FileWithJSONAndMultipleNamesIsUsageError(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "names.txt")
+	if err := os.WriteFile(filePath, []byte("a.com\nb.com\n"), 0o600); err != nil {
+		t.Fatalf("writing name file: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	got := run([]string{"-o", "json", "--file", filePath}, &stdout, &stderr, uiConfig{})
+	if got != 2 {
+		t.Errorf("run with --file (2 names) and -o json exit code = %d, want 2 (-o json supports exactly one domain)", got)
+	}
+}
+
+// TestRunLookupPool_FailingNameDoesNotAbortSurvivors is I3's third
+// required gap: TestRun_AcceptsMultipleDomainArgs uses two invalid names,
+// so it never actually proves a valid name's own result survives
+// alongside a failing one -- both of its names fail identically, and the
+// test only ever inspects the aggregate exit code. This drives
+// runLookupPool with one name that fails domain.Normalize immediately
+// (no network, exit 2) and one that completes a real WHOIS lookup, and
+// asserts both halves: the aggregate exit code is still the failing
+// name's worse code (2), AND the surviving name's own data actually
+// reached stdout rather than being dropped or blanked out by the other
+// worker's failure.
+func TestRunLookupPool_FailingNameDoesNotAbortSurvivors(t *testing.T) {
+	registryAddr := startFakeWHOISListener(t, func(string) string {
+		return "Domain Name: GOOD.COM\nRegistrar: Good Registrar, Inc.\n"
+	})
+	ianaAddr := startFakeWHOISListener(t, func(string) string {
+		return "refer: " + registryAddr + "\n"
+	})
+	resolver := bootstrap.NewResolver(map[string]string{})
+
+	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true, Concurrency: 2}
+	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"also-bad", "good.com"}, opts, nil, render.FormatPlain, uiConfig{}, resolver)
+
+	var sig exitSignal
+	if !errors.As(err, &sig) || sig.code != 2 {
+		t.Fatalf("runLookupPool err = %v, want exitSignal{2} (the failing name's code, worst across the two)", err)
+	}
+	if !strings.Contains(stdout.String(), "Good Registrar") {
+		t.Errorf("stdout missing good.com's registrar despite it succeeding -- a failing name must not suppress a surviving name's output. stdout:\n%s", stdout.String())
+	}
+}
+
+// TestRunLookup_FileDashReadsFromStdin exercises "--file -" through the
+// real run()/runLookup path, substituting the package-level stdin var
+// (main.go) for a fixed io.Reader instead of the real os.Stdin -- the
+// smallest seam that makes this path testable at all, since os.Stdin
+// itself can't be pointed at test-controlled content without a subprocess.
+// Restricted to --source whois for the same reason as
+// TestRunLookup_FileAndPositionalAreSourceIndependent above.
+func TestRunLookup_FileDashReadsFromStdin(t *testing.T) {
+	registryAddr := startFakeWHOISListener(t, func(string) string {
+		return "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
+	})
+	ianaAddr := startFakeWHOISListener(t, func(string) string {
+		return "refer: " + registryAddr + "\n"
+	})
+
+	old := stdin
+	stdin = strings.NewReader("example.com\n")
+	t.Cleanup(func() { stdin = old })
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	err := runLookup(context.Background(), &stdoutBuf, &stderrBuf, nil, lookupOptions{
+		FilePath:        "-",
+		whoisIANAServer: ianaAddr,
+		NoFollow:        true,
+		SourceFilter:    "whois",
+		Concurrency:     1,
+		Timeout:         2 * time.Second,
+	}, uiConfig{})
+	if err != nil {
+		t.Fatalf("runLookup: %v\nstderr: %s", err, stderrBuf.String())
+	}
+	if !strings.Contains(stdoutBuf.String(), "Example Registrar") {
+		t.Errorf("stdout missing the WHOIS-sourced registrar read via --file -, got:\n%s", stdoutBuf.String())
+	}
+}
+
+// TestRunLookup_CounterBranch_ConcurrentWithErrorDoesNotRace is a
+// regression test for a real defect: runLookupPool's progress counter was
+// briefly wired to write to raw stderr via spinner.RunFunc, while every
+// worker's own diagnostics (reportLookupError, reached whenever a name
+// fails -- not-found, a normalize failure, a total lookup failure, or -v
+// output) already go through syncStderr, the syncWriter built in Task 4
+// precisely to serialize concurrent writes to the one shared stderr
+// (main.go's syncWriter doc comment explains why). Writing to raw stderr
+// from the counter's animation goroutine while a worker writes through
+// syncStderr concurrently is a data race -- caught reliably under -race --
+// and even without -race, glues the error text onto the counter's
+// in-progress \r line with no reset.
+//
+// No prior committed test drove this branch at all: showCounter requires
+// ui.StderrTTY && format == render.FormatHuman && len(domains) > 1, which
+// the one direct runLookupPool test (TestRunLookup_EndToEnd_EmitsInInputOrder,
+// above) never hits -- it uses FormatPlain and the zero-value uiConfig
+// (StderrTTY: false). So "go test -race" was not actually exercising this
+// code path before this test existed.
+//
+// "localhost" and "also-bad" both fail domain.Normalize before any network
+// call (single-label input, same as TestRun_AcceptsMultipleDomainArgs),
+// so every worker hits reportLookupError immediately and repeatedly
+// relative to the counter's own animation ticks -- maximizing the chance
+// any unsynchronized write gets caught, and keeping the test hermetic and
+// fast (no fake WHOIS/RDAP servers needed).
+func TestRunLookup_CounterBranch_ConcurrentWithErrorDoesNotRace(t *testing.T) {
+	resolver := bootstrap.NewResolver(map[string]string{})
+	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{Concurrency: 2}
+
+	err := runLookupPool(context.Background(), &stdout, &stderr,
+		[]string{"localhost", "also-bad"}, opts, nil, render.FormatHuman,
+		uiConfig{StderrTTY: true}, resolver)
+
+	var sig exitSignal
+	if err != nil && !errors.As(err, &sig) {
+		t.Fatalf("runLookupPool: unexpected error type %v\nstderr:\n%s", err, stderr.String())
 	}
 }

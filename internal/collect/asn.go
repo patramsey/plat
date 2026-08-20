@@ -75,10 +75,11 @@ func collectASNWHOIS(ctx context.Context, asn uint32, whoisIANAServer string, op
 	if timeout <= 0 {
 		timeout = 5 * time.Second // matches whois.Client.timeout()'s own default
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	whoisClient := &whois.Client{Timeout: timeout, IANAServer: whoisIANAServer}
+	// See collect.go's collectWHOIS for why the whole-chain bound is
+	// ChainTimeout rather than a context.WithTimeout wrap here: a pacing
+	// wait must not be charged against the same budget as the actual
+	// network hops.
+	whoisClient := &whois.Client{Timeout: timeout, ChainTimeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter}
 	result, _ := whoisClient.LookupASN(ctx, asn)
 	return fromASNWHOIS(result)
 }

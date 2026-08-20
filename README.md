@@ -106,6 +106,26 @@ plat example.com
 # Multiple domains in one invocation
 plat example.com example.org
 
+# Bulk mode: read names from a file, one per line -- blank lines and
+# # comments are skipped -- or from stdin with -
+plat --file names.txt
+cat names.txt | plat --file -
+
+# Names are looked up concurrently (--concurrency, default 4; also
+# applies to names given on the command line), but results are always
+# emitted in input order regardless of which lookup finishes first, so
+# two runs of the same list produce identical output. WHOIS queries are
+# paced per server -- including referral hops to registrar servers -- so
+# a large single-TLD list cannot hammer one server. That per-server pace
+# (1 query/second) is a floor on wall time no --timeout can raise: a
+# 300-name single-TLD list takes at least 300s regardless of --timeout,
+# while a mixed-TLD list of the same size finishes faster since the
+# floor applies per server, not per run. A long bulk run also
+# prints a "looking up... N/total" progress counter to stderr when stderr
+# is a terminal and output is the default human format (suppressed for
+# piped/redirected output and for -o plain/json/ndjson).
+plat --file names.txt --concurrency 8 -o ndjson > results.ndjson
+
 # IP-address lookup — the netblock and its holding organization, from
 # the RIR's RDAP + WHOIS, merged the same way (see "IP Lookups" below)
 plat 8.8.8.8
@@ -150,7 +170,9 @@ plat example.com --no-follow
 # instead of the full view -- ignored for -o json/ndjson
 plat example.com -q
 
-# Adjust the per-source timeout (default 5s)
+# Adjust the per-source timeout (default 5s). It bounds time spent
+# talking to a server: in a bulk run, the time a name spends waiting its
+# turn for a paced WHOIS server is not charged against it.
 plat example.com --timeout 10s
 
 # Show the per-source diagnostic block: which sources were attempted,

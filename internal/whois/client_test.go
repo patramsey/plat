@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/netip"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -377,6 +378,97 @@ func TestLookupIP_FollowsIANAReferral(t *testing.T) {
 	}
 	if last.IPFields.NetName != "GOGL" {
 		t.Errorf("NetName = %q, want GOGL", last.IPFields.NetName)
+	}
+}
+
+// fakeLimiter records the servers it was asked to pace, in order.
+type fakeLimiter struct {
+	mu      sync.Mutex
+	servers []string
+}
+
+func (f *fakeLimiter) Acquire(_ context.Context, server string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.servers = append(f.servers, server)
+	return nil
+}
+
+// TestClient_QueryAcquiresLimiterForEveryServer pins that pacing happens
+// at the query choke point, so every WHOIS contact is covered -- including
+// referral hops to a registrar's server, which nothing at the call site
+// has to remember to request.
+func TestClient_QueryAcquiresLimiterForEveryServer(t *testing.T) {
+	addr := startListener(t, func(string) string { return "Domain Name: EXAMPLE.COM\r\n" })
+
+	f := &fakeLimiter{}
+	c := &Client{Timeout: 2 * time.Second, Limiter: f}
+
+	if _, err := c.query(context.Background(), addr, "example.com"); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if len(f.servers) != 1 {
+		t.Fatalf("limiter acquired %d times, want 1", len(f.servers))
+	}
+	if f.servers[0] != addr {
+		t.Errorf("limiter acquired for %q, want %q", f.servers[0], addr)
+	}
+}
+
+// TestClient_NilLimiterIsSafe pins that a single lookup -- which passes no
+// limiter -- still works. A nil Limiter must mean "no pacing", not a panic.
+func TestClient_NilLimiterIsSafe(t *testing.T) {
+	addr := startListener(t, func(string) string { return "Domain Name: EXAMPLE.COM\r\n" })
+
+	c := &Client{Timeout: 2 * time.Second} // Limiter deliberately unset
+	if _, err := c.query(context.Background(), addr, "example.com"); err != nil {
+		t.Fatalf("query with nil Limiter: %v", err)
+	}
+}
+
+// TestClient_LookupAcquiresLimiterForEveryHop drives a full three-hop
+// IANA -> registry -> registrar referral chain (mirroring
+// TestClient_ReferralChasing's setup) with a Limiter set, and proves the
+// choke-point placement inside query -- not just a single direct call to
+// it -- actually covers every hop Lookup makes. Asserting only the count
+// would also pass if the same server were paced three times instead of
+// three distinct servers once each, so this checks the recorded servers
+// slice itself, in order.
+func TestClient_LookupAcquiresLimiterForEveryHop(t *testing.T) {
+	registrarAddr := startListener(t, func(query string) string {
+		return "Domain Name: example.com\nRegistrant Organization: Example Corp\nRegistrar: Example Registrar, Inc.\n"
+	})
+
+	registryAddr := startListener(t, func(query string) string {
+		return fmt.Sprintf("Domain Name: EXAMPLE.COM\nRegistrar WHOIS Server: %s\nRegistrar: Example Registrar, Inc.\n", registrarAddr)
+	})
+
+	ianaAddr := startListener(t, func(query string) string {
+		return fmt.Sprintf("whois:        %s\ndomain:       COM\n", registryAddr)
+	})
+
+	f := &fakeLimiter{}
+	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second, Limiter: f}
+	q, err := domain.Normalize("example.com")
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	result, err := c.Lookup(context.Background(), q.Name)
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if len(result.Hops) != 3 {
+		t.Fatalf("Hops = %d, want 3", len(result.Hops))
+	}
+
+	want := []string{ianaAddr, registryAddr, registrarAddr}
+	if len(f.servers) != len(want) {
+		t.Fatalf("limiter acquired %d times, want %d (one per hop): got %v", len(f.servers), len(want), f.servers)
+	}
+	for i, server := range want {
+		if f.servers[i] != server {
+			t.Errorf("limiter acquisition %d = %q, want %q (distinct server per hop, in order)", i, f.servers[i], server)
+		}
 	}
 }
 

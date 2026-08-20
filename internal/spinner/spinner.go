@@ -33,11 +33,18 @@ var frames = []string{"⣾ ", "⣽ ", "⣻ ", "⢿ ", "⡿ ", "⣟ ", "⣯ ", "�
 
 const interval = time.Second / 10
 
-// Run displays an animated spinner with message on w while work executes
-// in the background, then clears the spinner line once work returns.
-// work is always fully executed before Run returns, regardless of how
-// long it takes relative to the animation.
+// Run displays an animated spinner with a fixed message on w while work
+// executes, then clears the line. Retained as the common case; it
+// delegates to RunFunc so there is only one animation loop.
 func Run(w io.Writer, message string, work func()) {
+	RunFunc(w, func() string { return message }, work)
+}
+
+// RunFunc is Run with a message re-evaluated on every frame, for progress
+// that changes while work runs -- a bulk run's completed-count, for
+// instance. message is called from the animation goroutine, so anything it
+// reads must be safe for concurrent access.
+func RunFunc(w io.Writer, message func() string, work func()) {
 	done := make(chan struct{})
 	go func() {
 		work()
@@ -49,9 +56,15 @@ func Run(w io.Writer, message string, work func()) {
 
 	var lineLen int
 	draw := func(frame string) {
-		line := frame + message
-		lineLen = len(line)
-		_, _ = fmt.Fprint(w, "\r"+line)
+		line := frame + message()
+		// Pad to the previous width so a shortening message cannot
+		// leave stale characters behind.
+		pad := ""
+		if n := lineLen - len(line); n > 0 {
+			pad = strings.Repeat(" ", n)
+		}
+		lineLen = len(line) + len(pad)
+		_, _ = fmt.Fprint(w, "\r"+line+pad)
 	}
 
 	draw(frames[0])
