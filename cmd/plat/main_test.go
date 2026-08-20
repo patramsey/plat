@@ -1291,8 +1291,9 @@ func TestRunLookupPool_BoundsRealLookupOneConcurrency(t *testing.T) {
 	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
 	opts := lookupOptions{NoFollow: true, Concurrency: concurrency}
 	sources := []model.SourceID{model.SourceRegistryRDAP}
+	client := newTestClient(t, resolver, opts, sources)
 	var stdout, stderr bytes.Buffer
-	if err := runLookupPool(context.Background(), &stdout, &stderr, domains, opts, sources, render.FormatPlain, uiConfig{}, resolver); err != nil {
+	if err := runLookupPool(context.Background(), &stdout, &stderr, domains, opts, sources, render.FormatPlain, uiConfig{}, client); err != nil {
 		t.Fatalf("runLookupPool: %v\nstderr:\n%s", err, stderr.String())
 	}
 
@@ -1434,7 +1435,8 @@ func TestRunLookup_EndToEnd_EmitsInInputOrder(t *testing.T) {
 		NoFollow:        true,
 		Concurrency:     2, // must be >= 2 for the two lookups to genuinely overlap
 	}
-	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"slow.com", "fast.net"}, opts, nil, render.FormatPlain, uiConfig{}, resolver)
+	client := newTestClient(t, resolver, opts, nil)
+	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"slow.com", "fast.net"}, opts, nil, render.FormatPlain, uiConfig{}, client)
 	if err != nil {
 		t.Fatalf("runLookupPool: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 	}
@@ -1559,7 +1561,8 @@ func TestRunLookupPool_FailingNameDoesNotAbortSurvivors(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true, Concurrency: 2}
-	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"also-bad", "good.com"}, opts, nil, render.FormatPlain, uiConfig{}, resolver)
+	client := newTestClient(t, resolver, opts, nil)
+	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"also-bad", "good.com"}, opts, nil, render.FormatPlain, uiConfig{}, client)
 
 	var sig exitSignal
 	if !errors.As(err, &sig) || sig.code != 2 {
@@ -1637,9 +1640,10 @@ func TestRunLookup_CounterBranch_ConcurrentWithErrorDoesNotRace(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	opts := lookupOptions{Concurrency: 2}
 
+	client := newTestClient(t, resolver, opts, nil)
 	err := runLookupPool(context.Background(), &stdout, &stderr,
 		[]string{"localhost", "also-bad"}, opts, nil, render.FormatHuman,
-		uiConfig{StderrTTY: true}, resolver)
+		uiConfig{StderrTTY: true}, client)
 
 	var sig exitSignal
 	if err != nil && !errors.As(err, &sig) {

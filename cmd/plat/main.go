@@ -20,11 +20,9 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/term"
 
-	"github.com/patramsey/plat/internal/bootstrap"
-	"github.com/patramsey/plat/internal/collect"
+	"github.com/patramsey/plat"
 	"github.com/patramsey/plat/internal/diff"
 	"github.com/patramsey/plat/internal/domain"
-	"github.com/patramsey/plat/internal/merge"
 	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/render"
@@ -32,7 +30,6 @@ import (
 	"github.com/patramsey/plat/internal/render/machine"
 	"github.com/patramsey/plat/internal/render/plain"
 	"github.com/patramsey/plat/internal/spinner"
-	"github.com/patramsey/plat/internal/whois"
 )
 
 // version, commit, date, and builtBy are overwritten via -ldflags at
@@ -295,26 +292,14 @@ type lookupOptions struct {
 	// runLookup looks up in parallel. Defaults to 4 via the flag
 	// registration; runLookup rejects anything less than 1.
 	Concurrency int
-	// Limiter paces outbound WHOIS queries across the whole run, shared by
-	// every worker in the pool runLookup builds. Set by runLookup itself
-	// (nil for a single name, a real *whois.HostLimiter for more than
-	// one) rather than by a flag -- every collect.Options construction
-	// site below must forward it.
-	Limiter whois.Limiter
-	// IANACache caches the WHOIS-server-per-TLD mapping resolved from
-	// the IANA hop, shared by every worker in the pool the same way
-	// Limiter is (nil for a single name, a real *whois.IANACache for
-	// more than one). Only lookupOneDomain's collect.Options forwards
-	// it -- lookupOneIP/lookupOneASN's WHOIS chains resolve IANA by
-	// address/AS number, not by TLD, so there is no cache key for them
-	// to share here.
-	IANACache *whois.IANACache
 	// whoisIANAServer overrides the WHOIS server lookupOne queries first
-	// to resolve a TLD's registry server (see collect.Collect's
-	// whoisIANAServer parameter). Unexported and unset by every real flag
-	// -- it's always "" (collect.Collect's real-network default) outside
-	// of this package's own tests, which construct lookupOptions directly
-	// to point it at a fake local listener.
+	// to resolve a TLD's registry server (see plat.Options.WHOISIANAServer).
+	// Unexported and unset by every real flag -- it's always "" (the
+	// real-network default) outside of this package's own tests, which
+	// construct lookupOptions directly to point it at a fake local
+	// listener. runLookup forwards it into the one plat.Client it builds;
+	// the per-server WHOIS pacing limiter and IANA referral cache the pool
+	// used to carry here now live on that client.
 	whoisIANAServer string
 	// SuppressSpinner disables the three per-name spinners in lookupOne's
 	// domain/IP/ASN branches. Set by runLookupPool when it is driving its
@@ -403,39 +388,42 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 		return usageError{err}
 	}
 
-	resolver, err := bootstrap.Load(ctx, bootstrap.Options{Refresh: opts.RefreshBootstrap, Timeout: opts.Timeout})
+	// Exactly one Client per run, shared by every name in the pool below.
+	// That is load-bearing, not incidental: the per-server WHOIS pacing
+	// limiter and the IANA referral cache live on the Client, so building
+	// one per name would silently un-pace a bulk run and resume hammering
+	// a single registry.
+	client, err := plat.New(ctx, plat.Options{
+		Timeout:          opts.Timeout,
+		Sources:          sources,
+		NoFollow:         opts.NoFollow,
+		RefreshBootstrap: opts.RefreshBootstrap,
+		WHOISIANAServer:  opts.whoisIANAServer,
+	})
 	if err != nil {
 		return fmt.Errorf("resolving RDAP bootstrap: %w", err)
 	}
 
-	return runLookupPool(ctx, stdout, stderr, domains, opts, sources, format, ui, resolver)
+	return runLookupPool(ctx, stdout, stderr, domains, opts, sources, format, ui, client)
 }
 
 // runLookupPool builds the bounded worker pool (opts.Concurrency workers)
 // and flushes results to stdout in input order, never completion order.
 // Split out of runLookup so tests can drive this, the actual pool/ordering
-// logic, directly against an already-resolved *bootstrap.Resolver (e.g.
-// one built via bootstrap.NewResolver against a fake RDAP server, exactly
-// like every lookupOne test in lookupone_test.go already does) instead of
-// going through runLookup's real bootstrap.Load fetch/cache/embedded
-// chain, which always hits the network or the embedded snapshot and can't
-// be pointed at a hermetic fake. This is the same "escape hatch for
-// tests" shape as lookupOptions.whoisIANAServer on the WHOIS side --
-// runLookup's real behavior is unchanged, this only names the seam.
-func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []string, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, resolver *bootstrap.Resolver) error {
-	// One limiter shared by every worker, so pacing is per WHOIS server
-	// across the whole run rather than per lookup. A single name needs no
-	// pacing at all -- keyed on the name count, not on whether --file was
-	// used, so a one-name file behaves exactly like a positional name.
-	var limiter whois.Limiter
-	var ianaCache *whois.IANACache
-	if len(domains) > 1 {
-		limiter = whois.NewHostLimiter(whois.DefaultWHOISInterval)
-		ianaCache = whois.NewIANACache()
-	}
-	opts.Limiter = limiter
-	opts.IANACache = ianaCache
-
+// logic, directly against an already-built *plat.Client (e.g. one built
+// with plat.Options.Resolver pointed at a fake RDAP server via
+// bootstrap.NewResolver, exactly like every lookupOne test in
+// lookupone_test.go already does) instead of going through runLookup's
+// real bootstrap fetch/cache/embedded chain, which always hits the
+// network or the embedded snapshot and can't be pointed at a hermetic
+// fake. This is the same "escape hatch for tests" shape as
+// lookupOptions.whoisIANAServer on the WHOIS side -- runLookup's real
+// behavior is unchanged, this only names the seam.
+//
+// The client is built once per run, by runLookup, and shared by every
+// worker here: the per-server WHOIS pacing limiter and the IANA referral
+// cache live on it, so one client per name would un-pace the whole run.
+func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []string, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, client *plat.Client) error {
 	// Each name renders into its own buffer; buffers are flushed in input
 	// order after every worker finishes, so output never depends on
 	// completion order.
@@ -472,7 +460,7 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 	runPool := func() {
 		for i, input := range domains {
 			g.Go(func() error {
-				codes[i] = lookupOne(ctx, &bufs[i], syncStderr, resolver, input, opts, sources, format, ui)
+				codes[i] = lookupOne(ctx, &bufs[i], syncStderr, client, input, opts, sources, format, ui)
 				done.Add(1)
 				return nil
 			})
@@ -519,7 +507,7 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 // Plain/JSON/NDJSON, never when stderr is redirected even if stdout is a
 // terminal, and never when runLookupPool's own bulk-run progress counter
 // is already driving that stderr line (SuppressSpinner).
-func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, input string, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
+func lookupOne(ctx context.Context, stdout, stderr io.Writer, client *plat.Client, input string, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig) int {
 	q, err := domain.Normalize(input)
 	if err != nil {
 		reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui)
@@ -544,11 +532,11 @@ func lookupOne(ctx context.Context, stdout, stderr io.Writer, resolver *bootstra
 
 	switch q.Kind {
 	case domain.KindIPv4, domain.KindIPv6:
-		return lookupOneIP(ctx, stdout, stderr, resolver, q, opts, sources, format, ui, prior)
+		return lookupOneIP(ctx, stdout, stderr, client, q, opts, sources, format, ui, prior)
 	case domain.KindASN:
-		return lookupOneASN(ctx, stdout, stderr, resolver, q, opts, sources, format, ui, prior)
+		return lookupOneASN(ctx, stdout, stderr, client, q, opts, sources, format, ui, prior)
 	default:
-		return lookupOneDomain(ctx, stdout, stderr, resolver, q, opts, sources, format, ui, prior)
+		return lookupOneDomain(ctx, stdout, stderr, client, q, opts, sources, format, ui, prior)
 	}
 }
 
@@ -694,21 +682,22 @@ func diffRender(w io.Writer, format render.Format, prior machine.Snapshot, encod
 // lookupOneDomain is lookupOne's KindDomain branch — the pre-M6 lookup
 // flow, unchanged apart from being split out of lookupOne so it can share
 // a signature shape with lookupOneIP.
-func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
-	baseURL, _ := resolver.BaseURL(q.Name.TLD) // "" is fine — Collect degrades to WHOIS-only
-	collectOpts := collect.Options{NoFollow: opts.NoFollow, Timeout: opts.Timeout, Sources: sources, Limiter: opts.Limiter, IANACache: opts.IANACache}
-
-	var records []model.SourceRecord
+func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, client *plat.Client, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
+	var res plat.Result
+	var lookupErr error
 	work := func() {
-		records = collect.Collect(ctx, q.Name, baseURL, opts.whoisIANAServer, collectOpts)
+		res, lookupErr = client.Lookup(ctx, q.Name.Punycode)
 	}
 	if ui.StderrTTY && format == render.FormatHuman && !opts.SuppressSpinner {
 		spinner.Run(stderr, "looking up "+q.Name.Punycode+"...", work)
 	} else {
 		work()
 	}
-
-	record := merge.Merge(records)
+	if res.Domain == nil {
+		reportLookupError(stderr, format, q.Name.Punycode, lookupErr, nil, opts.Verbose, ui)
+		return 3
+	}
+	record := *res.Domain
 
 	code := deriveOutcome(record.Sources)
 	if code == 0 {
@@ -739,21 +728,22 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, resolver *bo
 // lookupOutcomeError operate on []model.SourceResult, which model.IPRecord
 // carries just like model.Record, so both are reused unchanged -- exit
 // codes stay consistent between the domain and IP paths.
-func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
-	baseURL, _ := resolver.IPBaseURL(q.IP) // "" is fine — CollectIP degrades to WHOIS-only
-	collectOpts := collect.Options{Timeout: opts.Timeout, Sources: sources, Limiter: opts.Limiter}
-
-	var records []model.IPSourceRecord
+func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, client *plat.Client, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
+	var res plat.Result
+	var lookupErr error
 	work := func() {
-		records = collect.CollectIP(ctx, q.IP, baseURL, opts.whoisIANAServer, collectOpts)
+		res, lookupErr = client.Lookup(ctx, q.Input)
 	}
 	if ui.StderrTTY && format == render.FormatHuman && !opts.SuppressSpinner {
 		spinner.Run(stderr, "looking up "+q.Input+"...", work)
 	} else {
 		work()
 	}
-
-	record := merge.MergeIP(records)
+	if res.IP == nil {
+		reportLookupError(stderr, format, q.Input, lookupErr, nil, opts.Verbose, ui)
+		return 3
+	}
+	record := *res.IP
 
 	code := deriveOutcome(record.Sources)
 	if code == 0 {
@@ -784,21 +774,22 @@ func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, resolver *bootst
 // operate on []model.SourceResult, which model.ASNRecord carries just like
 // model.Record and model.IPRecord, so both are reused unchanged -- exit
 // codes stay consistent across the domain, IP, and ASN paths.
-func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, resolver *bootstrap.Resolver, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
-	baseURL, _ := resolver.ASNBaseURL(q.ASN) // "" is fine -- CollectASN degrades to WHOIS-only
-	collectOpts := collect.Options{Timeout: opts.Timeout, Sources: sources, Limiter: opts.Limiter}
-
-	var records []model.ASNSourceRecord
+func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, client *plat.Client, q domain.Query, opts lookupOptions, sources []model.SourceID, format render.Format, ui uiConfig, prior *machine.Snapshot) int {
+	var res plat.Result
+	var lookupErr error
 	work := func() {
-		records = collect.CollectASN(ctx, q.ASN, baseURL, opts.whoisIANAServer, collectOpts)
+		res, lookupErr = client.Lookup(ctx, q.Input)
 	}
 	if ui.StderrTTY && format == render.FormatHuman && !opts.SuppressSpinner {
 		spinner.Run(stderr, "looking up "+q.Input+"...", work)
 	} else {
 		work()
 	}
-
-	record := merge.MergeASN(records)
+	if res.ASN == nil {
+		reportLookupError(stderr, format, q.Input, lookupErr, nil, opts.Verbose, ui)
+		return 3
+	}
+	record := *res.ASN
 
 	code := deriveOutcome(record.Sources)
 	if code == 0 {
@@ -1009,27 +1000,14 @@ func reportLookupError(stderr io.Writer, format render.Format, domainName string
 // failure, or a source errored so non-existence can't be asserted with
 // confidence).
 func deriveOutcome(sources []model.SourceResult) int {
-	if len(sources) == 0 {
+	switch model.Classify(sources) {
+	case model.OutcomeOK:
+		return 0
+	case model.OutcomeNotFound:
+		return 1
+	default:
 		return 3
 	}
-	hasData, hasNotFound, hasFailed := false, false, false
-	for _, s := range sources {
-		switch {
-		case s.OK:
-			hasData = true
-		case s.NotFound:
-			hasNotFound = true
-		default:
-			hasFailed = true
-		}
-	}
-	if hasData {
-		return 0
-	}
-	if hasNotFound && !hasFailed {
-		return 1
-	}
-	return 3
 }
 
 // parseSourceFilter translates the --source flag's friendly value into
