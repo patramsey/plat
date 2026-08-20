@@ -36,6 +36,25 @@ follows [Semantic Versioning](https://semver.org/).
   between the two merged records, not noise.
   Snapshots saved before v0.3.1 (whose nameserver and status lists were
   unsorted) compare correctly, since lists are compared as sets.
+- The lookup engine is now importable as a Go library, at
+  `github.com/patramsey/plat` (`go get github.com/patramsey/plat`), with
+  no need to shell out to the `plat` binary. `plat.New` builds a
+  `Client`; `Client.Lookup` runs one domain, IP, or ASN lookup and
+  returns a merged, provenance-annotated record. A `Client` should be
+  built once and reused across lookups -- it holds the IANA bootstrap
+  data and a per-server WHOIS pacing limiter, and constructing a fresh
+  one per name throws both away. Per-field provenance, the CLI's core
+  idea, comes through unchanged: every field is a `Field[T]` carrying
+  its merged value and the sources that supplied it. A failing source
+  is not an error -- `Lookup` returns successfully as long as one
+  source answers, with per-source detail in the record's `Sources`
+  field. The record types (`Record`, `IPRecord`, `ASNRecord`, and their
+  component types) are aliases to internal types, so `internal/` stays
+  private and free to change underneath the public API. The JSON,
+  human, and plain renderers are not exposed by this package, so a
+  library consumer cannot currently produce plat's documented
+  `schemaVersion: 1` output from a `Result` -- that remains CLI-only.
+  This API is v0 and may change before 1.0.
 
 ### Changed
 - Internal maintenance: the RDAP fetch path and two merge helpers each

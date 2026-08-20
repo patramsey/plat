@@ -39,6 +39,7 @@ where sources disagree.
   - [Lifecycle](#lifecycle)
   - [Human view vs. JSON](#human-view-vs-json)
 - [Exit Codes](#exit-codes)
+- [Use as a Go library](#use-as-a-go-library)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [License](#license)
@@ -390,6 +391,42 @@ Exit `3`'s message distinguishes two different failure shapes:
   reached`
 - a mixed result where non-existence can't be confirmed: `lookup
   inconclusive — N of M sources failed`
+
+## Use as a Go library
+
+The lookup engine behind the CLI is importable directly, with no need to
+shell out to the `plat` binary:
+
+```bash
+go get github.com/patramsey/plat
+```
+
+```go
+c, err := plat.New(ctx, plat.Options{})
+if err != nil {
+	log.Fatal(err)
+}
+
+res, err := c.Lookup(ctx, "example.com")
+if err != nil {
+	log.Fatal(err)
+}
+
+fmt.Println(res.Domain.Expires.Value.Time, res.Domain.Expires.Sources)
+```
+
+Build one `Client` and reuse it for every `Lookup` — it holds the IANA
+bootstrap data and a per-server WHOIS pacing limiter, both of which are
+only useful if kept around. Every field on the result types is a
+`Field[T]` carrying both the merged value and which sources supplied it,
+same as the CLI's output; a source failing is normal, not an error, as
+long as at least one source returns data. The JSON/human/plain renderers
+are not part of this package, so a library consumer can't currently emit
+plat's `schemaVersion: 1` output directly from a `Result`.
+
+**This API is v0 and may change before 1.0.** See
+[`go doc github.com/patramsey/plat`](https://pkg.go.dev/github.com/patramsey/plat)
+for the full reference.
 
 ## License
 

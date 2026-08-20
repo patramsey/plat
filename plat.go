@@ -1,8 +1,3 @@
-// Package plat looks up ownership of a domain, IP address, or autonomous
-// system by querying RDAP and WHOIS concurrently and merging the answers
-// into one record with per-field provenance.
-//
-// This API is v0 and may change before 1.0.
 package plat
 
 import (
