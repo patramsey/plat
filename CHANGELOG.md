@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-19
+
 ### Added
 - `--file <path>` reads names from a file, one per line, with blank lines
   and `#` comments skipped; `--file -` reads stdin. `--concurrency N`
@@ -15,7 +17,8 @@ follows [Semantic Versioning](https://semver.org/).
   same list produce identical output. WHOIS queries are paced per server
   -- including referral hops to registrar servers -- so a large single-TLD
   list cannot hammer one server; the pace is a fixed conservative interval
-  and is not user-tunable. `--timeout` bounds the time a lookup spends
+  that no CLI flag changes (the Go library added below can tune it).
+  `--timeout` bounds the time a lookup spends
   talking to servers, so a name waiting its turn for a paced server is
   never timed out before it gets to ask -- pacing costs wall time, never
   a source. A single name is unaffected: no pacing, no pool, no progress
@@ -54,7 +57,15 @@ follows [Semantic Versioning](https://semver.org/).
   human, and plain renderers are not exposed by this package, so a
   library consumer cannot currently produce plat's documented
   `schemaVersion: 1` output from a `Result` -- that remains CLI-only.
-  This API is v0 and may change before 1.0.
+  Per-server WHOIS pacing is on by default and is tunable here, unlike
+  from the CLI: `Options.WHOISInterval` sets the interval and
+  `Options.DisableWHOISPacing` turns it off. Pacing is not free for
+  every single lookup -- when one lookup's referral chain queries the
+  same WHOIS host twice, which happens when a registry refers the
+  registrar query back to that host, the second query waits the full
+  interval. That is why the option exists, and why plat's own CLI
+  disables pacing for single-name runs, leaving single lookups exactly
+  as fast as before. This API is v0 and may change before 1.0.
 
 ### Changed
 - Internal maintenance: the RDAP fetch path and two merge helpers each
@@ -241,7 +252,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/patramsey/plat/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/patramsey/plat/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/patramsey/plat/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/patramsey/plat/compare/v0.2.0...v0.3.0
