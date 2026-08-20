@@ -431,6 +431,34 @@ func TestLookup_UsesSuppliedHTTPClient(t *testing.T) {
 	}
 }
 
+// failingTransport counts requests and fails them all, so a test can prove
+// a client was consulted without any request leaving the machine.
+type failingTransport struct{ n int }
+
+func (t *failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	t.n++
+	return nil, errors.New("failingTransport: no network in tests")
+}
+
+func TestNew_HTTPClientReachesBootstrapFetch(t *testing.T) {
+	tr := &failingTransport{}
+	// No Resolver: New must actually run bootstrap.Load, which fetches
+	// four registries. The transport fails every request immediately, so
+	// Load falls through to the embedded snapshot without touching the
+	// network -- but it must have gone through OUR client to do so.
+	_, err := New(context.Background(), Options{
+		DisableCache: true,
+		Timeout:      2 * time.Second,
+		HTTPClient:   &http.Client{Transport: tr},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if tr.n == 0 {
+		t.Fatal("supplied HTTPClient was never used for the bootstrap fetch")
+	}
+}
+
 // bootstrapJSONWith builds a minimal, valid IANA dns.json-shaped bootstrap
 // document mapping tld to baseURL -- enough for bootstrap.parseResolver
 // (unexported, so exercised only through Load) to accept it.

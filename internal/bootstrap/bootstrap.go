@@ -233,6 +233,12 @@ type Options struct {
 	// consumers who do not want an embedded dependency writing to their
 	// user's home directory.
 	DisableCache bool
+	// HTTPClient fetches the bootstrap documents. nil means
+	// http.DefaultClient. Exposed so an embedding library can route
+	// plat's every outbound request -- not just its RDAP queries --
+	// through a caller-supplied transport, for a proxy or for
+	// instrumentation.
+	HTTPClient *http.Client
 }
 
 // path returns the cache file path for the named bootstrap document (e.g.
@@ -280,7 +286,7 @@ func fetchOrEmbedded(ctx context.Context, cachePath, url string, embedded []byte
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
-	if data, err := fetchURL(ctx, url, timeout); err == nil && validBootstrapJSON(data) {
+	if data, err := fetchURL(ctx, url, timeout, opts.HTTPClient); err == nil && validBootstrapJSON(data) {
 		if haveCachePath {
 			writeCache(cachePath, data)
 		}
@@ -372,10 +378,10 @@ func writeCache(path string, data []byte) {
 }
 
 func fetch(ctx context.Context, timeout time.Duration) ([]byte, error) {
-	return fetchURL(ctx, bootstrapURL, timeout)
+	return fetchURL(ctx, bootstrapURL, timeout, nil)
 }
 
-func fetchURL(ctx context.Context, url string, timeout time.Duration) ([]byte, error) {
+func fetchURL(ctx context.Context, url string, timeout time.Duration, client *http.Client) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -383,7 +389,10 @@ func fetchURL(ctx context.Context, url string, timeout time.Duration) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
