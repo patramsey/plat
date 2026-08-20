@@ -1,6 +1,7 @@
 package plat_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -41,6 +42,26 @@ func ExampleClient_Lookup() {
 // Client: no disk cache, a longer per-lookup budget, and only the two
 // RDAP sources consulted. It builds no Client and performs no I/O, so it
 // is safe to run as part of the test suite.
+// ExampleEncodeJSON builds a Record by hand -- no lookup, no network -- and
+// encodes it the same way the CLI's -o json would. Its output is
+// deterministic, so it runs as part of the test suite.
+func ExampleEncodeJSON() {
+	rec := plat.Record{
+		Domain: plat.Field[string]{
+			Value:   "example.com",
+			Sources: []plat.SourceID{plat.SourceRegistryRDAP},
+		},
+	}
+	res := plat.Result{Kind: plat.KindDomain, Input: "example.com", Domain: &rec}
+
+	var buf bytes.Buffer
+	if err := plat.EncodeJSON(&buf, res, plat.EncodeOptions{}); err != nil {
+		panic(err)
+	}
+	fmt.Println(buf.String())
+	// Output: {"schemaVersion":1,"objectType":"domain","domain":{"value":"example.com","sources":["registry-rdap"]},"conflicts":[],"redacted":[],"sources":[]}
+}
+
 func ExampleOptions() {
 	_ = plat.Options{
 		Timeout:      30 * time.Second,

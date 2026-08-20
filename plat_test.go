@@ -486,21 +486,18 @@ func bootstrapJSONWith(tld, baseURL string) string {
 // New's bootstrap.Options literal); this one does, see the fix report's
 // mutation evidence.
 //
-// Every New call here uses an already-canceled context so any fetch
-// attempt New/Load does make (for ipv4.json/ipv6.json/asn.json, which
-// are never planted, or for bootstrap.json itself when DisableCache is
-// true) fails in microseconds on ctx.Err() rather than ever dialing out
-// -- confirmed empirically: a canceled-context http.Client.Do returns
-// "context canceled" without a network round trip. Resolver.Resolver is
-// not exported to this package's tests any other offline way: New never
-// takes a Resolver here (that would bypass bootstrap.Load, the exact
-// path under test), and Options has no field to point the fetch at a
-// fake server (Important 3 -- HTTPClient does not cover the bootstrap
-// fetch).
+// Every New call here supplies an HTTPClient built on failingTransport
+// (defined above), which fails every request in-process without ever
+// dialing out. That covers any fetch attempt New/Load does make (for
+// ipv4.json/ipv6.json/asn.json, which are never planted, or for
+// bootstrap.json itself when DisableCache is true), because HTTPClient
+// now reaches the bootstrap fetch (see TestNew_HTTPClientReachesBootstrapFetch
+// above) -- a more direct offline seam than the canceled-context trick this
+// test used before that was true. Resolver.Resolver is not exported to
+// this package's tests any other offline way: New never takes a Resolver
+// here, since that would bypass bootstrap.Load, the exact path under
+// test.
 func TestNew_CacheOptionsAreForwarded(t *testing.T) {
-	canceledCtx, cancel := context.WithCancel(context.Background())
-	cancel()
-
 	dir := t.TempDir()
 	planted := bootstrapJSONWith("faketld", "https://example.test/rdap/")
 	if err := os.WriteFile(filepath.Join(dir, "bootstrap.json"), []byte(planted), 0o600); err != nil {
@@ -508,9 +505,10 @@ func TestNew_CacheOptionsAreForwarded(t *testing.T) {
 	}
 
 	t.Run("CacheDir is read when caching is enabled", func(t *testing.T) {
-		c, err := New(canceledCtx, Options{
+		c, err := New(context.Background(), Options{
 			CacheDir:     dir,
 			DisableCache: false,
+			HTTPClient:   &http.Client{Transport: &failingTransport{}},
 		})
 		if err != nil {
 			t.Fatalf("New: %v", err)
@@ -521,9 +519,10 @@ func TestNew_CacheOptionsAreForwarded(t *testing.T) {
 	})
 
 	t.Run("DisableCache overrides a populated CacheDir", func(t *testing.T) {
-		c, err := New(canceledCtx, Options{
+		c, err := New(context.Background(), Options{
 			CacheDir:     dir,
 			DisableCache: true,
+			HTTPClient:   &http.Client{Transport: &failingTransport{}},
 		})
 		if err != nil {
 			t.Fatalf("New: %v", err)

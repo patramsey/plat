@@ -81,17 +81,57 @@ func TestEncodeJSON_DispatchesOnKind(t *testing.T) {
 	}
 }
 
+// TestEncodeNDJSON_MatchesTheCLI covers all three Kinds, not just
+// KindDomain: EncodeNDJSON's IP and ASN branches are otherwise never
+// exercised by any test in this package, so a reviewer's mutation
+// replacing either branch with "return ErrNoRecord" left the suite green.
+//
+// Note what this proves and what it does not: internal/render/machine's
+// NDJSON encoders (EncodeNDJSON, EncodeIPNDJSON, EncodeASNNDJSON) are
+// themselves pass-throughs to the JSON ones (Encode, EncodeIP, EncodeASN)
+// plus a trailing newline. Comparing plat.EncodeNDJSON's output against
+// them proves plat.EncodeNDJSON dispatches identically to plat.EncodeJSON
+// and correctly forwards to machine -- it does not prove NDJSON output is
+// distinct from JSON output. A future reader should not read this test as
+// evidence the two forms differ.
 func TestEncodeNDJSON_MatchesTheCLI(t *testing.T) {
 	res := sampleResults(t)
-	var got, want bytes.Buffer
-	if err := EncodeNDJSON(&got, res[KindDomain], EncodeOptions{}); err != nil {
-		t.Fatalf("EncodeNDJSON: %v", err)
+
+	cases := []struct {
+		kind Kind
+		want func(w *bytes.Buffer) error
+	}{
+		{KindDomain, func(w *bytes.Buffer) error {
+			return machine.EncodeNDJSON(w, *res[KindDomain].Domain, machine.Options{})
+		}},
+		{KindIP, func(w *bytes.Buffer) error {
+			return machine.EncodeIPNDJSON(w, *res[KindIP].IP, machine.Options{})
+		}},
+		{KindASN, func(w *bytes.Buffer) error {
+			return machine.EncodeASNNDJSON(w, *res[KindASN].ASN, machine.Options{})
+		}},
 	}
-	if err := machine.EncodeNDJSON(&want, *res[KindDomain].Domain, machine.Options{}); err != nil {
-		t.Fatalf("machine.EncodeNDJSON: %v", err)
+
+	for _, tc := range cases {
+		t.Run(tc.kind.String(), func(t *testing.T) {
+			var got, want bytes.Buffer
+			if err := EncodeNDJSON(&got, res[tc.kind], EncodeOptions{}); err != nil {
+				t.Fatalf("EncodeNDJSON: %v", err)
+			}
+			if err := tc.want(&want); err != nil {
+				t.Fatalf("machine encode: %v", err)
+			}
+			if got.String() != want.String() {
+				t.Errorf("EncodeNDJSON output differs from the CLI's.\ngot:  %q\nwant: %q", got.String(), want.String())
+			}
+		})
 	}
-	if got.String() != want.String() {
-		t.Errorf("EncodeNDJSON differs.\ngot:  %q\nwant: %q", got.String(), want.String())
+}
+
+func TestEncodeNDJSON_ZeroResultErrors(t *testing.T) {
+	var buf bytes.Buffer
+	if err := EncodeNDJSON(&buf, Result{}, EncodeOptions{}); err == nil {
+		t.Fatalf("encoding a zero Result returned nil error and wrote %q", buf.String())
 	}
 }
 

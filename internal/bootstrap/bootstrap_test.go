@@ -182,7 +182,7 @@ func TestFetch_NonOKStatusReturnsError(t *testing.T) {
 	bootstrapURL = srv.URL
 	defer func() { bootstrapURL = orig }()
 
-	_, err := fetch(context.Background(), 2*time.Second)
+	_, err := fetchURL(context.Background(), bootstrapURL, 2*time.Second, nil)
 	if err == nil {
 		t.Fatal("expected an error for a non-200 status, got nil")
 	}

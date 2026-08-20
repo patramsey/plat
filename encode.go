@@ -8,9 +8,11 @@ import (
 )
 
 // SchemaVersion is the version of the JSON document EncodeJSON and
-// EncodeNDJSON emit. It is the same schema the plat CLI's -o json produces,
-// and the same number that appears in the output's "schemaVersion" field.
-// A breaking change to the document's shape bumps it.
+// EncodeNDJSON emit -- currently 1. It is the same schema the plat CLI's
+// -o json produces, and the same number that appears in the output's
+// "schemaVersion" field. A breaking change to the document's shape bumps
+// it. Defined as an alias of machine.SchemaVersion, an internal package's
+// constant, so the two can never drift out of sync.
 const SchemaVersion = machine.SchemaVersion
 
 // EncodeOptions controls what the encoders include.
@@ -28,9 +30,11 @@ type EncodeOptions struct {
 var ErrNoRecord = errors.New("plat: Result carries no record")
 
 // EncodeJSON writes res as a schemaVersion 1 JSON document, the same bytes
-// the plat CLI's -o json emits for the same record. It selects the encoder
-// from res.Kind, so a caller never chooses between per-object-type
-// encoders.
+// the plat CLI's -o json emits for the same record. A caller never chooses
+// between per-object-type encoders: EncodeJSON dispatches on whichever of
+// res.Domain, res.IP, or res.ASN is non-nil (not on res.Kind), which is
+// what makes ErrNoRecord -- rather than a nil-pointer panic -- the outcome
+// of a hand-built Result whose pointer disagrees with its Kind.
 func EncodeJSON(w io.Writer, res Result, opts EncodeOptions) error {
 	m := machine.Options{Raw: opts.Raw}
 	switch {
@@ -46,7 +50,8 @@ func EncodeJSON(w io.Writer, res Result, opts EncodeOptions) error {
 
 // EncodeNDJSON writes res as a single newline-delimited JSON record, the
 // form the CLI's -o ndjson emits, for streaming many results into one
-// stream.
+// stream. It dispatches on res.Domain/IP/ASN exactly as EncodeJSON does;
+// see that doc comment for how ErrNoRecord arises.
 func EncodeNDJSON(w io.Writer, res Result, opts EncodeOptions) error {
 	m := machine.Options{Raw: opts.Raw}
 	switch {

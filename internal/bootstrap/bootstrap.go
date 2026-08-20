@@ -385,10 +385,6 @@ func writeCache(path string, data []byte) {
 	_ = os.WriteFile(path, data, 0o600)
 }
 
-func fetch(ctx context.Context, timeout time.Duration) ([]byte, error) {
-	return fetchURL(ctx, bootstrapURL, timeout, nil)
-}
-
 func fetchURL(ctx context.Context, url string, timeout time.Duration, client *http.Client) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
