@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,7 +69,7 @@ func selfReferringWHOIS(t *testing.T) string {
 func TestNew_DefaultsAreApplied(t *testing.T) {
 	c, err := New(context.Background(), Options{
 		DisableCache: true,
-		Resolver:     NewResolver(map[string]string{}),
+		Resolver:     NewResolver(ResolverConfig{Domains: map[string]string{}}),
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -145,7 +146,7 @@ func TestNew_DefaultWHOISIntervalPacesQueries(t *testing.T) {
 	c, err := New(context.Background(), Options{
 		DisableCache:    true,
 		Timeout:         5 * time.Second,
-		Resolver:        NewResolver(map[string]string{}), // no RDAP: WHOIS-only
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{}}), // no RDAP: WHOIS-only
 		WHOISIANAServer: addr,
 	})
 	if err != nil {
@@ -206,7 +207,7 @@ func TestLookup_DomainReturnsDomainKind(t *testing.T) {
 		NoFollow:        true,
 		Timeout:         2 * time.Second,
 		Sources:         []SourceID{SourceRegistryRDAP},
-		Resolver:        NewResolver(map[string]string{"com": srv.URL}),
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{"com": srv.URL}}),
 		WHOISIANAServer: "127.0.0.1:1",
 	})
 	if err != nil {
@@ -235,7 +236,7 @@ func TestLookup_DomainReturnsDomainKind(t *testing.T) {
 }
 
 func TestLookup_InvalidInputIsErrInvalidInput(t *testing.T) {
-	c, err := New(context.Background(), Options{DisableCache: true, Resolver: NewResolver(map[string]string{})})
+	c, err := New(context.Background(), Options{DisableCache: true, Resolver: NewResolver(ResolverConfig{Domains: map[string]string{}})})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -249,7 +250,7 @@ func TestLookup_AllSourcesFailIsErrLookupFailed(t *testing.T) {
 		DisableCache:    true,
 		NoFollow:        true,
 		Timeout:         200 * time.Millisecond,
-		Resolver:        NewResolver(map[string]string{"com": "http://127.0.0.1:1/dead"}),
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{"com": "http://127.0.0.1:1/dead"}}),
 		WHOISIANAServer: "127.0.0.1:1",
 	})
 	if err != nil {
@@ -276,7 +277,7 @@ func TestLookup_PartialSuccessIsNotAnError(t *testing.T) {
 		DisableCache:    true,
 		NoFollow:        true,
 		Timeout:         500 * time.Millisecond,
-		Resolver:        NewResolver(map[string]string{"com": srv.URL}),
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{"com": srv.URL}}),
 		WHOISIANAServer: "127.0.0.1:1",
 	})
 	if err != nil {
@@ -312,7 +313,7 @@ func TestLookup_PacingDelaysRepeatQueriesToOneServer(t *testing.T) {
 		DisableCache:    true,
 		Timeout:         5 * time.Second,
 		WHOISInterval:   interval,
-		Resolver:        NewResolver(map[string]string{}), // no RDAP: WHOIS-only
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{}}), // no RDAP: WHOIS-only
 		WHOISIANAServer: addr,
 	})
 	if err != nil {
@@ -352,7 +353,7 @@ func TestLookup_DisableWHOISPacingSkipsTheWait(t *testing.T) {
 		DisableWHOISPacing: true,
 		Timeout:            5 * time.Second,
 		WHOISInterval:      interval,
-		Resolver:           NewResolver(map[string]string{}),
+		Resolver:           NewResolver(ResolverConfig{Domains: map[string]string{}}),
 		WHOISIANAServer:    addr,
 	})
 	if err != nil {
@@ -414,7 +415,7 @@ func TestLookup_UsesSuppliedHTTPClient(t *testing.T) {
 		NoFollow:        true,
 		Timeout:         2 * time.Second,
 		Sources:         []SourceID{SourceRegistryRDAP},
-		Resolver:        NewResolver(map[string]string{"com": srv.URL}),
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{"com": srv.URL}}),
 		WHOISIANAServer: "127.0.0.1:1",
 		HTTPClient:      &http.Client{Transport: tr},
 	})
@@ -531,4 +532,57 @@ func TestNew_CacheOptionsAreForwarded(t *testing.T) {
 			t.Error(`BaseURL("faketld") found -- DisableCache did not stop the planted CacheDir file from being read`)
 		}
 	})
+}
+
+func TestResolverConfig_CoversEveryCombination(t *testing.T) {
+	v4 := netip.MustParsePrefix("192.0.2.0/24")
+	addr := netip.MustParseAddr("192.0.2.7")
+
+	tests := []struct {
+		name                       string
+		cfg                        ResolverConfig
+		wantDomain, wantIP, wantAS bool
+	}{
+		{
+			name:       "domains only",
+			cfg:        ResolverConfig{Domains: map[string]string{"com": "https://d/"}},
+			wantDomain: true,
+		},
+		{
+			name:   "prefixes only",
+			cfg:    ResolverConfig{Prefixes: map[netip.Prefix]string{v4: "https://i/"}},
+			wantIP: true,
+		},
+		{
+			name:   "asns only",
+			cfg:    ResolverConfig{ASNs: map[[2]uint32]string{{100, 200}: "https://a/"}},
+			wantAS: true,
+		},
+		{
+			name: "all three at once",
+			cfg: ResolverConfig{
+				Domains:  map[string]string{"com": "https://d/"},
+				Prefixes: map[netip.Prefix]string{v4: "https://i/"},
+				ASNs:     map[[2]uint32]string{{100, 200}: "https://a/"},
+			},
+			wantDomain: true, wantIP: true, wantAS: true,
+		},
+		{name: "empty config covers nothing", cfg: ResolverConfig{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewResolver(tt.cfg)
+
+			if _, ok := r.BaseURL("com"); ok != tt.wantDomain {
+				t.Errorf("BaseURL coverage = %v, want %v", ok, tt.wantDomain)
+			}
+			if _, ok := r.IPBaseURL(addr); ok != tt.wantIP {
+				t.Errorf("IPBaseURL coverage = %v, want %v", ok, tt.wantIP)
+			}
+			if _, ok := r.ASNBaseURL(150); ok != tt.wantAS {
+				t.Errorf("ASNBaseURL coverage = %v, want %v", ok, tt.wantAS)
+			}
+		})
+	}
 }

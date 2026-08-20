@@ -3,8 +3,6 @@
 # it cannot be un-exported without breaking consumers. Removing or
 # renaming one is a breaking change. Review additions accordingly.
 func New
-func NewASNResolver
-func NewIPResolver
 func NewResolver
 method Client.Lookup
 method Kind.String
@@ -22,6 +20,7 @@ type Record
 type RedactionNotice
 type RegistrarInfo
 type Resolver
+type ResolverConfig
 type Result
 type SourceID
 type SourceResult
