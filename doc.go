@@ -66,12 +66,15 @@
 // happens at the boundary, but the implementation underneath stays free
 // to change without breaking anything built against this package.
 //
-// # Not yet exposed
+// # Producing plat's JSON output
 //
-// The JSON, human, and plain renderers plat's CLI uses are not part of
-// this package. A caller wanting plat's documented "schemaVersion": 1
-// JSON output cannot currently produce it from a Result and must encode
-// the fields it needs itself.
+// EncodeJSON writes a Result as plat's documented "schemaVersion": 1
+// JSON document -- byte-identical to what the CLI's -o json prints for
+// the same record, including with EncodeOptions.Raw for embedded source
+// payloads. EncodeNDJSON writes the same document as a single
+// newline-delimited record; for one Result the two encoders produce
+// identical bytes; NDJSON's value is streaming many Results into one
+// stream, the way the CLI's -o ndjson does across multiple names.
 //
 // # Stability
 //

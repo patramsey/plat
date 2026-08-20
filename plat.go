@@ -59,12 +59,10 @@ type Options struct {
 	// bootstrap data, which is what almost every caller wants. Set it to
 	// query a private or mirrored RDAP deployment instead.
 	//
-	// Each of NewResolver, NewIPResolver, and NewASNResolver builds a
-	// Resolver that covers exactly ONE object kind -- there is no
-	// constructor that combines all three. A Resolver from NewResolver,
-	// for example, supplies RDAP base URLs for domains only; IP and ASN
-	// lookups made with it fall back to WHOIS-only, silently, because it
-	// reports no coverage for those kinds.
+	// Build one with NewResolver, passing a ResolverConfig. Any field of
+	// ResolverConfig left nil means plat has no RDAP endpoint for that
+	// object kind, and lookups of it fall back to WHOIS-only, silently --
+	// that is not an error, just reduced coverage.
 	Resolver *Resolver
 	// WHOISIANAServer is the WHOIS server consulted first to discover a
 	// TLD's registry WHOIS server. Empty means whois.iana.org. Set it to

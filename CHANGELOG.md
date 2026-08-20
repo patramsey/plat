@@ -6,6 +6,36 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `EncodeJSON` and `EncodeNDJSON` produce the plat CLI's exact
+  `schemaVersion: 1` JSON from a `Result` -- byte-identical to `-o json`
+  for the same lookup, with `EncodeOptions{Raw}` to include embedded
+  source payloads. `EncodeNDJSON` writes the same document as a single
+  newline-delimited record; for one `Result` it emits the same bytes as
+  `EncodeJSON`. NDJSON's value is streaming many `Result`s into one
+  stream, mirroring the CLI's `-o ndjson` across multiple names -- not
+  a different encoding of a single record. The schema version is
+  exposed as the `SchemaVersion` constant.
+- `Options.HTTPClient` now also covers the IANA bootstrap fetch that
+  `New` performs, not just RDAP queries. Previously, a caller who set
+  `HTTPClient` to route requests through a proxy still had `New` reach
+  `data.iana.org` directly; a hung or blocked direct request fell back
+  silently to the bootstrap snapshot embedded in the binary.
+
+### Changed
+- **Breaking:** `NewIPResolver` and `NewASNResolver` are removed.
+  `NewResolver` now takes a single `ResolverConfig{Domains, Prefixes,
+  ASNs}`, each field optional, in place of one constructor per object
+  kind: `NewResolver(m)` becomes
+  `NewResolver(ResolverConfig{Domains: m})`. The previous per-kind
+  constructors made it easy to point plat at a private RDAP deployment
+  for domains and, without noticing, lose RDAP coverage for every IP
+  and ASN lookup -- a `Resolver` built from `NewResolver` alone reports
+  no coverage for those kinds, so lookups of them fall back to
+  WHOIS-only, silently. Nothing in this repo's CI catches a break like
+  this automatically, so a consumer finds out at their own `go build`.
+  The API remains v0 and may still change before 1.0.
+
 ## [0.4.0] - 2026-08-19
 
 ### Added
