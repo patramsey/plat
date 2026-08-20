@@ -93,7 +93,7 @@ func TestLookupOne_HappyPath_RDAPAndWHOIS(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "example.com",
 		opts,
-		nil, render.FormatJSON, uiConfig{},
+		render.FormatJSON, uiConfig{},
 	)
 
 	if code != 0 {
@@ -126,7 +126,7 @@ func TestLookupOne_WHOISOnlyDegradedMode(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "example.com",
 		opts,
-		nil, render.FormatJSON, uiConfig{},
+		render.FormatJSON, uiConfig{},
 	)
 
 	if code != 0 {
@@ -166,7 +166,7 @@ func TestLookupOne_NotFound_ExitCode1(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "example.com",
 		opts,
-		nil, render.FormatPlain, uiConfig{},
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 1 {
@@ -189,7 +189,7 @@ func TestLookupOne_FailurePath_ExitCode3(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "example.com",
 		opts,
-		nil, render.FormatPlain, uiConfig{},
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 3 {
@@ -238,7 +238,7 @@ func TestLookupOne_Diff(t *testing.T) {
 	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
 		context.Background(), &baseline, &baselineErr, client, "example.com",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -256,7 +256,7 @@ func TestLookupOne_Diff(t *testing.T) {
 		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
 			context.Background(), &stdout, &stderr, client, "example.com",
-			opts, nil, render.FormatPlain, uiConfig{},
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 0 {
 			t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -282,7 +282,7 @@ func TestLookupOne_Diff(t *testing.T) {
 		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
 			context.Background(), &stdout, &stderr, client, "example.com",
-			opts, nil, render.FormatPlain, uiConfig{},
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 4 {
 			t.Errorf("exit code = %d, want 4\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -331,7 +331,7 @@ func TestLookupOne_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
 		context.Background(), &baseline, &baselineErr, client, "example.com",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -347,7 +347,7 @@ func TestLookupOne_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	client = newTestClient(t, resolver, opts, nil)
 	code = lookupOne(
 		context.Background(), errWriter{}, &stderr, client, "example.com",
-		opts, nil, render.FormatPlain, uiConfig{},
+		opts, render.FormatPlain, uiConfig{},
 	)
 	if code != 3 {
 		t.Errorf("exit code = %d, want 3\nstderr: %s", code, stderr.String())
@@ -388,7 +388,7 @@ func TestLookupOne_SpinnerBranch_HumanFormat(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "example.com",
 		opts,
-		nil, render.FormatHuman, uiConfig{StderrTTY: true},
+		render.FormatHuman, uiConfig{StderrTTY: true},
 	)
 
 	if code != 0 {
@@ -444,7 +444,7 @@ func TestLookupOne_IP_HappyPath_RDAPAndWHOIS(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
 		opts,
-		nil, render.FormatPlain, uiConfig{},
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 0 {
@@ -478,7 +478,7 @@ func TestLookupOne_IP_WHOISOnlyDegradedMode(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
 		opts,
-		nil, render.FormatPlain, uiConfig{},
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 0 {
@@ -520,7 +520,7 @@ func TestLookupOne_IP_NotFound_ExitCode1(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
 		opts,
-		nil, render.FormatPlain, uiConfig{},
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 1 {
@@ -545,7 +545,7 @@ func TestLookupOne_IP_FailurePath_ExitCode3(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
 		opts,
-		nil, render.FormatPlain, uiConfig{},
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 3 {
@@ -581,7 +581,7 @@ func TestLookupOne_IP_JSONOutput_ObjectTypeIsIP(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
 		opts,
-		nil, render.FormatJSON, uiConfig{},
+		render.FormatJSON, uiConfig{},
 	)
 
 	if code != 0 {
@@ -628,7 +628,7 @@ func TestLookupOne_IP_Diff(t *testing.T) {
 	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
 		context.Background(), &baseline, &baselineErr, client, "8.8.8.8",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -646,7 +646,7 @@ func TestLookupOne_IP_Diff(t *testing.T) {
 		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
 			context.Background(), &stdout, &stderr, client, "8.8.8.8",
-			opts, nil, render.FormatPlain, uiConfig{},
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 0 {
 			t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -672,7 +672,7 @@ func TestLookupOne_IP_Diff(t *testing.T) {
 		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
 			context.Background(), &stdout, &stderr, client, "8.8.8.8",
-			opts, nil, render.FormatPlain, uiConfig{},
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 4 {
 			t.Errorf("exit code = %d, want 4\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -717,7 +717,7 @@ func TestLookupOne_IP_SpinnerBranch_HumanFormat(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
 		opts,
-		nil, render.FormatHuman, uiConfig{StderrTTY: true},
+		render.FormatHuman, uiConfig{StderrTTY: true},
 	)
 
 	if code != 0 {
@@ -758,7 +758,7 @@ func TestLookupOne_IP_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
 		context.Background(), &baseline, &baselineErr, client, "8.8.8.8",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -774,7 +774,7 @@ func TestLookupOne_IP_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	client = newTestClient(t, resolver, opts, nil)
 	code = lookupOne(
 		context.Background(), errWriter{}, &stderr, client, "8.8.8.8",
-		opts, nil, render.FormatPlain, uiConfig{},
+		opts, render.FormatPlain, uiConfig{},
 	)
 	if code != 3 {
 		t.Errorf("exit code = %d, want 3\nstderr: %s", code, stderr.String())
@@ -823,7 +823,7 @@ func TestLookupOne_ASN_HappyPath_RDAPAndWHOIS(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
 		opts,
-		nil, render.FormatPlain, uiConfig{},
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 0 {
@@ -857,7 +857,7 @@ func TestLookupOne_ASN_WHOISOnlyDegradedMode(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
 		opts,
-		nil, render.FormatPlain, uiConfig{},
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 0 {
@@ -899,7 +899,7 @@ func TestLookupOne_ASN_NotFound_ExitCode1(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
 		opts,
-		nil, render.FormatPlain, uiConfig{},
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 1 {
@@ -924,7 +924,7 @@ func TestLookupOne_ASN_FailurePath_ExitCode3(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
 		opts,
-		nil, render.FormatPlain, uiConfig{},
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 3 {
@@ -960,7 +960,7 @@ func TestLookupOne_ASN_JSONOutput_ObjectTypeIsASN(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
 		opts,
-		nil, render.FormatJSON, uiConfig{},
+		render.FormatJSON, uiConfig{},
 	)
 
 	if code != 0 {
@@ -1004,7 +1004,7 @@ func TestLookupOne_ASN_Diff(t *testing.T) {
 	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
 		context.Background(), &baseline, &baselineErr, client, "AS15169",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -1022,7 +1022,7 @@ func TestLookupOne_ASN_Diff(t *testing.T) {
 		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
 			context.Background(), &stdout, &stderr, client, "AS15169",
-			opts, nil, render.FormatPlain, uiConfig{},
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 0 {
 			t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -1048,7 +1048,7 @@ func TestLookupOne_ASN_Diff(t *testing.T) {
 		client := newTestClient(t, resolver, opts, nil)
 		code := lookupOne(
 			context.Background(), &stdout, &stderr, client, "AS15169",
-			opts, nil, render.FormatPlain, uiConfig{},
+			opts, render.FormatPlain, uiConfig{},
 		)
 		if code != 4 {
 			t.Errorf("exit code = %d, want 4\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
@@ -1089,7 +1089,7 @@ func TestLookupOne_ASN_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	client := newTestClient(t, resolver, baseOpts, nil)
 	code := lookupOne(
 		context.Background(), &baseline, &baselineErr, client, "AS15169",
-		baseOpts, nil, render.FormatJSON, uiConfig{},
+		baseOpts, render.FormatJSON, uiConfig{},
 	)
 	if code != 0 {
 		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
@@ -1105,7 +1105,7 @@ func TestLookupOne_ASN_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	client = newTestClient(t, resolver, opts, nil)
 	code = lookupOne(
 		context.Background(), errWriter{}, &stderr, client, "AS15169",
-		opts, nil, render.FormatPlain, uiConfig{},
+		opts, render.FormatPlain, uiConfig{},
 	)
 	if code != 3 {
 		t.Errorf("exit code = %d, want 3\nstderr: %s", code, stderr.String())
@@ -1145,7 +1145,7 @@ func TestLookupOne_ASN_SpinnerBranch_HumanFormat(t *testing.T) {
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
 		opts,
-		nil, render.FormatHuman, uiConfig{StderrTTY: true},
+		render.FormatHuman, uiConfig{StderrTTY: true},
 	)
 
 	if code != 0 {
@@ -1202,7 +1202,7 @@ func TestLookupOne_ASN_RenderErrorPath_ExitCode3(t *testing.T) {
 	code := lookupOne(
 		context.Background(), errWriter{}, &stderr, client, "AS15169",
 		opts,
-		nil, render.FormatPlain, uiConfig{},
+		render.FormatPlain, uiConfig{},
 	)
 
 	if code != 3 {

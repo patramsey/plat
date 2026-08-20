@@ -1293,7 +1293,7 @@ func TestRunLookupPool_BoundsRealLookupOneConcurrency(t *testing.T) {
 	sources := []model.SourceID{model.SourceRegistryRDAP}
 	client := newTestClient(t, resolver, opts, sources)
 	var stdout, stderr bytes.Buffer
-	if err := runLookupPool(context.Background(), &stdout, &stderr, domains, opts, sources, render.FormatPlain, uiConfig{}, client); err != nil {
+	if err := runLookupPool(context.Background(), &stdout, &stderr, domains, opts, render.FormatPlain, uiConfig{}, client); err != nil {
 		t.Fatalf("runLookupPool: %v\nstderr:\n%s", err, stderr.String())
 	}
 
@@ -1364,9 +1364,10 @@ func TestRunLookup_ConcurrencyOneIsValid(t *testing.T) {
 //
 // Both names share one fake IANA server (as runLookup's own single
 // opts.whoisIANAServer override -- and real whois.iana.org in
-// production -- always does for every name in a run), so runLookup's own
-// per-run HostLimiter (whois.NewHostLimiter(whois.DefaultWHOISInterval),
-// built automatically for any run of more than one name) paces both
+// production -- always does for every name in a run), so the run's one
+// *plat.Client and its per-server HostLimiter (built by plat.New at
+// whois.DefaultWHOISInterval, since runLookup only sets
+// plat.Options.DisableWHOISPacing for a single-name run) pace both
 // names' IANA hop against that one shared host. Because that pacing picks
 // whichever goroutine reaches Acquire first essentially at random, the
 // *other* one absorbs a wait of up to one full DefaultWHOISInterval before
@@ -1436,7 +1437,7 @@ func TestRunLookup_EndToEnd_EmitsInInputOrder(t *testing.T) {
 		Concurrency:     2, // must be >= 2 for the two lookups to genuinely overlap
 	}
 	client := newTestClient(t, resolver, opts, nil)
-	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"slow.com", "fast.net"}, opts, nil, render.FormatPlain, uiConfig{}, client)
+	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"slow.com", "fast.net"}, opts, render.FormatPlain, uiConfig{}, client)
 	if err != nil {
 		t.Fatalf("runLookupPool: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
 	}
@@ -1562,7 +1563,7 @@ func TestRunLookupPool_FailingNameDoesNotAbortSurvivors(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true, Concurrency: 2}
 	client := newTestClient(t, resolver, opts, nil)
-	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"also-bad", "good.com"}, opts, nil, render.FormatPlain, uiConfig{}, client)
+	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"also-bad", "good.com"}, opts, render.FormatPlain, uiConfig{}, client)
 
 	var sig exitSignal
 	if !errors.As(err, &sig) || sig.code != 2 {
@@ -1642,7 +1643,7 @@ func TestRunLookup_CounterBranch_ConcurrentWithErrorDoesNotRace(t *testing.T) {
 
 	client := newTestClient(t, resolver, opts, nil)
 	err := runLookupPool(context.Background(), &stdout, &stderr,
-		[]string{"localhost", "also-bad"}, opts, nil, render.FormatHuman,
+		[]string{"localhost", "also-bad"}, opts, render.FormatHuman,
 		uiConfig{StderrTTY: true}, client)
 
 	var sig exitSignal

@@ -47,6 +47,14 @@ type Options struct {
 	// always on, but costs a single lookup nothing: the first query to a
 	// given server is never delayed.
 	WHOISInterval time.Duration
+	// DisableWHOISPacing turns off per-server WHOIS pacing for this
+	// client. Pacing exists to stop a bulk run hammering one server, so
+	// leaving it on is right for almost every caller. A single lookup
+	// whose referral chain happens to hit one server twice -- a registry
+	// that refers the registrar query back to the same host -- would
+	// otherwise pay the full interval for the second hop, which is a
+	// wait no one is served by.
+	DisableWHOISPacing bool
 	// HTTPClient is used for RDAP requests. nil means http.DefaultClient.
 	HTTPClient *http.Client
 	// Resolver supplies RDAP base URLs. nil means load IANA's published
@@ -66,9 +74,14 @@ type Options struct {
 //
 // A Client is safe for concurrent use.
 type Client struct {
-	opts      Options
-	resolver  *bootstrap.Resolver
-	limiter   *whois.HostLimiter
+	opts     Options
+	resolver *bootstrap.Resolver
+	// limiter is the whois.Limiter interface, not *whois.HostLimiter, so
+	// that "no pacing" is a true nil interface. A nil *HostLimiter stored
+	// here would arrive at collect.Options.Limiter as a non-nil interface
+	// wrapping a nil pointer, sail past collect's nil check, and panic
+	// inside Acquire on the nil receiver.
+	limiter   whois.Limiter
 	ianaCache *whois.IANACache
 	interval  time.Duration
 }
@@ -102,10 +115,17 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 		}
 	}
 
+	// Left nil -- a true nil interface, see the field's comment -- when
+	// pacing is off, which is what collect reads as "do not pace".
+	var limiter whois.Limiter
+	if !opts.DisableWHOISPacing {
+		limiter = whois.NewHostLimiter(interval)
+	}
+
 	return &Client{
 		opts:      opts,
 		resolver:  resolver,
-		limiter:   whois.NewHostLimiter(interval),
+		limiter:   limiter,
 		ianaCache: whois.NewIANACache(),
 		interval:  interval,
 	}, nil

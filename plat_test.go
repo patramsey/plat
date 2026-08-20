@@ -3,14 +3,66 @@ package plat
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/patramsey/plat/internal/whois"
 )
+
+// selfReferringWHOIS starts a fake WHOIS server that answers a whole
+// referral chain from ONE host: the IANA hop is referred back to itself,
+// and so is the registrar hop. That is not a contrivance -- example.com's
+// registry response really does name whois.iana.org as the registrar
+// WHOIS server, so a real single lookup hits one host three times. It is
+// also the only shape that can tell paced from un-paced apart, since a
+// limiter never delays the first query to a given server.
+func selfReferringWHOIS(t *testing.T) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	var mu sync.Mutex
+	var hop int
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer func() { _ = conn.Close() }()
+				buf := make([]byte, 4096)
+				n, _ := conn.Read(buf)
+				_ = strings.TrimRight(string(buf[:n]), "\r\n")
+				mu.Lock()
+				hop++
+				n = hop
+				mu.Unlock()
+				var reply string
+				switch n {
+				case 1: // IANA hop: the TLD's registry server is this host
+					reply = "refer: " + ln.Addr().String() + "\n"
+				case 2: // registry hop: refers the registrar query back here
+					reply = "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n" +
+						"Registrar WHOIS Server: " + ln.Addr().String() + "\n"
+				default: // registrar hop: terminal, no further referral
+					reply = "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
+				}
+				_, _ = conn.Write([]byte(reply))
+			}()
+		}
+	}()
+	return ln.Addr().String()
+}
 
 func TestNew_DefaultsAreApplied(t *testing.T) {
 	c, err := New(context.Background(), Options{
@@ -152,5 +204,84 @@ func TestLookup_PartialSuccessIsNotAnError(t *testing.T) {
 	}
 	if !sawFailure {
 		t.Fatal("test did not exercise a failing source; it proves nothing")
+	}
+}
+
+// TestLookup_PacingDelaysRepeatQueriesToOneServer is the load-bearing half
+// of the pacing pair: a default client must space repeat queries to the
+// same WHOIS host by the interval. Deleting the limiter (or storing a nil
+// one) makes this test fail on elapsed time -- verified by running it
+// against a client built with DisableWHOISPacing, which finishes in
+// milliseconds.
+func TestLookup_PacingDelaysRepeatQueriesToOneServer(t *testing.T) {
+	const interval = 300 * time.Millisecond
+	addr := selfReferringWHOIS(t)
+
+	c, err := New(context.Background(), Options{
+		DisableCache:    true,
+		Timeout:         5 * time.Second,
+		WHOISInterval:   interval,
+		Resolver:        NewResolver(map[string]string{}), // no RDAP: WHOIS-only
+		WHOISIANAServer: addr,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	start := time.Now()
+	res, err := c.Lookup(context.Background(), "example.com")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	elapsed := time.Since(start)
+
+	if res.Domain.Registrar.Name.Value == "" {
+		t.Fatal("chain produced no registrar; the test never reached the paced hops")
+	}
+	// Three queries to one host: the first is free, the two after it each
+	// wait a full interval.
+	if want := 2 * interval; elapsed < want {
+		t.Errorf("elapsed = %v, want >= %v -- repeat queries to one WHOIS server were not paced", elapsed, want)
+	}
+}
+
+// TestLookup_DisableWHOISPacingSkipsTheWait covers the option the plat CLI
+// sets for a single-name run. Two things must hold, and the first is the
+// one a type error cannot catch: a client with no limiter must not panic.
+// Storing a nil *whois.HostLimiter rather than a nil whois.Limiter would
+// hand collect a non-nil interface wrapping a nil pointer, sail past its
+// nil check, and panic inside Acquire -- so this test drives a full
+// referral chain, which is where Acquire is actually called.
+func TestLookup_DisableWHOISPacingSkipsTheWait(t *testing.T) {
+	const interval = 300 * time.Millisecond
+	addr := selfReferringWHOIS(t)
+
+	c, err := New(context.Background(), Options{
+		DisableCache:       true,
+		DisableWHOISPacing: true,
+		Timeout:            5 * time.Second,
+		WHOISInterval:      interval,
+		Resolver:           NewResolver(map[string]string{}),
+		WHOISIANAServer:    addr,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if c.limiter != nil {
+		t.Fatal("limiter is non-nil with DisableWHOISPacing set -- a nil *HostLimiter stored in the interface would panic in Acquire")
+	}
+
+	start := time.Now()
+	res, err := c.Lookup(context.Background(), "example.com")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	elapsed := time.Since(start)
+
+	if res.Domain.Registrar.Name.Value == "" {
+		t.Fatal("chain produced no registrar; the test never reached the hops that would have been paced")
+	}
+	if elapsed >= interval {
+		t.Errorf("elapsed = %v, want < %v -- pacing was not actually disabled", elapsed, interval)
 	}
 }
