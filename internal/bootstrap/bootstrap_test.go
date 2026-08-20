@@ -66,7 +66,7 @@ func TestNewResolver(t *testing.T) {
 
 func TestLoad_UsesFreshCache(t *testing.T) {
 	withIsolatedCacheDir(t)
-	path, ok := cachePath()
+	path, ok := cachePath(Options{})
 	if !ok {
 		t.Fatal("cachePath() unexpectedly unavailable")
 	}
@@ -92,7 +92,7 @@ func TestLoad_UsesFreshCache(t *testing.T) {
 
 func TestLoad_StaleCacheTriggersFetchFallback(t *testing.T) {
 	withIsolatedCacheDir(t)
-	path, ok := cachePath()
+	path, ok := cachePath(Options{})
 	if !ok {
 		t.Fatal("cachePath() unexpectedly unavailable")
 	}
@@ -159,7 +159,7 @@ func TestLoad_FetchSuccessWritesCache(t *testing.T) {
 	// which only ever runs after a successful fetch — have never actually
 	// executed until this test. Confirm the fetched doc was written to the
 	// cache file.
-	path, ok := cachePath()
+	path, ok := cachePath(Options{})
 	if !ok {
 		t.Fatal("cachePath() unexpectedly unavailable")
 	}
@@ -395,4 +395,38 @@ func TestParseASNRanges(t *testing.T) {
 			t.Errorf("into[{200,300}] = %q, %v; want %q, true", url, ok, "https://rir.example/")
 		}
 	})
+}
+
+func TestLoad_DisableCacheWritesNothing(t *testing.T) {
+	redirectRegistries(t, unreachableURL, unreachableURL, unreachableURL, unreachableURL)
+	dir := t.TempDir()
+	_, err := Load(context.Background(), Options{
+		CacheDir:     dir,
+		DisableCache: true,
+		Timeout:      50 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("DisableCache still wrote %d entries: %v", len(entries), entries)
+	}
+}
+
+func TestPath_CacheDirOverridesUserCacheDir(t *testing.T) {
+	got := path(Options{CacheDir: "/tmp/example"}, "bootstrap.json")
+	want := filepath.Join("/tmp/example", "bootstrap.json")
+	if got != want {
+		t.Fatalf("path = %q, want %q", got, want)
+	}
+}
+
+func TestPath_DisableCacheYieldsEmptyPath(t *testing.T) {
+	if got := path(Options{DisableCache: true}, "bootstrap.json"); got != "" {
+		t.Fatalf("path = %q, want \"\" when caching is disabled", got)
+	}
 }

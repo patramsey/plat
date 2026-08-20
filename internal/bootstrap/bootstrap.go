@@ -202,12 +202,30 @@ type Options struct {
 	Refresh bool
 	// Timeout bounds the network fetch. Defaults to 5s.
 	Timeout time.Duration
+	// CacheDir overrides where bootstrap documents are cached. Empty
+	// means the OS user cache directory plus a "plat" subdirectory --
+	// the location the CLI uses. A caller-supplied directory is used
+	// verbatim, without that subdirectory.
+	CacheDir string
+	// DisableCache stops plat touching the filesystem at all: nothing is
+	// read from or written to a cache, and every load falls through to
+	// the network and then the embedded snapshot. Intended for library
+	// consumers who do not want an embedded dependency writing to their
+	// user's home directory.
+	DisableCache bool
 }
 
 // path returns the cache file path for the named bootstrap document (e.g.
-// "bootstrap.json", "ipv4.json"), or "" if the user cache directory can't
-// be determined.
-func path(name string) string {
+// "bootstrap.json", "ipv4.json"), or "" if caching is disabled or the
+// user cache directory can't be determined. An empty return is the single
+// signal that disables all cache reads and writes in fetchOrEmbedded.
+func path(opts Options, name string) string {
+	if opts.DisableCache {
+		return ""
+	}
+	if opts.CacheDir != "" {
+		return filepath.Join(opts.CacheDir, name)
+	}
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		return ""
@@ -215,8 +233,8 @@ func path(name string) string {
 	return filepath.Join(dir, cacheDirName, name)
 }
 
-func cachePath() (string, bool) {
-	p := path(cacheFileName)
+func cachePath(opts Options) (string, bool) {
+	p := path(opts, cacheFileName)
 	return p, p != ""
 }
 
@@ -277,7 +295,7 @@ func validBootstrapJSON(data []byte) bool {
 // parse any one of them leaves that lookup kind unavailable without
 // affecting the others.
 func Load(ctx context.Context, opts Options) (*Resolver, error) {
-	data, err := fetchOrEmbedded(ctx, path(cacheFileName), bootstrapURL, embedded, opts)
+	data, err := fetchOrEmbedded(ctx, path(opts, cacheFileName), bootstrapURL, embedded, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +313,7 @@ func Load(ctx context.Context, opts Options) (*Resolver, error) {
 		{"ipv4.json", ipv4URL, embeddedIPv4},
 		{"ipv6.json", ipv6URL, embeddedIPv6},
 	} {
-		data, err := fetchOrEmbedded(ctx, path(reg.name), reg.url, reg.embedded, opts)
+		data, err := fetchOrEmbedded(ctx, path(opts, reg.name), reg.url, reg.embedded, opts)
 		if err != nil {
 			continue
 		}
@@ -303,7 +321,7 @@ func Load(ctx context.Context, opts Options) (*Resolver, error) {
 	}
 
 	r.byASNRange = make(map[[2]uint32]string)
-	if data, err := fetchOrEmbedded(ctx, path("asn.json"), asnURL, embeddedASN, opts); err == nil {
+	if data, err := fetchOrEmbedded(ctx, path(opts, "asn.json"), asnURL, embeddedASN, opts); err == nil {
 		_ = parseASNRanges(data, r.byASNRange)
 	}
 
