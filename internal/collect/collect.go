@@ -2,6 +2,7 @@ package collect
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"slices"
 	"strings"
@@ -52,6 +53,11 @@ type Options struct {
 	// (see whois.IANACache's doc comment). nil means no caching, which
 	// is correct for a single lookup.
 	IANACache *whois.IANACache
+	// HTTPClient is the client used for RDAP requests. nil means
+	// http.DefaultClient. Exposed so a library consumer can supply their
+	// own transport -- for a proxy, custom timeouts, or instrumentation
+	// -- without plat owning a second HTTP stack.
+	HTTPClient *http.Client
 }
 
 func (o Options) allows(id model.SourceID) bool {
@@ -146,7 +152,7 @@ func collectRDAP(ctx context.Context, name domain.Name, registryBaseURL string, 
 	var out []model.SourceRecord
 	var registrarPort43 string
 
-	rdapClient := &rdap.Client{Timeout: opts.Timeout}
+	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient}
 	start := time.Now()
 	result, err := rdapClient.Domain(ctx, registryBaseURL, name.Punycode)
 	if opts.allows(model.SourceRegistryRDAP) {

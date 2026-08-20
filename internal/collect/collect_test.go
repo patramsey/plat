@@ -946,3 +946,41 @@ func TestCollect_BulkPacingIsNotChargedAgainstTheChainDeadline(t *testing.T) {
 		t.Errorf("registry-whois retained for %d/%d names, want %d/%d -- a pacing wait is still being charged against the chain deadline", retained, len(names), len(names), len(names))
 	}
 }
+
+// countingTransport records how many round trips it served so the test
+// can prove the caller's client was the one actually used, rather than
+// merely that the lookup succeeded.
+type countingTransport struct {
+	n int
+}
+
+func (t *countingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	t.n++
+	return http.DefaultTransport.RoundTrip(r)
+}
+
+func TestCollect_UsesSuppliedHTTPClient(t *testing.T) {
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write(fixture)
+	}))
+	defer srv.Close()
+
+	tr := &countingTransport{}
+	name := domain.Name{Punycode: "example.com", Unicode: "example.com", TLD: "com"}
+
+	Collect(context.Background(), name, srv.URL, "127.0.0.1:1", Options{
+		Timeout:    2 * time.Second,
+		NoFollow:   true,
+		Sources:    []model.SourceID{model.SourceRegistryRDAP},
+		HTTPClient: &http.Client{Transport: tr},
+	})
+
+	if tr.n == 0 {
+		t.Fatal("supplied HTTPClient was never used; collect built its own")
+	}
+}

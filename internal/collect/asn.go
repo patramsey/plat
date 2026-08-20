@@ -47,7 +47,7 @@ func CollectASN(ctx context.Context, asn uint32, baseURL, whoisIANAServer string
 }
 
 func collectASNRDAP(ctx context.Context, asn uint32, baseURL string, opts Options) []model.ASNSourceRecord {
-	rdapClient := &rdap.Client{Timeout: opts.Timeout}
+	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient}
 	start := time.Now()
 	result, err := rdapClient.ASN(ctx, baseURL, asn)
 
