@@ -267,6 +267,17 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	return exitCode(err, stderr)
 }
 
+// lookupOptions carries every --flag value runLookup needs. Four of its
+// fields -- RefreshBootstrap, Timeout, SourceFilter, and NoFollow -- are
+// read only inside runLookup itself, where they are folded into the one
+// plat.Options passed to plat.New (see runLookup's Timeout/NoFollow/
+// RefreshBootstrap/Sources forwarding and parseSourceFilter(opts.SourceFilter)).
+// Past that point the struct still travels on, unread, through
+// runLookupPool, lookupOne, and each of the three lookupOne* helpers --
+// nothing down there consults these four fields, because their effect is
+// already baked into the shared client. A future edit that tried to read
+// one of them per-name at that depth would compile and silently do
+// nothing.
 type lookupOptions struct {
 	RefreshBootstrap bool
 	Timeout          time.Duration

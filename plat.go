@@ -50,11 +50,23 @@ type Options struct {
 	// otherwise pay the full interval for the second hop, which is a
 	// wait no one is served by.
 	DisableWHOISPacing bool
-	// HTTPClient is used for RDAP requests. nil means http.DefaultClient.
+	// HTTPClient is used for RDAP requests only. nil means
+	// http.DefaultClient. It does NOT cover the IANA bootstrap fetch New
+	// performs to load RDAP base URLs: that fetch always uses the default
+	// HTTP client, regardless of this field. A caller behind a proxy who
+	// needs the bootstrap fetch to go through it as well gets no error --
+	// New falls back silently to a cached or embedded snapshot instead.
 	HTTPClient *http.Client
 	// Resolver supplies RDAP base URLs. nil means load IANA's published
 	// bootstrap data, which is what almost every caller wants. Set it to
 	// query a private or mirrored RDAP deployment instead.
+	//
+	// Each of NewResolver, NewIPResolver, and NewASNResolver builds a
+	// Resolver that covers exactly ONE object kind -- there is no
+	// constructor that combines all three. A Resolver from NewResolver,
+	// for example, supplies RDAP base URLs for domains only; IP and ASN
+	// lookups made with it fall back to WHOIS-only, silently, because it
+	// reports no coverage for those kinds.
 	Resolver *Resolver
 	// WHOISIANAServer is the WHOIS server consulted first to discover a
 	// TLD's registry WHOIS server. Empty means whois.iana.org. Set it to
@@ -78,7 +90,6 @@ type Client struct {
 	// inside Acquire on the nil receiver.
 	limiter   whois.Limiter
 	ianaCache *whois.IANACache
-	interval  time.Duration
 }
 
 // New builds a Client, loading the IANA RDAP bootstrap data once.
@@ -122,7 +133,6 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 		resolver:  resolver,
 		limiter:   limiter,
 		ianaCache: whois.NewIANACache(),
-		interval:  interval,
 	}, nil
 }
 
