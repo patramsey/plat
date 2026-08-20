@@ -7,10 +7,15 @@ package plat
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/patramsey/plat/internal/bootstrap"
+	"github.com/patramsey/plat/internal/collect"
+	"github.com/patramsey/plat/internal/domain"
+	"github.com/patramsey/plat/internal/merge"
+	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/whois"
 )
 
@@ -104,4 +109,110 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 		ianaCache: whois.NewIANACache(),
 		interval:  interval,
 	}, nil
+}
+
+// Kind is the sort of object a Result describes.
+type Kind int
+
+const (
+	// KindDomain is a domain name.
+	KindDomain Kind = iota
+	// KindIP is an IP address allocation. IPv4 and IPv6 are not
+	// distinguished here; IPRecord.IPVersion carries that.
+	KindIP
+	// KindASN is an autonomous system.
+	KindASN
+)
+
+// String returns the kind's name, as used in -o json's objectType.
+func (k Kind) String() string {
+	switch k {
+	case KindDomain:
+		return "domain"
+	case KindIP:
+		return "ip"
+	case KindASN:
+		return "asn"
+	}
+	return "unknown"
+}
+
+// Result is one lookup's outcome. Exactly one of Domain, IP, and ASN is
+// non-nil, matching Kind. The three stay separate types because the
+// objects genuinely differ: an IP allocation has no registrar,
+// nameservers, or expiry, and a domain has no address range.
+type Result struct {
+	// Kind says which record pointer below is populated.
+	Kind Kind
+	// Input is the caller's original string, unmodified.
+	Input string
+	// Domain is set when Kind is KindDomain.
+	Domain *Record
+	// IP is set when Kind is KindIP.
+	IP *IPRecord
+	// ASN is set when Kind is KindASN.
+	ASN *ASNRecord
+}
+
+// Lookup classifies input as a domain, IP address, or ASN, queries the
+// relevant RDAP and WHOIS sources concurrently, and merges the answers.
+//
+// A source failing is normal and is not an error: as long as one source
+// returned data, Lookup returns a Result with nil error, and the
+// per-source detail is in the record's Sources field. Lookup returns
+// ErrInvalidInput, ErrNotFound, or ErrLookupFailed for the three cases
+// where there is no usable answer at all.
+func (c *Client) Lookup(ctx context.Context, input string) (Result, error) {
+	q, err := domain.Normalize(input)
+	if err != nil {
+		return Result{}, fmt.Errorf("%w: %w", ErrInvalidInput, err)
+	}
+
+	res := Result{Input: input}
+	var sources []model.SourceResult
+
+	switch q.Kind {
+	case domain.KindDomain:
+		baseURL, _ := c.resolver.BaseURL(q.Name.TLD) // "" is fine -- WHOIS-only
+		records := collect.Collect(ctx, q.Name, baseURL, c.opts.WHOISIANAServer, collect.Options{
+			NoFollow:   c.opts.NoFollow,
+			Timeout:    c.opts.Timeout,
+			Sources:    c.opts.Sources,
+			Limiter:    c.limiter,
+			IANACache:  c.ianaCache,
+			HTTPClient: c.opts.HTTPClient,
+		})
+		rec := merge.Merge(records)
+		res.Kind, res.Domain, sources = KindDomain, &rec, rec.Sources
+
+	case domain.KindIPv4, domain.KindIPv6:
+		baseURL, _ := c.resolver.IPBaseURL(q.IP)
+		records := collect.CollectIP(ctx, q.IP, baseURL, c.opts.WHOISIANAServer, collect.Options{
+			Timeout:    c.opts.Timeout,
+			Sources:    c.opts.Sources,
+			Limiter:    c.limiter,
+			HTTPClient: c.opts.HTTPClient,
+		})
+		rec := merge.MergeIP(records)
+		res.Kind, res.IP, sources = KindIP, &rec, rec.Sources
+
+	case domain.KindASN:
+		baseURL, _ := c.resolver.ASNBaseURL(q.ASN)
+		records := collect.CollectASN(ctx, q.ASN, baseURL, c.opts.WHOISIANAServer, collect.Options{
+			Timeout:    c.opts.Timeout,
+			Sources:    c.opts.Sources,
+			Limiter:    c.limiter,
+			HTTPClient: c.opts.HTTPClient,
+		})
+		rec := merge.MergeASN(records)
+		res.Kind, res.ASN, sources = KindASN, &rec, rec.Sources
+	}
+
+	switch model.Classify(sources) {
+	case model.OutcomeNotFound:
+		return res, ErrNotFound
+	case model.OutcomeFailed:
+		return res, ErrLookupFailed
+	}
+	return res, nil
 }
