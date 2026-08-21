@@ -6,19 +6,7 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Fixed
-- Human output is coloured again. Since v0.4.0 every `plat <name>` lookup
-  rendered monochrome in a terminal: bulk mode buffers each name's output
-  so results can be flushed in input order, and the renderer decides how
-  much colour to emit from the writer in front of it -- which is what
-  keeps piped output clean. A buffer is not a terminal, so every escape
-  was stripped, and the stripped bytes were then copied to a terminal that
-  did want colour. Correct behaviour, applied to the wrong writer. The
-  buffers now carry the real stdout's colour profile, so the renderer
-  downsamples to what the terminal actually supports instead of to the
-  buffer. Bulk (`--file`, multiple names) is coloured too, which it never
-  was. Piped output, `NO_COLOR`, `--no-color`, and every machine format
-  are unchanged, and `plat` still emits zero ANSI in all of them.
+## [0.5.0] - 2026-08-20
 
 ### Added
 - `EncodeJSON` and `EncodeNDJSON` produce the plat CLI's exact
@@ -49,6 +37,20 @@ follows [Semantic Versioning](https://semver.org/).
   WHOIS-only, silently. Nothing in this repo's CI catches a break like
   this automatically, so a consumer finds out at their own `go build`.
   The API remains v0 and may still change before 1.0.
+
+### Fixed
+- Human output is coloured again. Since v0.4.0 every `plat <name>` lookup
+  rendered monochrome in a terminal: bulk mode buffers each name's output
+  so results can be flushed in input order, and the renderer decides how
+  much colour to emit from the writer in front of it -- which is what
+  keeps piped output clean. A buffer is not a terminal, so every escape
+  was stripped, and the stripped bytes were then copied to a terminal that
+  did want colour. Correct behaviour, applied to the wrong writer. The
+  buffers now carry the real stdout's colour profile, so the renderer
+  downsamples to what the terminal actually supports instead of to the
+  buffer. Bulk (`--file`, multiple names) is coloured too, which it never
+  was. Piped output, `NO_COLOR`, `--no-color`, and every machine format
+  are unchanged, and `plat` still emits zero ANSI in all of them.
 
 ## [0.4.0] - 2026-08-19
 
@@ -296,7 +298,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/patramsey/plat/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/patramsey/plat/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/patramsey/plat/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/patramsey/plat/compare/v0.3.0...v0.3.1
