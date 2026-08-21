@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,7 +69,7 @@ func selfReferringWHOIS(t *testing.T) string {
 func TestNew_DefaultsAreApplied(t *testing.T) {
 	c, err := New(context.Background(), Options{
 		DisableCache: true,
-		Resolver:     NewResolver(map[string]string{}),
+		Resolver:     NewResolver(ResolverConfig{Domains: map[string]string{}}),
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -145,7 +146,7 @@ func TestNew_DefaultWHOISIntervalPacesQueries(t *testing.T) {
 	c, err := New(context.Background(), Options{
 		DisableCache:    true,
 		Timeout:         5 * time.Second,
-		Resolver:        NewResolver(map[string]string{}), // no RDAP: WHOIS-only
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{}}), // no RDAP: WHOIS-only
 		WHOISIANAServer: addr,
 	})
 	if err != nil {
@@ -206,7 +207,7 @@ func TestLookup_DomainReturnsDomainKind(t *testing.T) {
 		NoFollow:        true,
 		Timeout:         2 * time.Second,
 		Sources:         []SourceID{SourceRegistryRDAP},
-		Resolver:        NewResolver(map[string]string{"com": srv.URL}),
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{"com": srv.URL}}),
 		WHOISIANAServer: "127.0.0.1:1",
 	})
 	if err != nil {
@@ -235,7 +236,7 @@ func TestLookup_DomainReturnsDomainKind(t *testing.T) {
 }
 
 func TestLookup_InvalidInputIsErrInvalidInput(t *testing.T) {
-	c, err := New(context.Background(), Options{DisableCache: true, Resolver: NewResolver(map[string]string{})})
+	c, err := New(context.Background(), Options{DisableCache: true, Resolver: NewResolver(ResolverConfig{Domains: map[string]string{}})})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -249,7 +250,7 @@ func TestLookup_AllSourcesFailIsErrLookupFailed(t *testing.T) {
 		DisableCache:    true,
 		NoFollow:        true,
 		Timeout:         200 * time.Millisecond,
-		Resolver:        NewResolver(map[string]string{"com": "http://127.0.0.1:1/dead"}),
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{"com": "http://127.0.0.1:1/dead"}}),
 		WHOISIANAServer: "127.0.0.1:1",
 	})
 	if err != nil {
@@ -276,7 +277,7 @@ func TestLookup_PartialSuccessIsNotAnError(t *testing.T) {
 		DisableCache:    true,
 		NoFollow:        true,
 		Timeout:         500 * time.Millisecond,
-		Resolver:        NewResolver(map[string]string{"com": srv.URL}),
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{"com": srv.URL}}),
 		WHOISIANAServer: "127.0.0.1:1",
 	})
 	if err != nil {
@@ -312,7 +313,7 @@ func TestLookup_PacingDelaysRepeatQueriesToOneServer(t *testing.T) {
 		DisableCache:    true,
 		Timeout:         5 * time.Second,
 		WHOISInterval:   interval,
-		Resolver:        NewResolver(map[string]string{}), // no RDAP: WHOIS-only
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{}}), // no RDAP: WHOIS-only
 		WHOISIANAServer: addr,
 	})
 	if err != nil {
@@ -352,7 +353,7 @@ func TestLookup_DisableWHOISPacingSkipsTheWait(t *testing.T) {
 		DisableWHOISPacing: true,
 		Timeout:            5 * time.Second,
 		WHOISInterval:      interval,
-		Resolver:           NewResolver(map[string]string{}),
+		Resolver:           NewResolver(ResolverConfig{Domains: map[string]string{}}),
 		WHOISIANAServer:    addr,
 	})
 	if err != nil {
@@ -414,7 +415,7 @@ func TestLookup_UsesSuppliedHTTPClient(t *testing.T) {
 		NoFollow:        true,
 		Timeout:         2 * time.Second,
 		Sources:         []SourceID{SourceRegistryRDAP},
-		Resolver:        NewResolver(map[string]string{"com": srv.URL}),
+		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{"com": srv.URL}}),
 		WHOISIANAServer: "127.0.0.1:1",
 		HTTPClient:      &http.Client{Transport: tr},
 	})
@@ -428,6 +429,34 @@ func TestLookup_UsesSuppliedHTTPClient(t *testing.T) {
 
 	if tr.n == 0 {
 		t.Fatal("supplied HTTPClient was never used; Lookup built its own")
+	}
+}
+
+// failingTransport counts requests and fails them all, so a test can prove
+// a client was consulted without any request leaving the machine.
+type failingTransport struct{ n int }
+
+func (t *failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	t.n++
+	return nil, errors.New("failingTransport: no network in tests")
+}
+
+func TestNew_HTTPClientReachesBootstrapFetch(t *testing.T) {
+	tr := &failingTransport{}
+	// No Resolver: New must actually run bootstrap.Load, which fetches
+	// four registries. The transport fails every request immediately, so
+	// Load falls through to the embedded snapshot without touching the
+	// network -- but it must have gone through OUR client to do so.
+	_, err := New(context.Background(), Options{
+		DisableCache: true,
+		Timeout:      2 * time.Second,
+		HTTPClient:   &http.Client{Transport: tr},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if tr.n == 0 {
+		t.Fatal("supplied HTTPClient was never used for the bootstrap fetch")
 	}
 }
 
@@ -457,21 +486,18 @@ func bootstrapJSONWith(tld, baseURL string) string {
 // New's bootstrap.Options literal); this one does, see the fix report's
 // mutation evidence.
 //
-// Every New call here uses an already-canceled context so any fetch
-// attempt New/Load does make (for ipv4.json/ipv6.json/asn.json, which
-// are never planted, or for bootstrap.json itself when DisableCache is
-// true) fails in microseconds on ctx.Err() rather than ever dialing out
-// -- confirmed empirically: a canceled-context http.Client.Do returns
-// "context canceled" without a network round trip. Resolver.Resolver is
-// not exported to this package's tests any other offline way: New never
-// takes a Resolver here (that would bypass bootstrap.Load, the exact
-// path under test), and Options has no field to point the fetch at a
-// fake server (Important 3 -- HTTPClient does not cover the bootstrap
-// fetch).
+// Every New call here supplies an HTTPClient built on failingTransport
+// (defined above), which fails every request in-process without ever
+// dialing out. That covers any fetch attempt New/Load does make (for
+// ipv4.json/ipv6.json/asn.json, which are never planted, or for
+// bootstrap.json itself when DisableCache is true), because HTTPClient
+// now reaches the bootstrap fetch (see TestNew_HTTPClientReachesBootstrapFetch
+// above) -- a more direct offline seam than the canceled-context trick this
+// test used before that was true. Resolver.Resolver is not exported to
+// this package's tests any other offline way: New never takes a Resolver
+// here, since that would bypass bootstrap.Load, the exact path under
+// test.
 func TestNew_CacheOptionsAreForwarded(t *testing.T) {
-	canceledCtx, cancel := context.WithCancel(context.Background())
-	cancel()
-
 	dir := t.TempDir()
 	planted := bootstrapJSONWith("faketld", "https://example.test/rdap/")
 	if err := os.WriteFile(filepath.Join(dir, "bootstrap.json"), []byte(planted), 0o600); err != nil {
@@ -479,9 +505,10 @@ func TestNew_CacheOptionsAreForwarded(t *testing.T) {
 	}
 
 	t.Run("CacheDir is read when caching is enabled", func(t *testing.T) {
-		c, err := New(canceledCtx, Options{
+		c, err := New(context.Background(), Options{
 			CacheDir:     dir,
 			DisableCache: false,
+			HTTPClient:   &http.Client{Transport: &failingTransport{}},
 		})
 		if err != nil {
 			t.Fatalf("New: %v", err)
@@ -492,9 +519,10 @@ func TestNew_CacheOptionsAreForwarded(t *testing.T) {
 	})
 
 	t.Run("DisableCache overrides a populated CacheDir", func(t *testing.T) {
-		c, err := New(canceledCtx, Options{
+		c, err := New(context.Background(), Options{
 			CacheDir:     dir,
 			DisableCache: true,
+			HTTPClient:   &http.Client{Transport: &failingTransport{}},
 		})
 		if err != nil {
 			t.Fatalf("New: %v", err)
@@ -503,4 +531,57 @@ func TestNew_CacheOptionsAreForwarded(t *testing.T) {
 			t.Error(`BaseURL("faketld") found -- DisableCache did not stop the planted CacheDir file from being read`)
 		}
 	})
+}
+
+func TestResolverConfig_CoversEveryCombination(t *testing.T) {
+	v4 := netip.MustParsePrefix("192.0.2.0/24")
+	addr := netip.MustParseAddr("192.0.2.7")
+
+	tests := []struct {
+		name                       string
+		cfg                        ResolverConfig
+		wantDomain, wantIP, wantAS bool
+	}{
+		{
+			name:       "domains only",
+			cfg:        ResolverConfig{Domains: map[string]string{"com": "https://d/"}},
+			wantDomain: true,
+		},
+		{
+			name:   "prefixes only",
+			cfg:    ResolverConfig{Prefixes: map[netip.Prefix]string{v4: "https://i/"}},
+			wantIP: true,
+		},
+		{
+			name:   "asns only",
+			cfg:    ResolverConfig{ASNs: map[[2]uint32]string{{100, 200}: "https://a/"}},
+			wantAS: true,
+		},
+		{
+			name: "all three at once",
+			cfg: ResolverConfig{
+				Domains:  map[string]string{"com": "https://d/"},
+				Prefixes: map[netip.Prefix]string{v4: "https://i/"},
+				ASNs:     map[[2]uint32]string{{100, 200}: "https://a/"},
+			},
+			wantDomain: true, wantIP: true, wantAS: true,
+		},
+		{name: "empty config covers nothing", cfg: ResolverConfig{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewResolver(tt.cfg)
+
+			if _, ok := r.BaseURL("com"); ok != tt.wantDomain {
+				t.Errorf("BaseURL coverage = %v, want %v", ok, tt.wantDomain)
+			}
+			if _, ok := r.IPBaseURL(addr); ok != tt.wantIP {
+				t.Errorf("IPBaseURL coverage = %v, want %v", ok, tt.wantIP)
+			}
+			if _, ok := r.ASNBaseURL(150); ok != tt.wantAS {
+				t.Errorf("ASNBaseURL coverage = %v, want %v", ok, tt.wantAS)
+			}
+		})
+	}
 }

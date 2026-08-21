@@ -50,23 +50,19 @@ type Options struct {
 	// otherwise pay the full interval for the second hop, which is a
 	// wait no one is served by.
 	DisableWHOISPacing bool
-	// HTTPClient is used for RDAP requests only. nil means
-	// http.DefaultClient. It does NOT cover the IANA bootstrap fetch New
-	// performs to load RDAP base URLs: that fetch always uses the default
-	// HTTP client, regardless of this field. A caller behind a proxy who
-	// needs the bootstrap fetch to go through it as well gets no error --
-	// New falls back silently to a cached or embedded snapshot instead.
+	// HTTPClient is used for RDAP requests and the IANA bootstrap fetch that
+	// New performs to load RDAP base URLs. nil means http.DefaultClient.
+	// Exposed so an embedding library can route plat's every outbound request
+	// through a caller-supplied transport, for a proxy or for instrumentation.
 	HTTPClient *http.Client
 	// Resolver supplies RDAP base URLs. nil means load IANA's published
 	// bootstrap data, which is what almost every caller wants. Set it to
 	// query a private or mirrored RDAP deployment instead.
 	//
-	// Each of NewResolver, NewIPResolver, and NewASNResolver builds a
-	// Resolver that covers exactly ONE object kind -- there is no
-	// constructor that combines all three. A Resolver from NewResolver,
-	// for example, supplies RDAP base URLs for domains only; IP and ASN
-	// lookups made with it fall back to WHOIS-only, silently, because it
-	// reports no coverage for those kinds.
+	// Build one with NewResolver, passing a ResolverConfig. Any field of
+	// ResolverConfig left nil means plat has no RDAP endpoint for that
+	// object kind, and lookups of it fall back to WHOIS-only, silently --
+	// that is not an error, just reduced coverage.
 	Resolver *Resolver
 	// WHOISIANAServer is the WHOIS server consulted first to discover a
 	// TLD's registry WHOIS server. Empty means whois.iana.org. Set it to
@@ -115,6 +111,7 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 			Timeout:      opts.Timeout,
 			CacheDir:     opts.CacheDir,
 			DisableCache: opts.DisableCache,
+			HTTPClient:   opts.HTTPClient,
 		})
 		if err != nil {
 			return nil, err

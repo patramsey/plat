@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Shipped and released — latest tag `v0.3.1`. The module is scaffolded, 14 packages under `cmd/` and `internal/`, released via goreleaser (binaries, checksums, Homebrew tap).
+Shipped and released — latest tag `v0.4.0`. The module is scaffolded, 14 packages under `cmd/` and `internal/`, released via goreleaser (binaries, checksums, Homebrew tap).
 
 Working today: domain lookups, IP-address lookups, and ASN lookups — each merged from RDAP and WHOIS with per-field provenance, rendered human/plain/JSON/NDJSON.
 
@@ -121,4 +121,4 @@ This is a render-and-exit tool for v1 — **not** an interactive Bubble Tea app 
 
 Still out of scope: availability monitoring, watch mode, historical WHOIS archiving, acting as a WHOIS/RDAP server. Design internals to not preclude these, but don't build them.
 
-Deferred rather than rejected, each tracked as an open issue: `--diff` between runs (#33), bulk mode (#34), interactive Bubble Tea mode (#35), extracting `internal/` as a public library (#36). #50 tracks the remaining duplication across the three object types — the parser vocabulary half is done; the fetch trio, `presentSorted`×3, `status`×3, and the two adapters are deliberately left alone, since none has ever caused a bug.
+Deferred rather than rejected, each tracked as an open issue: `--diff` between runs (#33), bulk mode (#34), interactive Bubble Tea mode (#35). Extracting `internal/` as a public library (#36) shipped in v0.4.0 and is no longer deferred. #50 tracks the remaining duplication across the three object types — the parser vocabulary half is done; the fetch trio, `presentSorted`×3, `status`×3, and the two adapters are deliberately left alone, since none has ever caused a bug.

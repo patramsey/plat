@@ -64,8 +64,7 @@ func RenderASN(w io.Writer, r model.ASNRecord, opts Options) error {
 		out = header.String() + "\n\n" + out
 	}
 
-	_, err := lipgloss.Fprint(w, out)
-	return err
+	return writeOut(w, out)
 }
 
 // asnTitle picks the title-line identifier: Handle when present (an ASN's

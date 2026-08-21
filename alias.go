@@ -87,36 +87,33 @@ const (
 // your own through Options.Resolver to query a private or mirrored RDAP
 // deployment instead.
 //
-// A Resolver built by one of the three constructors below covers exactly
-// ONE object kind -- there is no constructor that combines all three.
-// Using, say, a NewResolver Resolver for an IP or ASN lookup is not an
-// error: it simply reports no RDAP coverage for that kind, and the
-// lookup falls back to WHOIS-only.
+// Build one with NewResolver, passing a ResolverConfig. A field left nil
+// means plat has no RDAP endpoint for that object kind, and lookups of it
+// fall back to WHOIS-only -- that is not an error, just reduced coverage.
 type Resolver = bootstrap.Resolver
 
-// NewResolver builds a Resolver from an explicit TLD-to-RDAP-base-URL
-// map, for domain lookups ONLY. IP and ASN lookups made with the result
-// fall back to WHOIS-only, silently -- use NewIPResolver or
-// NewASNResolver (or both, alongside this) to cover those kinds too.
-func NewResolver(byTLD map[string]string) *Resolver {
-	return bootstrap.NewResolver(byTLD)
+// ResolverConfig describes which RDAP base URLs a Resolver should serve.
+// Any field may be nil, meaning plat has no RDAP endpoint for that object
+// kind and lookups of it fall back to WHOIS-only.
+//
+// One config covers all three kinds deliberately. The predecessor API had a
+// separate constructor per kind, which made it easy to point plat at a
+// private RDAP deployment for domains and, without noticing, lose RDAP for
+// every IP and ASN lookup.
+type ResolverConfig struct {
+	// Domains maps a TLD (no leading dot, e.g. "com") to its RDAP base URL.
+	Domains map[string]string
+	// Prefixes maps an IP prefix to the RDAP base URL serving it. The
+	// most specific matching prefix wins.
+	Prefixes map[netip.Prefix]string
+	// ASNs maps an inclusive [start, end] autonomous-system number range
+	// to its RDAP base URL.
+	ASNs map[[2]uint32]string
 }
 
-// NewIPResolver builds a Resolver from an explicit
-// prefix-to-RDAP-base-URL map, for IP lookups ONLY. Domain and ASN
-// lookups made with the result fall back to WHOIS-only, silently -- use
-// NewResolver or NewASNResolver (or both, alongside this) to cover those
-// kinds too.
-func NewIPResolver(prefixes map[netip.Prefix]string) *Resolver {
-	return bootstrap.NewIPResolver(prefixes)
-}
-
-// NewASNResolver builds a Resolver from an explicit ASN-range-to-
-// RDAP-base-URL map, for ASN lookups ONLY. Each key is an inclusive
-// [start, end] autonomous-system number range. Domain and IP lookups
-// made with the result fall back to WHOIS-only, silently -- use
-// NewResolver or NewIPResolver (or both, alongside this) to cover those
-// kinds too.
-func NewASNResolver(ranges map[[2]uint32]string) *Resolver {
-	return bootstrap.NewASNResolver(ranges)
+// NewResolver builds a Resolver from an explicit set of RDAP endpoints,
+// for querying a private or mirrored RDAP deployment instead of the ones
+// IANA publishes. Pass it as Options.Resolver.
+func NewResolver(cfg ResolverConfig) *Resolver {
+	return bootstrap.NewCombinedResolver(cfg.Domains, cfg.Prefixes, cfg.ASNs)
 }

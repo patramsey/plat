@@ -420,9 +420,19 @@ bootstrap data and a per-server WHOIS pacing limiter, both of which are
 only useful if kept around. Every field on the result types is a
 `Field[T]` carrying both the merged value and which sources supplied it,
 same as the CLI's output; a source failing is normal, not an error, as
-long as at least one source returns data. The JSON/human/plain renderers
-are not part of this package, so a library consumer can't currently emit
-plat's `schemaVersion: 1` output directly from a `Result`.
+long as at least one source returns data.
+
+`EncodeJSON` writes a `Result` as plat's `schemaVersion: 1` JSON —
+byte-identical to what `-o json` prints for the same lookup:
+
+```go
+_ = plat.EncodeJSON(os.Stdout, res, plat.EncodeOptions{})
+```
+
+`EncodeNDJSON` writes the same document as a single newline-delimited
+record; for one `Result` it produces identical bytes to `EncodeJSON` —
+its purpose is streaming many `Result`s into one stream, mirroring the
+CLI's `-o ndjson`.
 
 **This API is v0 and may change before 1.0.** See
 [`go doc github.com/patramsey/plat`](https://pkg.go.dev/github.com/patramsey/plat)

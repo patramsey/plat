@@ -41,27 +41,27 @@ type Resolver struct {
 }
 
 // NewResolver builds a Resolver directly from a TLD -> RDAP base URL map,
-// bypassing Load's fetch/cache/embedded-fallback chain entirely. It is
-// re-exported as public API (plat.NewResolver) for production use, in
-// addition to letting other packages' tests point a Resolver at a fake
-// RDAP server without hitting the real network or the real IANA
-// bootstrap file.
+// bypassing Load's fetch/cache/embedded-fallback chain entirely. It lets
+// other packages' tests (this module's cmd/plat included) point a
+// Resolver at a fake RDAP server without hitting the real network or the
+// real IANA bootstrap file.
 //
 // The Resolver this returns covers domain lookups ONLY: byPrefix and
 // byASNRange are left nil, so IPBaseURL and ASNBaseURL always report "no
 // coverage" on it. A lookup made with it for an IP address or ASN falls
-// back to WHOIS-only, silently -- there is no combining constructor that
-// covers more than one object kind. See NewIPResolver and NewASNResolver
-// for the other two.
+// back to WHOIS-only, silently. See NewIPResolver and NewASNResolver for
+// the other two single-kind constructors, and NewCombinedResolver for one
+// that covers all three at once -- that last one is what the public
+// plat.NewResolver builds on, precisely to avoid the accidental partial
+// coverage a single-kind constructor invites.
 func NewResolver(byTLD map[string]string) *Resolver {
 	return &Resolver{byTLD: byTLD}
 }
 
 // NewIPResolver builds a Resolver from an IP-prefix -> RDAP base URL map,
-// bypassing Load's fetch/cache/embedded-fallback chain. It is re-exported
-// as public API (plat.NewIPResolver) for production use, in addition to
-// letting other packages' tests point a Resolver at a fake RDAP server
-// without touching the network.
+// bypassing Load's fetch/cache/embedded-fallback chain. It lets other
+// packages' tests (this module's cmd/plat included) point a Resolver at
+// a fake RDAP server without touching the network.
 //
 // The Resolver this returns covers IP lookups ONLY: byTLD and
 // byASNRange are left nil, so BaseURL and ASNBaseURL always report "no
@@ -72,10 +72,9 @@ func NewIPResolver(prefixes map[netip.Prefix]string) *Resolver {
 }
 
 // NewASNResolver builds a Resolver from an ASN-range -> RDAP base URL
-// map, bypassing Load's fetch/cache/embedded-fallback chain. It is
-// re-exported as public API (plat.NewASNResolver) for production use, in
-// addition to letting other packages' tests point a Resolver at a fake
-// RDAP server without touching the network.
+// map, bypassing Load's fetch/cache/embedded-fallback chain. It lets
+// other packages' tests (this module's cmd/plat included) point a
+// Resolver at a fake RDAP server without touching the network.
 //
 // The Resolver this returns covers ASN lookups ONLY: byTLD and byPrefix
 // are left nil, so BaseURL and IPBaseURL always report "no coverage" on
@@ -83,6 +82,15 @@ func NewIPResolver(prefixes map[netip.Prefix]string) *Resolver {
 // silently.
 func NewASNResolver(ranges map[[2]uint32]string) *Resolver {
 	return &Resolver{byASNRange: ranges}
+}
+
+// NewCombinedResolver builds a Resolver covering any combination of the
+// three object kinds. Any map may be nil, meaning "no RDAP coverage for
+// that kind", which makes lookups of it fall back to WHOIS-only. It backs
+// the public plat.NewResolver, whose single-kind predecessors made partial
+// coverage easy to request by accident.
+func NewCombinedResolver(byTLD map[string]string, prefixes map[netip.Prefix]string, ranges map[[2]uint32]string) *Resolver {
+	return &Resolver{byTLD: byTLD, byPrefix: prefixes, byASNRange: ranges}
 }
 
 // BaseURL returns the RDAP base URL for tld and whether the TLD has RDAP
@@ -233,6 +241,12 @@ type Options struct {
 	// consumers who do not want an embedded dependency writing to their
 	// user's home directory.
 	DisableCache bool
+	// HTTPClient fetches the bootstrap documents. nil means
+	// http.DefaultClient. Exposed so an embedding library can route
+	// plat's every outbound request -- not just its RDAP queries --
+	// through a caller-supplied transport, for a proxy or for
+	// instrumentation.
+	HTTPClient *http.Client
 }
 
 // path returns the cache file path for the named bootstrap document (e.g.
@@ -280,7 +294,7 @@ func fetchOrEmbedded(ctx context.Context, cachePath, url string, embedded []byte
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
-	if data, err := fetchURL(ctx, url, timeout); err == nil && validBootstrapJSON(data) {
+	if data, err := fetchURL(ctx, url, timeout, opts.HTTPClient); err == nil && validBootstrapJSON(data) {
 		if haveCachePath {
 			writeCache(cachePath, data)
 		}
@@ -371,11 +385,7 @@ func writeCache(path string, data []byte) {
 	_ = os.WriteFile(path, data, 0o600)
 }
 
-func fetch(ctx context.Context, timeout time.Duration) ([]byte, error) {
-	return fetchURL(ctx, bootstrapURL, timeout)
-}
-
-func fetchURL(ctx context.Context, url string, timeout time.Duration) ([]byte, error) {
+func fetchURL(ctx context.Context, url string, timeout time.Duration, client *http.Client) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -383,7 +393,10 @@ func fetchURL(ctx context.Context, url string, timeout time.Duration) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

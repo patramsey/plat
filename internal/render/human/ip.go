@@ -64,8 +64,7 @@ func RenderIP(w io.Writer, r model.IPRecord, opts Options) error {
 		out = header.String() + "\n\n" + out
 	}
 
-	_, err := lipgloss.Fprint(w, out)
-	return err
+	return writeOut(w, out)
 }
 
 // ipTitle picks the title-line identifier: CIDR when present (the most

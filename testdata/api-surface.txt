@@ -2,15 +2,16 @@
 # Adding a line here commits that name to the public API permanently --
 # it cannot be un-exported without breaking consumers. Removing or
 # renaming one is a breaking change. Review additions accordingly.
+func EncodeJSON
+func EncodeNDJSON
 func New
-func NewASNResolver
-func NewIPResolver
 func NewResolver
 method Client.Lookup
 method Kind.String
 type ASNRecord
 type Client
 type Conflict
+type EncodeOptions
 type Field
 type IPRecord
 type Kind
@@ -22,12 +23,14 @@ type Record
 type RedactionNotice
 type RegistrarInfo
 type Resolver
+type ResolverConfig
 type Result
 type SourceID
 type SourceResult
 type TimeValue
 value ErrInvalidInput
 value ErrLookupFailed
+value ErrNoRecord
 value ErrNotFound
 value KindASN
 value KindDomain
@@ -36,6 +39,7 @@ value LifecycleAutoRenewGrace
 value LifecyclePendingDelete
 value LifecyclePendingRestore
 value LifecycleRedemptionGrace
+value SchemaVersion
 value SourceRegistrarRDAP
 value SourceRegistrarWHOIS
 value SourceRegistryRDAP
