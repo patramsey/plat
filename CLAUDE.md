@@ -113,7 +113,9 @@ This is a render-and-exit tool for v1 — **not** an interactive Bubble Tea app 
 
 `README.md`'s demo GIF is recorded from `docs/demo.tape` via `vhs docs/demo.tape` (requires `vhs`, plus its `ffmpeg`/`ttyd` runtime deps). Regenerate it whenever a change touches what the commands in that script print — flags, output formatting, or the sample domains' field values — so the GIF never goes stale relative to the tool it's demonstrating.
 
-**Known gap:** the tape's three commands are all domain lookups. IP and ASN lookups shipped after it was written and are not demonstrated, so the GIF undersells the tool. Adding them means re-recording, which needs `vhs` installed locally.
+The tape covers a domain, an IP, and an ASN (all Google, deliberately, so it reads as one operator seen three ways), then a multi-name lookup piped into `jq` and a `--diff` against a snapshot taken seconds earlier.
+
+**Two traps when re-recording.** First, check `which -a plat`: a Homebrew-installed plat shadows a freshly built one on a default macOS `$PATH`, and the v0.4.0 Homebrew build rendered human output with no colour at all, so recording against it publishes a monochrome GIF of a bug. Build to a temp dir and put it first: `go build -o /tmp/platdemo/plat ./cmd/plat && PATH=/tmp/platdemo:$PATH vhs docs/demo.tape`. Second, vhs's `Type` cannot contain a double quote, escaped or not — a `jq` filter written with string literals will not parse, which is why the tape's filter uses bare object keys.
 
 ## Non-goals
 
