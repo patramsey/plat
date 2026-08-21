@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/colorprofile"
+
 	"github.com/patramsey/plat/internal/bootstrap"
 	"github.com/patramsey/plat/internal/domain"
 	"github.com/patramsey/plat/internal/model"
@@ -1649,5 +1651,64 @@ func TestRunLookup_CounterBranch_ConcurrentWithErrorDoesNotRace(t *testing.T) {
 	var sig exitSignal
 	if err != nil && !errors.As(err, &sig) {
 		t.Fatalf("runLookupPool: unexpected error type %v\nstderr:\n%s", err, stderr.String())
+	}
+}
+
+// TestRunLookupPool_PreservesColorForAColorTerminal pins the fix for the
+// regression that shipped in v0.4.0: bulk mode renders each name into a
+// bytes.Buffer so output can be flushed in input order, and the renderer
+// decides how much color to emit from the writer in front of it. A buffer
+// is not a terminal, so every escape was stripped -- and the stripped
+// bytes were then copied to a terminal that did want color. Every human
+// lookup came out monochrome.
+//
+// ui.Profile carries the REAL stdout's capability, which is what
+// runLookupPool uses to ask for color and then downsample on flush. The
+// assertion is on ANSI actually surviving to the writer: rendering to a
+// buffer and checking the text reads correctly is precisely the shape of
+// test that let this through in the first place.
+//
+// t.Setenv("CLICOLOR_FORCE", "") is not decoration -- runLookupPool sets
+// that variable process-wide on this path, and registering it here makes
+// Go restore it afterwards so the setting cannot leak into other tests.
+func TestRunLookupPool_PreservesColorForAColorTerminal(t *testing.T) {
+	t.Setenv("CLICOLOR_FORCE", "")
+
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write(fixture)
+	}))
+	defer rdapSrv.Close()
+
+	// Concurrency must be set: runLookupPool does g.SetLimit(opts.Concurrency)
+	// and a limit of 0 blocks forever. runLookup rejects 0 before it ever
+	// reaches here, but a direct pool call bypasses that guard.
+	opts := lookupOptions{NoFollow: true, Concurrency: 1}
+	sources := []model.SourceID{model.SourceRegistryRDAP}
+	client := newTestClient(t, bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL}), opts, sources)
+
+	for _, tc := range []struct {
+		name      string
+		profile   colorprofile.Profile
+		wantColor bool
+	}{
+		{"color terminal keeps ANSI", colorprofile.TrueColor, true},
+		{"no profile strips ANSI", colorprofile.Profile(0), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			ui := uiConfig{Profile: tc.profile, Width: 80}
+			if err := runLookupPool(context.Background(), &stdout, &stderr, []string{"example.com"},
+				opts, render.FormatHuman, ui, client); err != nil {
+				t.Fatalf("runLookupPool: %v\nstderr:\n%s", err, stderr.String())
+			}
+			if got := strings.Contains(stdout.String(), "\x1b["); got != tc.wantColor {
+				t.Errorf("ANSI present = %v, want %v\noutput:\n%s", got, tc.wantColor, stdout.String())
+			}
+		})
 	}
 }

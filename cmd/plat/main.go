@@ -20,6 +20,8 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/term"
 
+	"github.com/charmbracelet/colorprofile"
+
 	"github.com/patramsey/plat"
 	"github.com/patramsey/plat/internal/diff"
 	"github.com/patramsey/plat/internal/domain"
@@ -95,6 +97,7 @@ func main() {
 	ui := uiConfig{NoColor: os.Getenv("NO_COLOR") != ""}
 	if render.IsTerminal(os.Stdout) {
 		ui.Dark = lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+		ui.Profile = colorprofile.Detect(os.Stdout, os.Environ())
 		if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
 			ui.Width = w
 		}
@@ -132,6 +135,15 @@ type uiConfig struct {
 	Width     int
 	NoColor   bool
 	StderrTTY bool
+	// Profile is the colour capability of the REAL stdout, detected once
+	// at startup. It matters because bulk mode renders into per-name
+	// buffers to hold output until it can be flushed in input order, and
+	// a buffer is not a terminal -- so the renderer, asked to decide from
+	// the writer in front of it, would strip colour that the actual
+	// destination wanted. Carrying the real answer here lets runLookupPool
+	// put it back. Zero value (Unknown) means "no colour", which is what
+	// every test wants.
+	Profile colorprofile.Profile
 }
 
 func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
@@ -446,6 +458,26 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 // The client is built once per run, by runLookup, and shared by every
 // worker here: the per-server WHOIS pacing limiter and the IANA referral
 // cache live on it, so one client per name would un-pace the whole run.
+// renderTarget wraps a per-name output buffer so the renderer downsamples
+// colour to the REAL stdout's capability rather than to the buffer's.
+//
+// Bulk mode buffers each name's output to flush it in input order, and the
+// renderer decides how much colour to emit from the writer in front of it
+// -- which is what keeps piped output clean. A buffer is not a terminal,
+// so without this every escape is stripped and the stripped bytes are then
+// copied to a terminal that did want colour: correct behaviour applied to
+// the wrong writer. That was the v0.4.0 regression.
+//
+// A profile below ANSI (including the zero value, which is what tests use)
+// means no colour is wanted, so the buffer is returned unwrapped and the
+// renderer strips exactly as before.
+func renderTarget(buf *bytes.Buffer, p colorprofile.Profile) io.Writer {
+	if p < colorprofile.ANSI {
+		return buf
+	}
+	return &colorprofile.Writer{Forward: buf, Profile: p}
+}
+
 func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []string, opts lookupOptions, format render.Format, ui uiConfig, client *plat.Client) error {
 	// Each name renders into its own buffer; buffers are flushed in input
 	// order after every worker finishes, so output never depends on
@@ -483,7 +515,7 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 	runPool := func() {
 		for i, input := range domains {
 			g.Go(func() error {
-				codes[i] = lookupOne(ctx, &bufs[i], syncStderr, client, input, opts, format, ui)
+				codes[i] = lookupOne(ctx, renderTarget(&bufs[i], ui.Profile), syncStderr, client, input, opts, format, ui)
 				done.Add(1)
 				return nil
 			})

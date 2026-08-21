@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 
 	"github.com/patramsey/plat/internal/model"
 )
@@ -78,6 +79,29 @@ type Options struct {
 // internal/render/plain.Render exactly (this package styles, it does not
 // add or remove fields) — both iterate the same model.FieldOrder — then
 // Conflicts/Redacted always, and Sources only when opts.Verbose.
+
+// writeOut emits already-styled output to w.
+//
+// lipgloss.Fprint decides how much colour to emit by inspecting w, which is
+// what keeps piped output clean -- but it gets that decision wrong when w is
+// only an intermediary. Bulk mode buffers each name's output to flush it in
+// input order; the buffer is not a terminal, so Fprint stripped every escape
+// and the stripped bytes were then copied to a terminal that did want
+// colour. That was the v0.4.0 regression.
+//
+// When the caller has already resolved the profile and handed us a writer
+// that carries it, that answer is better than anything re-derived from the
+// writer's type, so honour it. Everyone else -- including every renderer
+// test, which passes a plain buffer -- keeps the original behaviour exactly.
+func writeOut(w io.Writer, s string) error {
+	if cw, ok := w.(*colorprofile.Writer); ok {
+		_, err := cw.WriteString(s)
+		return err
+	}
+	_, err := lipgloss.Fprint(w, s)
+	return err
+}
+
 func Render(w io.Writer, r model.Record, opts Options) error {
 	width := opts.Width
 	if width <= 0 {
@@ -126,8 +150,7 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 		out = header.String() + "\n\n" + out
 	}
 
-	_, err := lipgloss.Fprint(w, out)
-	return err
+	return writeOut(w, out)
 }
 
 // buildSummary composes the at-a-glance line under the title: a lock
@@ -284,8 +307,7 @@ func RenderSources(w io.Writer, th Theme, width int, sources []model.SourceResul
 	}
 	var b strings.Builder
 	writeSources(&b, th, width, sources)
-	_, err := lipgloss.Fprint(w, b.String())
-	return err
+	return writeOut(w, b.String())
 }
 
 // writeField dispatches one model.FieldOrder entry to the write* helper
