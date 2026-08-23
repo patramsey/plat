@@ -2,6 +2,7 @@ package parse
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -67,6 +68,7 @@ var defaultSynonyms = map[string]string{
 	"domain nameservers":                     fNameservers,
 	"nserver":                                fNameservers,
 	"nameservers":                            fNameservers,
+	"nameserver":                             fNameservers, // .lt uses the singular; without this synonym its nameservers were dropped entirely
 	"creation date":                          fCreated,
 	"created":                                fCreated,
 	"created on":                             fCreated,
@@ -184,6 +186,23 @@ func tokenizeKV(raw string) []kvPair {
 		out = append(out, kvPair{key, val})
 	}
 	return out
+}
+
+// stripGlue reduces a WHOIS nameserver value to its hostname.
+//
+// Registries append glue addresses to the nameserver line in at least five
+// dialects -- space-separated (.de), parenthesised (.cz, .eu), bracketed
+// (.pl, .lt), and comma-separated after a trailing dot (.ru). In every one
+// of them the hostname is the first whitespace-delimited token, so that is
+// the whole rule. Glue is discarded rather than kept: model.Record has no
+// field for it, so carrying it inside the hostname string does not preserve
+// data, it produces a value that is not a hostname.
+func stripGlue(v string) string {
+	fields := strings.Fields(v)
+	if len(fields) == 0 {
+		return ""
+	}
+	return strings.TrimSuffix(fields[0], ".")
 }
 
 func firstToken(s string) string {
@@ -327,7 +346,17 @@ func Parse(raw, tld string) Fields {
 		case fStatus:
 			f.Statuses = append(f.Statuses, firstToken(p.val))
 		case fNameservers:
-			f.Nameservers = append(f.Nameservers, p.val)
+			ns := stripGlue(p.val)
+			if ns == "" {
+				break
+			}
+			// EURid lists one line per address family for the same host, so
+			// a source can repeat a name once glue is stripped.
+			if !slices.ContainsFunc(f.Nameservers, func(existing string) bool {
+				return strings.EqualFold(existing, ns)
+			}) {
+				f.Nameservers = append(f.Nameservers, ns)
+			}
 		case fCreated:
 			f.Created = ParseDate(p.val)
 		case fUpdated:

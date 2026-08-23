@@ -2,6 +2,8 @@ package parse
 
 import (
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -386,5 +388,75 @@ func TestParse_TrailingDotPaddingStripped(t *testing.T) {
 	}
 	if f.Expires.Raw != "2026-Aug-22." {
 		t.Errorf("Expires.Raw = %q, want %q", f.Expires.Raw, "2026-Aug-22.")
+	}
+}
+
+// TestParse_StripsGlueAddressesFromNameservers guards against registries
+// appending glue IP addresses onto the nameserver line: DENIC packs them
+// space-separated, CZ.NIC parenthesised. Both fixtures were recorded live
+// against the named registry on 2026-08-23 (see the fixture files' own
+// header comments); the `want` order matches the order each registry
+// actually emitted, not alphabetical -- CZ.NIC's response lists
+// d.ns.nic.cz before a.ns.nic.cz and b.ns.nic.cz.
+func TestParse_StripsGlueAddressesFromNameservers(t *testing.T) {
+	tests := []struct {
+		name    string
+		fixture string
+		tld     string
+		want    []string
+	}{
+		{
+			name:    "denic space-separated glue",
+			fixture: "denic-de-recorded.txt",
+			tld:     "de",
+			want:    []string{"ns1.denic.de", "ns2.denic.de", "ns3.denic.de", "ns4.denic.net"},
+		},
+		{
+			name:    "cznic parenthesised glue",
+			fixture: "cznic-cz-recorded.txt",
+			tld:     "cz",
+			want:    []string{"d.ns.nic.cz", "a.ns.nic.cz", "b.ns.nic.cz"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "whois", tt.fixture))
+			if err != nil {
+				t.Fatalf("reading fixture: %v", err)
+			}
+			got := Parse(string(raw), tt.tld).Nameservers
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("nameservers = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestStripGlue covers the dialects whose registries are not recorded as
+// fixtures here, so the rule is pinned for all five shapes seen live.
+func TestStripGlue(t *testing.T) {
+	for _, tt := range []struct{ in, want string }{
+		{"ns1.denic.de 77.67.63.106 2001:668:1f:11:0:0:0:106", "ns1.denic.de"},
+		{"d.ns.nic.cz (193.29.206.1, 2001:678:1::1)", "d.ns.nic.cz"},
+		{"bilbo.nask.org.pl. [195.187.245.51]", "bilbo.nask.org.pl"},
+		{"ns5.nic.ru. 31.177.67.100, 2a02:2090:e800:9000:31:177:67:100", "ns5.nic.ru"},
+		{"ns1.domreg.lt\t[185.150.40.44 2a07:ab40::44]", "ns1.domreg.lt"},
+		{"ns4.denic.net", "ns4.denic.net"},
+		{"", ""},
+	} {
+		if got := stripGlue(tt.in); got != tt.want {
+			t.Errorf("stripGlue(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+// EURid lists the same host once per address family. After glue is
+// stripped those collapse to duplicates, which must not reach the record.
+func TestParse_DeduplicatesNameserversWithinASource(t *testing.T) {
+	raw := "Name server: ns1.example.eu (192.0.2.1)\nName server: ns1.example.eu (2001:db8::1)\nName server: ns2.example.eu\n"
+	got := Parse(raw, "example").Nameservers
+	want := []string{"ns1.example.eu", "ns2.example.eu"}
+	if !slices.Equal(got, want) {
+		t.Errorf("nameservers = %q, want %q", got, want)
 	}
 }
