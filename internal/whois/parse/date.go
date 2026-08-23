@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -36,7 +37,24 @@ var dateLayouts = []string{
 	"02.01.2006",
 	"January 2, 2006",
 	"Mon Jan 02 2006",
+	// .io and others emit an ISO-8601 basic offset ("+0000"); RFC 3339
+	// requires "+00:00", so time.Parse rejects it and no other layout
+	// matches.
+	"2006-01-02T15:04:05-0700",
+	// .kr, spaces and a trailing dot ("1996. 07. 20.").
+	"2006. 01. 02.",
+	// The rewritten form of a JPRS "(JST)"-suffixed timestamp; see
+	// jstSuffix below.
+	"2006/01/02 15:04:05 -0700",
 }
+
+// jstSuffix matches JPRS's "(JST)" trailer. It is handled by substitution
+// rather than by letting time.Parse resolve the abbreviation: Go looks
+// abbreviations up in the local tz database, so "JST" parses to a
+// different instant -- or fails -- depending on the machine the binary
+// runs on. Japan has no DST and a fixed +09:00 offset, so the rewrite is
+// exact. This is the same reasoning that keeps CLST out of the list.
+var jstSuffix = regexp.MustCompile(`\s*\(JST\)\s*$`)
 
 // ParseDate tries each known WHOIS date layout in turn, on both the raw
 // string and a title-cased variant (WHOIS month abbreviations appear in
@@ -48,7 +66,11 @@ func ParseDate(s string) Date {
 	if raw == "" {
 		return d
 	}
-	candidates := []string{raw, titleCaseWords(raw)}
+	parseable := raw
+	if jstSuffix.MatchString(parseable) {
+		parseable = jstSuffix.ReplaceAllString(parseable, "") + " +0900"
+	}
+	candidates := []string{parseable, titleCaseWords(parseable)}
 	for _, cand := range candidates {
 		for _, layout := range dateLayouts {
 			if t, err := time.Parse(layout, cand); err == nil {

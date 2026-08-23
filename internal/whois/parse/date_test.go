@@ -48,6 +48,27 @@ func TestParseDate(t *testing.T) {
 	}
 }
 
+func TestParseDate_AdditionalRealFormats(t *testing.T) {
+	for _, tt := range []struct {
+		name, in, want string // want is RFC3339 in UTC
+	}{
+		{"iso basic offset", "2027-03-08T00:00:00+0000", "2027-03-08T00:00:00Z"},
+		{"iso basic offset non-zero", "2027-03-08T00:00:00+0200", "2027-03-07T22:00:00Z"},
+		{"jprs jst", "2026/03/01 01:05:03 (JST)", "2026-02-28T16:05:03Z"},
+		{"kr dotted", "1996. 07. 20.", "1996-07-20T00:00:00Z"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseDate(tt.in)
+			if !got.Parsed {
+				t.Fatalf("ParseDate(%q) did not parse", tt.in)
+			}
+			if s := got.Time.UTC().Format(time.RFC3339); s != tt.want {
+				t.Errorf("ParseDate(%q) = %s, want %s", tt.in, s, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseDate_TortureFormats(t *testing.T) {
 	tests := []struct {
 		name       string
