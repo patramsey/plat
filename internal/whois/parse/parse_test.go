@@ -482,6 +482,22 @@ func TestParse_StripsGlueAddressesFromNameservers(t *testing.T) {
 			tld:     "cz",
 			want:    []string{"d.ns.nic.cz", "a.ns.nic.cz", "b.ns.nic.cz"},
 		},
+		{
+			// NASK's "nameservers:" value spans four lines, but only the
+			// first carries the "nameservers:" key -- the other three are
+			// bare continuation lines with no key of their own, and the
+			// two of those with bracketed IPv6 glue contain a colon that
+			// the default kv tokenizer mistakes for its own key/value
+			// separator, so they land in Unmapped instead of
+			// Nameservers. bilbo.nask.org.pl is the only nameserver the
+			// current tokenizer actually recovers from this dialect; this
+			// pins that real (still-limited) behavior rather than the
+			// four hosts the raw response lists.
+			name:    "nask bracketed glue, multi-line value",
+			fixture: "nask-pl-recorded.txt",
+			tld:     "pl",
+			want:    []string{"bilbo.nask.org.pl"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -512,6 +528,21 @@ func TestStripGlue(t *testing.T) {
 		if got := stripGlue(tt.in); got != tt.want {
 			t.Errorf("stripGlue(%q) = %q, want %q", tt.in, got, tt.want)
 		}
+	}
+}
+
+// .lt uses the singular "Nameserver:" key rather than "Name Server:" or
+// "nserver:" -- without the "nameserver" entry in defaultSynonyms routing
+// it to fNameservers, the whole line falls into Unmapped and Nameservers
+// comes back empty. TestStripGlue exercises the same .lt-shaped glue
+// through stripGlue alone, which says nothing about whether the key ever
+// reaches stripGlue in the first place; this test guards that routing.
+func TestParse_LTSingularNameserverSynonym(t *testing.T) {
+	raw := "Nameserver:\t\tns1.domreg.lt\t[185.150.40.44 2a07:ab40::44]\n"
+	got := Parse(raw, "lt").Nameservers
+	want := []string{"ns1.domreg.lt"}
+	if !slices.Equal(got, want) {
+		t.Errorf("nameservers = %q, want %q", got, want)
 	}
 }
 

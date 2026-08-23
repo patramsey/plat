@@ -57,7 +57,12 @@ var canonicalEPPStatus = map[string]string{
 // (space-separated, e.g. Verisign's "client transfer prohibited") or WHOIS
 // (already camelCase, e.g. "clientTransferProhibited") into one camelCase
 // EPP form, so the merge engine can union/compare status sets across
-// sources regardless of which vocabulary spelling each one used.
+// sources regardless of which vocabulary spelling each one used. After
+// the casing pass it also folds the result through canonicalEPPStatus,
+// so two sources that agree on the status but disagree on casing (e.g.
+// RDAP's "clientDeleteProhibited" vs. a registrar WHOIS's
+// "clientdeleteprohibited") end up as the exact same string instead of
+// two spellings of one fact.
 func NormalizeEPPStatus(raw string) string {
 	s := strings.TrimSpace(raw)
 	if s == "" {

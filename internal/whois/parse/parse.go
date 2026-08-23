@@ -246,6 +246,29 @@ func tokenizeBrackets(raw string) []kvPair {
 	return out
 }
 
+// indexTopLevelColon returns the index of the first ':' in s that is not
+// enclosed in parentheses, or -1 if there is none. A colon inside an
+// unmatched '(' is glue (an IPv6 address parenthesised after a
+// nameserver hostname), not a key/value separator.
+func indexTopLevelColon(s string) int {
+	depth := 0
+	for i, r := range s {
+		switch r {
+		case '(':
+			depth++
+		case ')':
+			if depth > 0 {
+				depth--
+			}
+		case ':':
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
 // tokenizeIndent handles Nominet-style ".uk" WHOIS output: a
 // non-indented "Header:" line introduces a section, followed by one or
 // more indented lines holding that section's content. An indented line
@@ -273,29 +296,6 @@ func tokenizeBrackets(raw string) []kvPair {
 // its IPv6 glue that must not be mistaken for that separator, or the
 // whole line (and its hostname) is lost into Unmapped under a garbage
 // key instead of reaching stripGlue.
-// indexTopLevelColon returns the index of the first ':' in s that is not
-// enclosed in parentheses, or -1 if there is none. A colon inside an
-// unmatched '(' is glue (an IPv6 address parenthesised after a
-// nameserver hostname), not a key/value separator.
-func indexTopLevelColon(s string) int {
-	depth := 0
-	for i, r := range s {
-		switch r {
-		case '(':
-			depth++
-		case ')':
-			if depth > 0 {
-				depth--
-			}
-		case ':':
-			if depth == 0 {
-				return i
-			}
-		}
-	}
-	return -1
-}
-
 func tokenizeIndent(raw string) []kvPair {
 	var out []kvPair
 	section := ""

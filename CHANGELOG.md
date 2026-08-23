@@ -36,11 +36,12 @@ follows [Semantic Versioning](https://semver.org/).
   credited and the displayed spelling is unchanged. This was the same
   failure as the nameserver conflicts above: two true spellings of one
   fact, read as a disagreement.
-- `.eu` returns its nameservers; its WHOIS format needed its own
-  tokenizer branch and had been misread as Nominet's. Note honestly:
-  EURid publishes no status and no dates at all for any `.eu` domain --
-  those fields stay empty because the registry does not emit them, not
-  because plat fails to parse them.
+- `.eu` returns its nameservers; its WHOIS format had been misread as
+  the generic `kv` dialect and now routes to Nominet's indent
+  tokenizer, which its section-header layout actually matches. Note
+  honestly: EURid publishes no status and no dates at all for any
+  `.eu` domain -- those fields stay empty because the registry does
+  not emit them, not because plat fails to parse them.
 - Third-level `.jp` records (`.ad.jp`, `.co.jp`) now return domain,
   status, and nameservers. JPRS prefixes third-level lines with a
   lettered ordinal the bracket tokenizer couldn't match. Second-level
