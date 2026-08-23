@@ -244,3 +244,27 @@ func decodeSnapshot(t *testing.T, rec model.Record) machine.Snapshot {
 	}
 	return snap
 }
+
+// TestDiffNameMatches_IPWithinRangeOfCIDRlessSnapshot covers the RIPE/
+// APNIC/AFRINIC case: no CIDR, no handle, so Name is empty and the match
+// must fall back to containment in the recorded start/end range. The
+// negative half is load-bearing -- an implementation that returns true
+// whenever a range is present would pass the positive assertion alone.
+func TestDiffNameMatches_IPWithinRangeOfCIDRlessSnapshot(t *testing.T) {
+	snap := machine.Snapshot{ObjectType: "ip", IPStart: "193.0.0.0", IPEnd: "193.0.7.255"}
+	q, err := domain.Normalize("193.0.6.139")
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	if !diffNameMatches(snap, q) {
+		t.Error("an address inside the snapshot's range did not match")
+	}
+
+	outside, err := domain.Normalize("8.8.8.8")
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	if diffNameMatches(snap, outside) {
+		t.Error("an address outside the snapshot's range matched")
+	}
+}

@@ -33,6 +33,15 @@ type Snapshot struct {
 	ObjectType    string
 	Name          string
 
+	// IPStart and IPEnd carry an IP record's address range so callers
+	// can match it by containment when Name is empty -- RIPE, APNIC
+	// and AFRINIC IPv4 WHOIS records supply neither a CIDR nor a
+	// handle, so Name has nothing to fall back to even though the
+	// range is always present. Both are empty for domain and ASN
+	// snapshots.
+	IPStart string
+	IPEnd   string
+
 	domain *recordView
 	ip     *ipRecordView
 	asn    *asnRecordView
@@ -95,6 +104,16 @@ func Decode(r io.Reader) (Snapshot, error) {
 			s.Name = v.CIDR.Value
 		} else if v.Handle != nil {
 			s.Name = v.Handle.Value
+		}
+		// RIPE, APNIC and AFRINIC IPv4 WHOIS records carry neither a CIDR
+		// nor a handle, which left Name empty and made --diff reject its
+		// own snapshot. The address range is always present, so carry it
+		// and let the caller match by containment.
+		if v.StartAddress != nil {
+			s.IPStart = v.StartAddress.Value
+		}
+		if v.EndAddress != nil {
+			s.IPEnd = v.EndAddress.Value
 		}
 	case "asn":
 		var v asnRecordView
