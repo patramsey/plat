@@ -686,6 +686,78 @@ func TestLookupOne_IP_Diff(t *testing.T) {
 	})
 }
 
+// TestLookupOne_IP_Diff_NoCIDRSnapshot closes the same gap
+// TestLookupOne_IP_Diff exists for, but on the boundary Task 7 actually
+// touched: Decode -> loadSnapshot -> diffNameMatches, driven by a real
+// WHOIS-sourced record with no CIDR and no handle. decode_test.go's
+// TestDecode_IPSnapshotWithoutCIDRCarriesItsRange and main_test.go's
+// TestDiffNameMatches_IPWithinRangeOfCIDRlessSnapshot are each
+// load-bearing for their own half, but neither round-trips through the
+// other -- a StartAddress/EndAddress mix-up at the JSON-tag level would
+// be invisible to both, since the struct fields and the literal JSON
+// keys in those tests were written by the same hand. This test instead
+// takes a snapshot through plat's own encoder and reads it back through
+// plat's own decoder, so the keys are chosen once, not twice.
+//
+// testdata/whois/ripe-193.0.6.139.txt (recorded for #44) is exactly the
+// shape that broke --diff: a RIPE inetnum range with no NetHandle. The
+// resolver has no RDAP prefix registered for it, so IPBaseURL reports no
+// coverage and both the snapshot and the fresh lookup take the same
+// WHOIS-only path -- see bootstrap.NewIPResolver's doc comment -- which
+// keeps the two sides directly comparable without needing a --source
+// flag.
+func TestLookupOne_IP_Diff_NoCIDRSnapshot(t *testing.T) {
+	fixture, err := os.ReadFile("../../testdata/whois/ripe-193.0.6.139.txt")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+
+	rirWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+		return string(fixture)
+	})
+	ianaAddr := startFakeWHOISListener(t, func(query string) string {
+		return "refer: " + rirWHOISAddr + "\n"
+	})
+
+	resolver := bootstrap.NewIPResolver(nil)
+	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
+
+	// Produce a baseline -o json snapshot from a fresh lookup, exactly
+	// what a user would have saved via `plat 193.0.6.139 -o json > before.json`.
+	var baseline, baselineErr bytes.Buffer
+	client := newTestClient(t, resolver, baseOpts, nil)
+	code := lookupOne(
+		context.Background(), &baseline, &baselineErr, client, "193.0.6.139",
+		baseOpts, render.FormatJSON, uiConfig{},
+	)
+	if code != 0 {
+		t.Fatalf("baseline lookup exit code = %d, want 0\nstderr: %s", code, baselineErr.String())
+	}
+	if strings.Contains(baseline.String(), `"cidr"`) || strings.Contains(baseline.String(), `"handle"`) {
+		t.Fatalf("baseline snapshot has a cidr or handle field -- fixture no longer exercises the CIDR-less case:\n%s", baseline.String())
+	}
+
+	snapPath := filepath.Join(t.TempDir(), "before.json")
+	if err := os.WriteFile(snapPath, baseline.Bytes(), 0o600); err != nil {
+		t.Fatalf("writing snapshot: %v", err)
+	}
+
+	opts := baseOpts
+	opts.DiffPath = snapPath
+	var stdout, stderr bytes.Buffer
+	diffClient := newTestClient(t, resolver, opts, nil)
+	code = lookupOne(
+		context.Background(), &stdout, &stderr, diffClient, "193.0.6.139",
+		opts, render.FormatPlain, uiConfig{},
+	)
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0\nstdout: %s\nstderr: %s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "no changes") {
+		t.Errorf(`stdout missing "no changes", got:\n%s`, stdout.String())
+	}
+}
+
 // TestLookupOne_IP_SpinnerBranch_HumanFormat is lookupOneIP's counterpart
 // to TestLookupOne_SpinnerBranch_HumanFormat/
 // TestLookupOne_ASN_SpinnerBranch_HumanFormat: StderrTTY: true + FormatHuman

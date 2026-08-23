@@ -6,6 +6,61 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Nameservers no longer carry glue addresses. `.de`, `.cz`, `.pl`, `.ru`,
+  `.lt`, and `.eu` each append the nameserver's IP address onto the same
+  WHOIS line, in a different dialect per registry (space-separated,
+  parenthesised, bracketed). plat stored the whole line as the hostname,
+  so `nic.cz` showed three nameservers as six, invented a `nameservers`
+  conflict between sources that actually agreed, and left the field
+  with no provenance at all -- plat reporting its own parsing gap as a
+  disagreement in the data, on the exact signal this tool exists to
+  provide. Indent-format registries separately dropped a nameserver
+  outright when its glue was IPv6-only (`ns1.example.eu
+  (2a05:d018::1)`): the line tokenizer split on the first colon, which
+  sits inside the address, so the whole line fell into `Unmapped` under
+  a garbage key instead of `Nameservers`. `.lt` had lost its
+  nameservers entirely to a missing `Nameserver:` (singular) synonym.
+  Glue is stripped correctly for every dialect listed, `.pl` included --
+  but `.pl` also splits its nameserver list across continuation lines
+  that plat's generic key/value tokenizer does not yet follow, so `.pl`
+  lookups still return only the first of typically four nameservers;
+  fixing that tokenizer gap is tracked as a follow-up, not shipped here.
+- EPP statuses are now matched case-insensitively. A registrar whose
+  WHOIS output lowercases them -- Cloudflare's does -- had every
+  restriction listed twice, once per casing, read by plat as two
+  different statuses rather than one spelled two ways.
+- A ccTLD status written as an English phrase, not an EPP token, is
+  kept whole instead of being truncated to its first word. CZ.NIC's
+  `Sponsoring registrar change forbidden` had been shortened to
+  `sponsoring`.
+- IDN domains no longer report a conflict with themselves. RDAP
+  publishes the Unicode form (`bücher.com`) and WHOIS publishes the
+  A-label (`xn--bcher-kva.com`) for the same domain; plat now folds
+  both to punycode before comparing values, so all four sources are
+  credited and the displayed spelling is unchanged. This was the same
+  failure as the nameserver conflicts above: two true spellings of one
+  fact, read as a disagreement.
+- `.eu` returns its nameservers; its WHOIS format had been misread as
+  the generic `kv` dialect and now routes to Nominet's indent
+  tokenizer, which its section-header layout actually matches. Note
+  honestly: EURid publishes no status and no dates at all for any
+  `.eu` domain -- those fields stay empty because the registry does
+  not emit them, not because plat fails to parse them.
+- Third-level `.jp` records (`.ad.jp`, `.co.jp`) now return domain,
+  status, and nameservers. JPRS prefixes third-level lines with a
+  lettered ordinal the bracket tokenizer couldn't match. Second-level
+  `.jp` (`example.jp`) was never affected.
+- Three more date formats parse instead of falling back unparsed:
+  ISO-8601 with a basic (non-colon) UTC offset, as `.io` emits it;
+  JPRS's `(JST)`-suffixed timestamps; and `.kr`'s dotted `1996. 07.
+  20.` form.
+- `--diff` accepts IP snapshots from RIPE, APNIC, and AFRINIC. Their
+  WHOIS records carry neither a CIDR nor a handle, which the diff
+  matcher needed to identify a snapshot's record; those comparisons
+  previously failed with `--diff snapshot is for , but the query is
+  ...` and exited 2 instead of reporting what changed.
+
 ## [0.5.0] - 2026-08-20
 
 ### Added

@@ -1,0 +1,11 @@
+% Recorded live from whois.denic.de, query "-T dn,ace denic.de", 2026-08-23.
+% Legal preamble trimmed; keys and values otherwise verbatim.
+
+Domain: denic.de
+Nserver: ns1.denic.de 77.67.63.106 2001:668:1f:11:0:0:0:106
+Nserver: ns2.denic.de 81.91.164.6 2a02:568:0:2:0:0:0:54
+Nserver: ns3.denic.de 195.243.137.27 2003:8:14:0:0:0:0:106
+Nserver: ns4.denic.net
+Dnskey: 257 3 8 AwEAAb/xrM2MD+xm84YNYby6TxkMaC6PtzF2bB9WBB7ux7iqzhViob4GKvQ6L7CkXjyAxfKbTzrdvXoAPpsAPW4pkThReDAVp3QxvUKrkBM8/uWRF3wpaUoPsAHm1dbcL9aiW3lqlLMZjDEwDfU6lxLcPg9d14fq4dc44FvPx6aYcymkgJoYvR6P1wECpxqlEAR2K1cvMtqCqvVESBQV/EUtWiALNuwR2PbhwtBWJd+e8BdFI7OLkit4uYYux6Yu35uyGQ==
+Status: connect
+Changed: 2024-12-19T13:33:43+01:00

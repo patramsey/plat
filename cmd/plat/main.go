@@ -694,6 +694,12 @@ func diffNameMatches(snap machine.Snapshot, q domain.Query) bool {
 		if prefix, err := netip.ParsePrefix(snap.Name); err == nil {
 			return prefix.Contains(q.IP)
 		}
+		// No CIDR: match by containment in the recorded range instead.
+		start, errS := netip.ParseAddr(snap.IPStart)
+		end, errE := netip.ParseAddr(snap.IPEnd)
+		if errS == nil && errE == nil {
+			return q.IP.Compare(start) >= 0 && q.IP.Compare(end) <= 0
+		}
 	}
 	return strings.EqualFold(snap.Name, diffQueryName(q))
 }

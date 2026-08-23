@@ -33,6 +33,15 @@ type Snapshot struct {
 	ObjectType    string
 	Name          string
 
+	// IPStart and IPEnd carry an IP record's address range so callers
+	// can match it by containment when Name is empty -- RIPE, APNIC
+	// and AFRINIC IPv4 WHOIS records supply neither a CIDR nor a
+	// handle, so Name has nothing to fall back to even though the
+	// range is always present. Both are empty for domain and ASN
+	// snapshots.
+	IPStart string
+	IPEnd   string
+
 	domain *recordView
 	ip     *ipRecordView
 	asn    *asnRecordView
@@ -91,10 +100,33 @@ func Decode(r io.Reader) (Snapshot, error) {
 			return Snapshot{}, fmt.Errorf("reading ip snapshot: %w", err)
 		}
 		s.ip = &v
-		if v.CIDR != nil {
+		// RIPE, APNIC and AFRINIC IPv4 WHOIS records carry neither a CIDR
+		// nor a handle, which left Name empty -- an empty record identity
+		// both prints as "" in human/JSON --diff output and (for
+		// -o json consumers keying on it) is indistinguishable from no
+		// record at all. Fall back through the record's netname, then
+		// finally to the address range itself, so Name is never empty as
+		// long as the record has any identity at all.
+		switch {
+		case v.CIDR != nil:
 			s.Name = v.CIDR.Value
-		} else if v.Handle != nil {
+		case v.Handle != nil:
 			s.Name = v.Handle.Value
+		case v.Name != nil:
+			s.Name = v.Name.Value
+		case v.StartAddress != nil && v.EndAddress != nil:
+			s.Name = v.StartAddress.Value + "-" + v.EndAddress.Value
+		}
+		// IPStart and IPEnd are carried independently of Name so
+		// diffNameMatches can match by containment: Name may now be a
+		// netname or a range string, neither of which netip.ParsePrefix
+		// can parse, so the containment fallback is what actually fires
+		// for these records.
+		if v.StartAddress != nil {
+			s.IPStart = v.StartAddress.Value
+		}
+		if v.EndAddress != nil {
+			s.IPEnd = v.EndAddress.Value
 		}
 	case "asn":
 		var v asnRecordView

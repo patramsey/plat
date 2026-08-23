@@ -2,6 +2,8 @@ package parse
 
 import (
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -166,6 +168,71 @@ func TestTokenizeIndent_UKFixture(t *testing.T) {
 	for _, p := range pairs {
 		if strings.Contains(p.val, "WHOIS lookup made on") || strings.Contains(p.key, "whois lookup") {
 			t.Errorf("trailing timestamp line leaked into output: %+v", p)
+		}
+	}
+}
+
+func TestTokenizeIndent_FlatKeyValueLines(t *testing.T) {
+	// EURid's ".eu" responses open with non-indented lines that already
+	// carry their own value ("Domain: europa.eu", "Script: LATIN")
+	// before any indented section -- the flatKeyPattern branch this
+	// pins independently of the eu template's synonym table.
+	raw := "Domain: example.eu\nScript: LATIN\n\nRegistrant:\n        NOT DISCLOSED!\n"
+	pairs := tokenizeIndent(raw)
+
+	want := map[string]string{
+		"domain": "example.eu",
+		"script": "LATIN",
+	}
+	got := map[string]string{}
+	for _, p := range pairs {
+		got[p.key] = p.val
+	}
+	for key, wantVal := range want {
+		if got[key] != wantVal {
+			t.Errorf("key %q = %q, want %q", key, got[key], wantVal)
+		}
+	}
+
+	// A prose line whose only colon sits deep inside a sentence (not a
+	// short label) must not be mistaken for a flat key/value pair --
+	// this is what flatKeyPattern's word-count/letters-only gate exists
+	// to reject.
+	prose := "WHOIS lookup made on Sun, 12 Jul 2026 at 09:15:00"
+	pairs = tokenizeIndent(raw + "\n" + prose + "\n")
+	for _, p := range pairs {
+		if strings.Contains(p.val, "lookup made on") || strings.Contains(p.key, "whois lookup") {
+			t.Errorf("prose line leaked into flat key/value output: %+v", p)
+		}
+	}
+}
+
+func TestParse_IndentIPv6OnlyGlueNameserver(t *testing.T) {
+	// Regression: tokenizeIndent's indented-content branch used to split
+	// an indented line on the FIRST colon it found. For a nameserver
+	// whose only glue is IPv6 -- "ns1.example.eu (2a05:d018:c5f:3701::1)"
+	// -- that first colon sits inside the address itself, so the line
+	// tokenized as key "ns1.example.eu (2a05" / value
+	// "d018:c5f:3701::1)" and landed in Unmapped under that garbage key
+	// instead of reaching stripGlue. Unlike a real recording where an
+	// affected host might also have an IPv4-glued sibling line that
+	// rescues it via dedup, this fixture gives ns1 only IPv6 glue, so a
+	// regression here can't hide behind a duplicate.
+	raw := "Domain: example.eu\nName servers:\n        ns1.example.eu (2a05:d018:c5f:3701::1)\n        ns2.example.eu (192.0.2.9)\n"
+	f := Parse(raw, "eu")
+
+	wantNS := []string{"ns1.example.eu", "ns2.example.eu"}
+	if len(f.Nameservers) != len(wantNS) {
+		t.Fatalf("Nameservers = %v, want %v", f.Nameservers, wantNS)
+	}
+	for i := range wantNS {
+		if f.Nameservers[i] != wantNS[i] {
+			t.Errorf("Nameservers[%d] = %q, want %q", i, f.Nameservers[i], wantNS[i])
+		}
+	}
+	for key := range f.Unmapped {
+		if strings.Contains(key, "ns1.example.eu") {
+			t.Errorf("IPv6-glued nameserver line leaked into Unmapped under key %q", key)
 		}
 	}
 }
@@ -386,5 +453,163 @@ func TestParse_TrailingDotPaddingStripped(t *testing.T) {
 	}
 	if f.Expires.Raw != "2026-Aug-22." {
 		t.Errorf("Expires.Raw = %q, want %q", f.Expires.Raw, "2026-Aug-22.")
+	}
+}
+
+// TestParse_StripsGlueAddressesFromNameservers guards against registries
+// appending glue IP addresses onto the nameserver line: DENIC packs them
+// space-separated, CZ.NIC parenthesised. Both fixtures were recorded live
+// against the named registry on 2026-08-23 (see the fixture files' own
+// header comments); the `want` order matches the order each registry
+// actually emitted, not alphabetical -- CZ.NIC's response lists
+// d.ns.nic.cz before a.ns.nic.cz and b.ns.nic.cz.
+func TestParse_StripsGlueAddressesFromNameservers(t *testing.T) {
+	tests := []struct {
+		name    string
+		fixture string
+		tld     string
+		want    []string
+	}{
+		{
+			name:    "denic space-separated glue",
+			fixture: "denic-de-recorded.txt",
+			tld:     "de",
+			want:    []string{"ns1.denic.de", "ns2.denic.de", "ns3.denic.de", "ns4.denic.net"},
+		},
+		{
+			name:    "cznic parenthesised glue",
+			fixture: "cznic-cz-recorded.txt",
+			tld:     "cz",
+			want:    []string{"d.ns.nic.cz", "a.ns.nic.cz", "b.ns.nic.cz"},
+		},
+		{
+			// NASK's "nameservers:" value spans four lines, but only the
+			// first carries the "nameservers:" key -- the other three are
+			// bare continuation lines with no key of their own, and the
+			// two of those with bracketed IPv6 glue contain a colon that
+			// the default kv tokenizer mistakes for its own key/value
+			// separator, so they land in Unmapped instead of
+			// Nameservers. bilbo.nask.org.pl is the only nameserver the
+			// current tokenizer actually recovers from this dialect; this
+			// pins that real (still-limited) behavior rather than the
+			// four hosts the raw response lists.
+			name:    "nask bracketed glue, multi-line value",
+			fixture: "nask-pl-recorded.txt",
+			tld:     "pl",
+			want:    []string{"bilbo.nask.org.pl"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "whois", tt.fixture))
+			if err != nil {
+				t.Fatalf("reading fixture: %v", err)
+			}
+			got := Parse(string(raw), tt.tld).Nameservers
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("nameservers = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestStripGlue covers the dialects whose registries are not recorded as
+// fixtures here, so the rule is pinned for all five shapes seen live.
+func TestStripGlue(t *testing.T) {
+	for _, tt := range []struct{ in, want string }{
+		{"ns1.denic.de 77.67.63.106 2001:668:1f:11:0:0:0:106", "ns1.denic.de"},
+		{"d.ns.nic.cz (193.29.206.1, 2001:678:1::1)", "d.ns.nic.cz"},
+		{"bilbo.nask.org.pl. [195.187.245.51]", "bilbo.nask.org.pl"},
+		{"ns5.nic.ru. 31.177.67.100, 2a02:2090:e800:9000:31:177:67:100", "ns5.nic.ru"},
+		{"ns1.domreg.lt\t[185.150.40.44 2a07:ab40::44]", "ns1.domreg.lt"},
+		{"ns4.denic.net", "ns4.denic.net"},
+		{"", ""},
+	} {
+		if got := stripGlue(tt.in); got != tt.want {
+			t.Errorf("stripGlue(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+// .lt uses the singular "Nameserver:" key rather than "Name Server:" or
+// "nserver:" -- without the "nameserver" entry in defaultSynonyms routing
+// it to fNameservers, the whole line falls into Unmapped and Nameservers
+// comes back empty. TestStripGlue exercises the same .lt-shaped glue
+// through stripGlue alone, which says nothing about whether the key ever
+// reaches stripGlue in the first place; this test guards that routing.
+func TestParse_LTSingularNameserverSynonym(t *testing.T) {
+	raw := "Nameserver:\t\tns1.domreg.lt\t[185.150.40.44 2a07:ab40::44]\n"
+	got := Parse(raw, "lt").Nameservers
+	want := []string{"ns1.domreg.lt"}
+	if !slices.Equal(got, want) {
+		t.Errorf("nameservers = %q, want %q", got, want)
+	}
+}
+
+// EURid lists the same host once per address family. After glue is
+// stripped those collapse to duplicates, which must not reach the record.
+func TestParse_DeduplicatesNameserversWithinASource(t *testing.T) {
+	raw := "Name server: ns1.example.eu (192.0.2.1)\nName server: ns1.example.eu (2001:db8::1)\nName server: ns2.example.eu\n"
+	got := Parse(raw, "example").Nameservers
+	want := []string{"ns1.example.eu", "ns2.example.eu"}
+	if !slices.Equal(got, want) {
+		t.Errorf("nameservers = %q, want %q", got, want)
+	}
+}
+
+// A status carrying the ICANN <eppCode> <url> form is truncated to the
+// code; a registry that puts an English phrase there keeps the phrase.
+func TestParse_TruncatesStatusOnlyForTheICANNURLForm(t *testing.T) {
+	for _, tt := range []struct {
+		name, raw string
+		want      []string
+	}{
+		{
+			name: "icann form with url",
+			raw:  "Domain Status: clientTransferProhibited https://icann.org/epp#clientTransferProhibited\n",
+			want: []string{"clientTransferProhibited"},
+		},
+		{
+			name: "free-text ccTLD phrase survives whole",
+			raw:  "status: Sponsoring registrar change forbidden\n",
+			want: []string{"Sponsoring registrar change forbidden"},
+		},
+		{
+			name: "bare code untouched",
+			raw:  "status: connect\n",
+			want: []string{"connect"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Parse(tt.raw, "example").Statuses; !slices.Equal(got, tt.want) {
+				t.Errorf("statuses = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// JPRS prefixes third-level (.ad.jp, .co.jp) record lines with a lettered
+// ordinal -- "a. [Domain Name]" -- which the bracket tokenizer's ^\[ anchor
+// could not match, so those records came back with no domain, status or
+// nameservers at all.
+func TestParse_JPRSOrdinalPrefixedLines(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "whois", "jprs-adjp-recorded.txt"))
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	f := Parse(string(raw), "jp")
+	if f.Domain == "" {
+		t.Error("domain not parsed from an ordinal-prefixed [Domain Name] line")
+	}
+	if len(f.Statuses) == 0 {
+		t.Error("no status parsed; JPRS uses [State] for third-level records")
+	}
+}
+
+func TestTokenizeBrackets_AcceptsOrdinalPrefix(t *testing.T) {
+	got := tokenizeBrackets("a. [Domain Name]                NIC.AD.JP\n[State]   Connected\n")
+	want := []kvPair{{"domain name", "NIC.AD.JP"}, {"state", "Connected"}}
+	if !slices.Equal(got, want) {
+		t.Errorf("pairs = %+v, want %+v", got, want)
 	}
 }

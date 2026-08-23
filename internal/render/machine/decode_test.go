@@ -267,3 +267,19 @@ func TestDecode_FieldsOmitsAbsentFields(t *testing.T) {
 		}
 	}
 }
+
+// RIPE/APNIC/AFRINIC IPv4 WHOIS records carry neither cidr nor handle, so
+// a snapshot of one had an empty Name and --diff rejected it as corrupt.
+func TestDecode_IPSnapshotWithoutCIDRCarriesItsRange(t *testing.T) {
+	doc := `{"schemaVersion":1,"objectType":"ip",
+	  "startAddress":{"value":"193.0.0.0","sources":["registry-whois"]},
+	  "endAddress":{"value":"193.0.7.255","sources":["registry-whois"]},
+	  "name":{"value":"RIPE-NCC","sources":["registry-whois"]}}`
+	snap, err := Decode(strings.NewReader(doc))
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if snap.IPStart != "193.0.0.0" || snap.IPEnd != "193.0.7.255" {
+		t.Errorf("IPStart/IPEnd = %q/%q, want 193.0.0.0/193.0.7.255", snap.IPStart, snap.IPEnd)
+	}
+}

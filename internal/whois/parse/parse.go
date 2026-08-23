@@ -2,6 +2,7 @@ package parse
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -62,11 +63,13 @@ var defaultSynonyms = map[string]string{
 	"whois":                                  fRefer,
 	"domain status":                          fStatus,
 	"status":                                 fStatus,
+	"state":                                  fStatus, // .jp third-level records
 	"name server":                            fNameservers,
 	"name servers":                           fNameservers,
 	"domain nameservers":                     fNameservers,
 	"nserver":                                fNameservers,
 	"nameservers":                            fNameservers,
+	"nameserver":                             fNameservers, // .lt uses the singular; without this synonym its nameservers were dropped entirely
 	"creation date":                          fCreated,
 	"created":                                fCreated,
 	"created on":                             fCreated,
@@ -186,6 +189,23 @@ func tokenizeKV(raw string) []kvPair {
 	return out
 }
 
+// stripGlue reduces a WHOIS nameserver value to its hostname.
+//
+// Registries append glue addresses to the nameserver line in at least five
+// dialects -- space-separated (.de), parenthesised (.cz, .eu), bracketed
+// (.pl, .lt), and comma-separated after a trailing dot (.ru). In every one
+// of them the hostname is the first whitespace-delimited token, so that is
+// the whole rule. Glue is discarded rather than kept: model.Record has no
+// field for it, so carrying it inside the hostname string does not preserve
+// data, it produces a value that is not a hostname.
+func stripGlue(v string) string {
+	fields := strings.Fields(v)
+	if len(fields) == 0 {
+		return ""
+	}
+	return strings.TrimSuffix(fields[0], ".")
+}
+
 func firstToken(s string) string {
 	f := strings.Fields(s)
 	if len(f) == 0 {
@@ -195,7 +215,18 @@ func firstToken(s string) string {
 }
 
 // tokenizeBrackets handles JPRS-style "[Key]    value" lines.
-var bracketLine = regexp.MustCompile(`^\[([^\]]+)\]\s*(.*)$`)
+//
+// A leading "a. " / "b. " ordinal appears on JPRS's third-level records
+// (.ad.jp, .co.jp) and nowhere else; the optional group keeps second-level
+// .jp records matching exactly as before.
+var bracketLine = regexp.MustCompile(`^(?:[a-z]\.\s+)?\[([^\]]+)\]\s*(.*)$`)
+
+// flatKeyPattern matches a short, letters-only, at-most-three-word label --
+// used by tokenizeIndent to recognize a non-indented "Key: value" line
+// (e.g. EURid's flat "Domain: europa.eu") without also swallowing prose
+// that happens to contain a colon, like a trailing "WHOIS lookup made on
+// Sun, 12 Jul 2026 at 09:15:00" timestamp line.
+var flatKeyPattern = regexp.MustCompile(`^[A-Za-z]+(?: [A-Za-z]+){0,2}$`)
 
 func tokenizeBrackets(raw string) []kvPair {
 	var out []kvPair
@@ -215,6 +246,29 @@ func tokenizeBrackets(raw string) []kvPair {
 	return out
 }
 
+// indexTopLevelColon returns the index of the first ':' in s that is not
+// enclosed in parentheses, or -1 if there is none. A colon inside an
+// unmatched '(' is glue (an IPv6 address parenthesised after a
+// nameserver hostname), not a key/value separator.
+func indexTopLevelColon(s string) int {
+	depth := 0
+	for i, r := range s {
+		switch r {
+		case '(':
+			depth++
+		case ')':
+			if depth > 0 {
+				depth--
+			}
+		case ':':
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
 // tokenizeIndent handles Nominet-style ".uk" WHOIS output: a
 // non-indented "Header:" line introduces a section, followed by one or
 // more indented lines holding that section's content. An indented line
@@ -225,9 +279,23 @@ func tokenizeBrackets(raw string) []kvPair {
 // enclosing section's header as the key, so multiple indented lines
 // under "Name servers:" each become a separate pair sharing that key —
 // exactly like tokenizeKV's repeated "Name Server:" lines do for other
-// registries. Blank lines and any other non-indented, non-header line
-// (e.g. a trailing "WHOIS lookup made on ..." timestamp line) are
-// ignored, the same way tokenizeKV skips comment lines.
+// registries. A non-indented line that already carries its own value
+// under a short, label-like key (e.g. EURid's ".eu" responses open with
+// flat "Domain: europa.eu" / "Script: LATIN" lines before any indented
+// section) is emitted as its own pair immediately rather than treated as
+// a section header, since it has no indented body of its own. The
+// flatKeyPattern check keeps this narrow: it must not swallow prose that
+// happens to contain a colon, like a trailing "WHOIS lookup made on Sun,
+// 12 Jul 2026 at 09:15:00" timestamp line (digits/commas/many words),
+// which tokenizeIndent must keep dropping the same as before. Blank
+// lines and any other non-indented, non-header, non-label-valued line
+// are ignored, the same way tokenizeKV skips comment lines. Within an
+// indented line, the key/value separator is the first colon *not*
+// nested inside parentheses -- an indented "host (glue)" line like
+// EURid's "ns1.example.eu (2a05:d018:c5f:3701::1)" carries colons inside
+// its IPv6 glue that must not be mistaken for that separator, or the
+// whole line (and its hostname) is lost into Unmapped under a garbage
+// key instead of reaching stripGlue.
 func tokenizeIndent(raw string) []kvPair {
 	var out []kvPair
 	section := ""
@@ -237,10 +305,19 @@ func tokenizeIndent(raw string) []kvPair {
 			continue
 		}
 		if !strings.HasPrefix(trimmedRight, " ") && !strings.HasPrefix(trimmedRight, "\t") {
-			if strings.HasSuffix(strings.TrimSpace(trimmedRight), ":") {
-				section = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(trimmedRight), ":"))
-			} else {
-				section = ""
+			trimmed := strings.TrimSpace(trimmedRight)
+			section = ""
+			switch {
+			case strings.HasSuffix(trimmed, ":"):
+				section = strings.ToLower(strings.TrimSuffix(trimmed, ":"))
+			default:
+				if idx := strings.Index(trimmed, ":"); idx >= 0 {
+					key := strings.TrimSpace(trimmed[:idx])
+					val := strings.TrimSpace(trimmed[idx+1:])
+					if val != "" && flatKeyPattern.MatchString(key) {
+						out = append(out, kvPair{strings.ToLower(key), val})
+					}
+				}
 			}
 			continue
 		}
@@ -248,7 +325,7 @@ func tokenizeIndent(raw string) []kvPair {
 			continue
 		}
 		content := strings.TrimSpace(trimmedRight)
-		if idx := strings.Index(content, ":"); idx >= 0 && strings.TrimSpace(content[idx+1:]) != "" {
+		if idx := indexTopLevelColon(content); idx >= 0 && strings.TrimSpace(content[idx+1:]) != "" {
 			key := strings.ToLower(strings.TrimSpace(content[:idx]))
 			val := strings.TrimSpace(content[idx+1:])
 			out = append(out, kvPair{key, val})
@@ -325,9 +402,30 @@ func Parse(raw, tld string) Fields {
 		case fRefer:
 			f.Refer = p.val
 		case fStatus:
-			f.Statuses = append(f.Statuses, firstToken(p.val))
+			// ICANN's gTLD convention is "<eppCode> <url>", so the code is the
+			// first token. A registry that puts an English phrase here (CZ.NIC:
+			// "Sponsoring registrar change forbidden") must keep the phrase --
+			// truncating it yields a meaningless fragment presented next to
+			// genuine EPP codes.
+			val := p.val
+			if strings.Contains(val, "http://") || strings.Contains(val, "https://") {
+				val = firstToken(val)
+			}
+			if val != "" {
+				f.Statuses = append(f.Statuses, val)
+			}
 		case fNameservers:
-			f.Nameservers = append(f.Nameservers, p.val)
+			ns := stripGlue(p.val)
+			if ns == "" {
+				break
+			}
+			// EURid lists one line per address family for the same host, so
+			// a source can repeat a name once glue is stripped.
+			if !slices.ContainsFunc(f.Nameservers, func(existing string) bool {
+				return strings.EqualFold(existing, ns)
+			}) {
+				f.Nameservers = append(f.Nameservers, ns)
+			}
 		case fCreated:
 			f.Created = ParseDate(p.val)
 		case fUpdated:

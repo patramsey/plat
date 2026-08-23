@@ -1,6 +1,9 @@
 package parse
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // templateManifest is the single source of truth this milestone
 // establishes for "every registered ccTLD template must have a fixture
@@ -14,10 +17,10 @@ var templateManifest = []struct {
 	wantDomain  string
 	wantNSCount int
 }{
-	{tld: "de", fixture: "denic-de-example.txt", wantDomain: "example.de", wantNSCount: 2},
+	{tld: "de", fixture: "denic-de-recorded.txt", wantDomain: "denic.de", wantNSCount: 4},
 	{tld: "jp", fixture: "jprs-jp-example.txt", wantDomain: "EXAMPLE.JP", wantNSCount: 2},
 	{tld: "uk", fixture: "nominet-uk-example.txt", wantDomain: "example.uk", wantNSCount: 2},
-	{tld: "eu", fixture: "eurid-eu-example.txt", wantDomain: "example.eu", wantNSCount: 2},
+	{tld: "eu", fixture: "eurid-eu-recorded.txt", wantDomain: "europa.eu", wantNSCount: 12},
 	{tld: "fr", fixture: "afnic-fr-example.txt", wantDomain: "example.fr", wantNSCount: 2},
 	{tld: "nl", fixture: "sidn-nl-example.txt", wantDomain: "example.nl", wantNSCount: 2},
 }
@@ -48,13 +51,13 @@ func TestTemplateManifest_EveryRegisteredTemplateHasAFixture(t *testing.T) {
 }
 
 func TestParse_DENICSynonymOverride(t *testing.T) {
-	raw := loadFixture(t, "denic-de-example.txt")
+	raw := loadFixture(t, "denic-de-recorded.txt")
 	f := Parse(raw, "de")
 
-	if f.Domain != "example.de" {
-		t.Errorf("Domain = %q, want example.de", f.Domain)
+	if f.Domain != "denic.de" {
+		t.Errorf("Domain = %q, want denic.de", f.Domain)
 	}
-	wantNS := []string{"ns1.example.de", "ns2.example.de"}
+	wantNS := []string{"ns1.denic.de", "ns2.denic.de", "ns3.denic.de", "ns4.denic.net"}
 	if len(f.Nameservers) != len(wantNS) {
 		t.Fatalf("Nameservers = %v, want %v", f.Nameservers, wantNS)
 	}
@@ -73,14 +76,59 @@ func TestParse_EURIDNestedRegistrarSynonymOverride(t *testing.T) {
 	// pair (key "name"), which isn't a registrar synonym anywhere else
 	// (too generic/ambiguous to add globally), so without a eu-specific
 	// override it lands in Unmapped instead of populating Registrar.
-	raw := loadFixture(t, "eurid-eu-example.txt")
+	raw := loadFixture(t, "eurid-eu-recorded.txt")
 	f := Parse(raw, "eu")
 
-	if f.Domain != "example.eu" {
-		t.Errorf("Domain = %q, want example.eu", f.Domain)
+	if f.Domain != "europa.eu" {
+		t.Errorf("Domain = %q, want europa.eu", f.Domain)
 	}
-	if f.Registrar != "Example Registrar B.V." {
-		t.Errorf("Registrar = %q, want %q (synonym override for 'name' -> registrar failed)", f.Registrar, "Example Registrar B.V.")
+	if f.Registrar != "ClearMedia NV" {
+		t.Errorf("Registrar = %q, want %q (synonym override for 'name' -> registrar failed)", f.Registrar, "ClearMedia NV")
+	}
+}
+
+func TestParse_EURIDNoNameserverLinesInUnmapped(t *testing.T) {
+	// Pins the property, not just the count: an indented "host (glue)"
+	// line that fails to tokenize as a nameserver doesn't vanish
+	// silently, it lands in Unmapped under a garbage key that still
+	// contains the glue's opening paren (e.g. "ns4az1.europa.eu (2a05"
+	// when the first colon inside an IPv6 address was mistaken for the
+	// key/value separator). Checking for that here means a future
+	// recording whose glue shape breaks tokenizeIndent again -- even if
+	// dedup happens to keep wantNSCount unchanged, as it did the first
+	// time this bug was found -- still fails loudly instead of passing
+	// green on a coincidence.
+	raw := loadFixture(t, "eurid-eu-recorded.txt")
+	f := Parse(raw, "eu")
+
+	for key := range f.Unmapped {
+		if strings.Contains(key, "(") {
+			t.Errorf("a Name servers line leaked into Unmapped under host-shaped key %q", key)
+		}
+	}
+}
+
+func TestParse_EURIDHasNoStatusOrDates(t *testing.T) {
+	// Verified live against whois.eu: EURid's response for a domain has
+	// no top-level Status field and no Created/Updated/Expires fields at
+	// all -- unlike most registries, it simply never publishes them over
+	// WHOIS. Statuses/Created/Updated/Expires must come back empty here
+	// because the registry doesn't say, not because plat failed to parse
+	// something that was there.
+	raw := loadFixture(t, "eurid-eu-recorded.txt")
+	f := Parse(raw, "eu")
+
+	if len(f.Statuses) != 0 {
+		t.Errorf("Statuses = %v, want none (EURid publishes no status over WHOIS)", f.Statuses)
+	}
+	if f.Created.Parsed {
+		t.Errorf("Created = %+v, want unparsed (EURid publishes no creation date over WHOIS)", f.Created)
+	}
+	if f.Updated.Parsed {
+		t.Errorf("Updated = %+v, want unparsed (EURid publishes no update date over WHOIS)", f.Updated)
+	}
+	if f.Expires.Parsed {
+		t.Errorf("Expires = %+v, want unparsed (EURid publishes no expiry date over WHOIS)", f.Expires)
 	}
 }
 

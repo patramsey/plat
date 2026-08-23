@@ -982,3 +982,59 @@ func TestStatusAsymmetry_EPPDropIsDomainOnly(t *testing.T) {
 		}
 	})
 }
+
+// Four sources agree on an IDN, spelled two ways. Before this fix plat
+// reported a four-way conflict and credited the field to one source --
+// surfacing its own normalisation gap as data, on the exact signal
+// (the conflict marker) that the tool exists to provide.
+func TestMerge_IDNSpellingsAgree(t *testing.T) {
+	src := func(id model.SourceID, domain string) model.SourceRecord {
+		return model.SourceRecord{
+			Meta:    model.SourceResult{Source: id, OK: true},
+			Present: true,
+			Domain:  domain,
+		}
+	}
+	rec := Merge([]model.SourceRecord{
+		src(model.SourceRegistrarRDAP, "bücher.com"),
+		src(model.SourceRegistryRDAP, "XN--BCHER-KVA.COM"),
+		src(model.SourceRegistrarWHOIS, "xn--bcher-kva.com"),
+		src(model.SourceRegistryWHOIS, "XN--BCHER-KVA.COM"),
+	})
+
+	if rec.Domain.Value != "bücher.com" {
+		t.Errorf("Domain.Value = %q, want the display spelling %q", rec.Domain.Value, "bücher.com")
+	}
+	if len(rec.Domain.Sources) != 4 {
+		t.Errorf("Domain.Sources = %v, want all four credited", rec.Domain.Sources)
+	}
+	for _, c := range rec.Conflicts {
+		if c.Field == model.FieldDomain {
+			t.Errorf("recorded a domain conflict for four agreeing sources: %+v", c)
+		}
+	}
+}
+
+// Genuinely different domains must still conflict.
+func TestMerge_DifferentDomainsStillConflict(t *testing.T) {
+	src := func(id model.SourceID, domain string) model.SourceRecord {
+		return model.SourceRecord{
+			Meta:    model.SourceResult{Source: id, OK: true},
+			Present: true,
+			Domain:  domain,
+		}
+	}
+	rec := Merge([]model.SourceRecord{
+		src(model.SourceRegistryRDAP, "example.com"),
+		src(model.SourceRegistryWHOIS, "different.com"),
+	})
+	var found bool
+	for _, c := range rec.Conflicts {
+		if c.Field == model.FieldDomain {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("two genuinely different domains did not produce a conflict")
+	}
+}

@@ -7,7 +7,7 @@ jp:
 uk:
   format: indent
 eu:
-  format: kv
+  format: indent
   synonyms:
     # EURid nests the registrar name under a sub-key ("Registrar:" has no
     # value of its own; the name is the next line's "Name:") -- the
