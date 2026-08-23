@@ -1796,6 +1796,22 @@ func TestRunLookup_WHOISPacingFollowsDomainCount(t *testing.T) {
 	})
 
 	t.Run("two domains turns pacing on", func(t *testing.T) {
+		// Asymmetric failure direction from the "one domain" subtest above,
+		// worth flagging explicitly: that one asserts content is PRESENT
+		// within 200ms, so an unrelated slowdown (a saturated machine
+		// pushing even the unpaced path past 200ms) makes it fail-closed --
+		// a spurious but safe FAIL that gets investigated. This subtest
+		// asserts content is ABSENT within 200ms, so the same slowdown
+		// makes it fail-open: if the machine is so degraded that even the
+		// one free, unpaced slot can't finish inside the 200ms cutoff, the
+		// assertion is satisfied whether pacing correctly held both
+		// domains back or a mutant disabled pacing entirely and something
+		// else stalled instead -- green either way, no longer
+		// discriminating. The 200ms cutoff against the ~1s pacing interval
+		// (5x margin) makes this exceedingly unlikely in practice, but
+		// unlike its sibling subtest, this one's green is conditional on
+		// the machine being healthy enough to clear that one free hop in
+		// well under 200ms, not purely on correct pacing.
 		out := run(t, []string{"a.sharedhosttwo", "b.sharedhostthree"})
 		if strings.Contains(out, "Shared Host Registrar") {
 			t.Errorf("registrar data present for a two-name run within the 200ms deadline -- a correctly-paced shared host hands out only one free slot total across both names' hops, and every other query needs a full 1s wait, so this should never finish that fast. output:\n%s", out)
