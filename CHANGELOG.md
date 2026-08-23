@@ -21,6 +21,11 @@ follows [Semantic Versioning](https://semver.org/).
   sits inside the address, so the whole line fell into `Unmapped` under
   a garbage key instead of `Nameservers`. `.lt` had lost its
   nameservers entirely to a missing `Nameserver:` (singular) synonym.
+  Glue is stripped correctly for every dialect listed, `.pl` included --
+  but `.pl` also splits its nameserver list across continuation lines
+  that plat's generic key/value tokenizer does not yet follow, so `.pl`
+  lookups still return only the first of typically four nameservers;
+  fixing that tokenizer gap is tracked as a follow-up, not shipped here.
 - EPP statuses are now matched case-insensitively. A registrar whose
   WHOIS output lowercases them -- Cloudflare's does -- had every
   restriction listed twice, once per casing, read by plat as two
