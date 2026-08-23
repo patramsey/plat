@@ -1,6 +1,9 @@
 package parse
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // templateManifest is the single source of truth this milestone
 // establishes for "every registered ccTLD template must have a fixture
@@ -81,6 +84,27 @@ func TestParse_EURIDNestedRegistrarSynonymOverride(t *testing.T) {
 	}
 	if f.Registrar != "ClearMedia NV" {
 		t.Errorf("Registrar = %q, want %q (synonym override for 'name' -> registrar failed)", f.Registrar, "ClearMedia NV")
+	}
+}
+
+func TestParse_EURIDNoNameserverLinesInUnmapped(t *testing.T) {
+	// Pins the property, not just the count: an indented "host (glue)"
+	// line that fails to tokenize as a nameserver doesn't vanish
+	// silently, it lands in Unmapped under a garbage key that still
+	// contains the glue's opening paren (e.g. "ns4az1.europa.eu (2a05"
+	// when the first colon inside an IPv6 address was mistaken for the
+	// key/value separator). Checking for that here means a future
+	// recording whose glue shape breaks tokenizeIndent again -- even if
+	// dedup happens to keep wantNSCount unchanged, as it did the first
+	// time this bug was found -- still fails loudly instead of passing
+	// green on a coincidence.
+	raw := loadFixture(t, "eurid-eu-recorded.txt")
+	f := Parse(raw, "eu")
+
+	for key := range f.Unmapped {
+		if strings.Contains(key, "(") {
+			t.Errorf("a Name servers line leaked into Unmapped under host-shaped key %q", key)
+		}
 	}
 }
 

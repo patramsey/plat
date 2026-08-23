@@ -172,6 +172,71 @@ func TestTokenizeIndent_UKFixture(t *testing.T) {
 	}
 }
 
+func TestTokenizeIndent_FlatKeyValueLines(t *testing.T) {
+	// EURid's ".eu" responses open with non-indented lines that already
+	// carry their own value ("Domain: europa.eu", "Script: LATIN")
+	// before any indented section -- the flatKeyPattern branch this
+	// pins independently of the eu template's synonym table.
+	raw := "Domain: example.eu\nScript: LATIN\n\nRegistrant:\n        NOT DISCLOSED!\n"
+	pairs := tokenizeIndent(raw)
+
+	want := map[string]string{
+		"domain": "example.eu",
+		"script": "LATIN",
+	}
+	got := map[string]string{}
+	for _, p := range pairs {
+		got[p.key] = p.val
+	}
+	for key, wantVal := range want {
+		if got[key] != wantVal {
+			t.Errorf("key %q = %q, want %q", key, got[key], wantVal)
+		}
+	}
+
+	// A prose line whose only colon sits deep inside a sentence (not a
+	// short label) must not be mistaken for a flat key/value pair --
+	// this is what flatKeyPattern's word-count/letters-only gate exists
+	// to reject.
+	prose := "WHOIS lookup made on Sun, 12 Jul 2026 at 09:15:00"
+	pairs = tokenizeIndent(raw + "\n" + prose + "\n")
+	for _, p := range pairs {
+		if strings.Contains(p.val, "lookup made on") || strings.Contains(p.key, "whois lookup") {
+			t.Errorf("prose line leaked into flat key/value output: %+v", p)
+		}
+	}
+}
+
+func TestParse_IndentIPv6OnlyGlueNameserver(t *testing.T) {
+	// Regression: tokenizeIndent's indented-content branch used to split
+	// an indented line on the FIRST colon it found. For a nameserver
+	// whose only glue is IPv6 -- "ns1.example.eu (2a05:d018:c5f:3701::1)"
+	// -- that first colon sits inside the address itself, so the line
+	// tokenized as key "ns1.example.eu (2a05" / value
+	// "d018:c5f:3701::1)" and landed in Unmapped under that garbage key
+	// instead of reaching stripGlue. Unlike a real recording where an
+	// affected host might also have an IPv4-glued sibling line that
+	// rescues it via dedup, this fixture gives ns1 only IPv6 glue, so a
+	// regression here can't hide behind a duplicate.
+	raw := "Domain: example.eu\nName servers:\n        ns1.example.eu (2a05:d018:c5f:3701::1)\n        ns2.example.eu (192.0.2.9)\n"
+	f := Parse(raw, "eu")
+
+	wantNS := []string{"ns1.example.eu", "ns2.example.eu"}
+	if len(f.Nameservers) != len(wantNS) {
+		t.Fatalf("Nameservers = %v, want %v", f.Nameservers, wantNS)
+	}
+	for i := range wantNS {
+		if f.Nameservers[i] != wantNS[i] {
+			t.Errorf("Nameservers[%d] = %q, want %q", i, f.Nameservers[i], wantNS[i])
+		}
+	}
+	for key := range f.Unmapped {
+		if strings.Contains(key, "ns1.example.eu") {
+			t.Errorf("IPv6-glued nameserver line leaked into Unmapped under key %q", key)
+		}
+	}
+}
+
 func TestParse_UKTemplateEndToEnd(t *testing.T) {
 	raw := loadFixture(t, "nominet-uk-example.txt")
 	f := Parse(raw, "uk")

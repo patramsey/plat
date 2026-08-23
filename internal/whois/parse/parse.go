@@ -216,6 +216,13 @@ func firstToken(s string) string {
 // tokenizeBrackets handles JPRS-style "[Key]    value" lines.
 var bracketLine = regexp.MustCompile(`^\[([^\]]+)\]\s*(.*)$`)
 
+// flatKeyPattern matches a short, letters-only, at-most-three-word label --
+// used by tokenizeIndent to recognize a non-indented "Key: value" line
+// (e.g. EURid's flat "Domain: europa.eu") without also swallowing prose
+// that happens to contain a colon, like a trailing "WHOIS lookup made on
+// Sun, 12 Jul 2026 at 09:15:00" timestamp line.
+var flatKeyPattern = regexp.MustCompile(`^[A-Za-z]+(?: [A-Za-z]+){0,2}$`)
+
 func tokenizeBrackets(raw string) []kvPair {
 	var out []kvPair
 	for _, line := range strings.Split(raw, "\n") {
@@ -254,8 +261,35 @@ func tokenizeBrackets(raw string) []kvPair {
 // 12 Jul 2026 at 09:15:00" timestamp line (digits/commas/many words),
 // which tokenizeIndent must keep dropping the same as before. Blank
 // lines and any other non-indented, non-header, non-label-valued line
-// are ignored, the same way tokenizeKV skips comment lines.
-var flatKeyPattern = regexp.MustCompile(`^[A-Za-z]+(?: [A-Za-z]+){0,2}$`)
+// are ignored, the same way tokenizeKV skips comment lines. Within an
+// indented line, the key/value separator is the first colon *not*
+// nested inside parentheses -- an indented "host (glue)" line like
+// EURid's "ns1.example.eu (2a05:d018:c5f:3701::1)" carries colons inside
+// its IPv6 glue that must not be mistaken for that separator, or the
+// whole line (and its hostname) is lost into Unmapped under a garbage
+// key instead of reaching stripGlue.
+// indexTopLevelColon returns the index of the first ':' in s that is not
+// enclosed in parentheses, or -1 if there is none. A colon inside an
+// unmatched '(' is glue (an IPv6 address parenthesised after a
+// nameserver hostname), not a key/value separator.
+func indexTopLevelColon(s string) int {
+	depth := 0
+	for i, r := range s {
+		switch r {
+		case '(':
+			depth++
+		case ')':
+			if depth > 0 {
+				depth--
+			}
+		case ':':
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
 
 func tokenizeIndent(raw string) []kvPair {
 	var out []kvPair
@@ -286,7 +320,7 @@ func tokenizeIndent(raw string) []kvPair {
 			continue
 		}
 		content := strings.TrimSpace(trimmedRight)
-		if idx := strings.Index(content, ":"); idx >= 0 && strings.TrimSpace(content[idx+1:]) != "" {
+		if idx := indexTopLevelColon(content); idx >= 0 && strings.TrimSpace(content[idx+1:]) != "" {
 			key := strings.ToLower(strings.TrimSpace(content[:idx]))
 			val := strings.TrimSpace(content[idx+1:])
 			out = append(out, kvPair{key, val})
