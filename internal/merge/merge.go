@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/idna"
+
 	"github.com/patramsey/plat/internal/model"
 )
 
@@ -168,11 +170,38 @@ func normalizeScalar(s string) string {
 	return strings.ToLower(s)
 }
 
+// normalizeDomain is normalizeScalar plus punycode folding, used only when
+// comparing the domain field.
+//
+// RDAP may publish a Unicode name while every WHOIS source publishes the
+// A-label, so the same domain arrives spelled two ways. Comparing the
+// folded forms lets all sources be credited and keeps the conflict list
+// for real disagreements. The stored value is untouched: the record still
+// shows the winner's spelling, so a user reading human output sees
+// "bücher.com" rather than "xn--bcher-kva.com".
+func normalizeDomain(s string) string {
+	n := normalizeScalar(s)
+	if ascii, err := idna.Lookup.ToASCII(n); err == nil {
+		return ascii
+	}
+	return n
+}
+
+// comparisonKey returns the normaliser used to decide whether two source
+// values for a field are the same fact.
+func comparisonKey(field, s string) string {
+	if field == model.FieldDomain {
+		return normalizeDomain(s)
+	}
+	return normalizeScalar(s)
+}
+
 // scalar picks the first present, non-empty, non-redacted candidate (in
 // precedence order — cands is already sorted) as the winner. A skipped
 // higher-precedence redacted candidate generates a RedactionNotice. Every
 // present non-redacted candidate whose value matches the winner (after
-// normalizeScalar) joins Field.Sources; a genuinely differing one becomes
+// comparisonKey, which is normalizeScalar plus punycode folding for the
+// domain field) joins Field.Sources; a genuinely differing one becomes
 // part of a Conflict.
 func (m *mergeState) scalar(field string, cands []scalarCandidate) model.Field[string] {
 	var winner *scalarCandidate
@@ -202,7 +231,7 @@ func (m *mergeState) scalar(field string, cands []scalarCandidate) model.Field[s
 		if c.Value == "" || c.Redacted {
 			continue
 		}
-		if normalizeScalar(c.Value) == normalizeScalar(winner.Value) {
+		if comparisonKey(field, c.Value) == comparisonKey(field, winner.Value) {
 			f.Sources = append(f.Sources, c.Source)
 		} else {
 			hasConflict = true
