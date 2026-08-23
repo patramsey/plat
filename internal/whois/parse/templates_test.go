@@ -17,7 +17,7 @@ var templateManifest = []struct {
 	wantDomain  string
 	wantNSCount int
 }{
-	{tld: "de", fixture: "denic-de-example.txt", wantDomain: "example.de", wantNSCount: 2},
+	{tld: "de", fixture: "denic-de-recorded.txt", wantDomain: "denic.de", wantNSCount: 4},
 	{tld: "jp", fixture: "jprs-jp-example.txt", wantDomain: "EXAMPLE.JP", wantNSCount: 2},
 	{tld: "uk", fixture: "nominet-uk-example.txt", wantDomain: "example.uk", wantNSCount: 2},
 	{tld: "eu", fixture: "eurid-eu-recorded.txt", wantDomain: "europa.eu", wantNSCount: 12},
@@ -51,13 +51,13 @@ func TestTemplateManifest_EveryRegisteredTemplateHasAFixture(t *testing.T) {
 }
 
 func TestParse_DENICSynonymOverride(t *testing.T) {
-	raw := loadFixture(t, "denic-de-example.txt")
+	raw := loadFixture(t, "denic-de-recorded.txt")
 	f := Parse(raw, "de")
 
-	if f.Domain != "example.de" {
-		t.Errorf("Domain = %q, want example.de", f.Domain)
+	if f.Domain != "denic.de" {
+		t.Errorf("Domain = %q, want denic.de", f.Domain)
 	}
-	wantNS := []string{"ns1.example.de", "ns2.example.de"}
+	wantNS := []string{"ns1.denic.de", "ns2.denic.de", "ns3.denic.de", "ns4.denic.net"}
 	if len(f.Nameservers) != len(wantNS) {
 		t.Fatalf("Nameservers = %v, want %v", f.Nameservers, wantNS)
 	}

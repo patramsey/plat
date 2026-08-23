@@ -103,6 +103,12 @@ This is a render-and-exit tool for v1 — **not** an interactive Bubble Tea app 
 ## Testing approach
 
 - Golden files in `testdata/` (recorded real RDAP JSON + WHOIS blobs) covering ~20 representative domains: thin .com, thick .org, GDPR-redacted .eu/.de, no-RDAP ccTLD, IDN, expired domain, rate-limited response. Parser/merge tests run fully offline against these.
+- Fixtures are **recordings**, not illustrations. Trim legal preamble;
+  never reshape a key, invent a field, or write a fixture to match what
+  the parser currently does. A fabricated fixture does not merely fail
+  to catch a bug — it asserts the bug is correct. `eurid-eu-example.txt`
+  claimed a `Status:` line EURid does not emit, and `templates_test.go`
+  asserted two nameservers from it while real `.eu` returned zero.
 - `httptest` for mocking RDAP; a small local TCP listener for WHOIS to test referral chasing, timeouts, and per-server quirks.
 - Merge engine gets table-driven tests over precedence, redaction override, and conflict detection.
 - Renderer snapshot tests run with color forced off.
