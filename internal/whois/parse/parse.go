@@ -344,7 +344,18 @@ func Parse(raw, tld string) Fields {
 		case fRefer:
 			f.Refer = p.val
 		case fStatus:
-			f.Statuses = append(f.Statuses, firstToken(p.val))
+			// ICANN's gTLD convention is "<eppCode> <url>", so the code is the
+			// first token. A registry that puts an English phrase here (CZ.NIC:
+			// "Sponsoring registrar change forbidden") must keep the phrase --
+			// truncating it yields a meaningless fragment presented next to
+			// genuine EPP codes.
+			val := p.val
+			if strings.Contains(val, "http://") || strings.Contains(val, "https://") {
+				val = firstToken(val)
+			}
+			if val != "" {
+				f.Statuses = append(f.Statuses, val)
+			}
 		case fNameservers:
 			ns := stripGlue(p.val)
 			if ns == "" {

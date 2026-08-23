@@ -30,3 +30,25 @@ func TestNormalizeEPPStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeEPPStatus_CanonicalisesKnownCodesCaseInsensitively(t *testing.T) {
+	for _, tt := range []struct{ in, want string }{
+		{"clientDeleteProhibited", "clientDeleteProhibited"},
+		{"clientdeleteprohibited", "clientDeleteProhibited"},
+		{"CLIENTDELETEPROHIBITED", "clientDeleteProhibited"},
+		{"clientTransferProhibited", "clientTransferProhibited"},
+		{"serverupdateprohibited", "serverUpdateProhibited"},
+		{"redemptionperiod", "redemptionPeriod"},
+		{"pendingdelete", "pendingDelete"},
+		{"autorenewperiod", "autoRenewPeriod"},
+		{"ok", "ok"},
+		{"active", "active"},
+		// Not an EPP code: today's behaviour is preserved untouched.
+		{"connect", "connect"},
+		{"Sponsoring registrar change forbidden", "sponsoringRegistrarChangeForbidden"},
+	} {
+		if got := NormalizeEPPStatus(tt.in); got != tt.want {
+			t.Errorf("NormalizeEPPStatus(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}

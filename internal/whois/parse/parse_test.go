@@ -460,3 +460,34 @@ func TestParse_DeduplicatesNameserversWithinASource(t *testing.T) {
 		t.Errorf("nameservers = %q, want %q", got, want)
 	}
 }
+
+// A status carrying the ICANN <eppCode> <url> form is truncated to the
+// code; a registry that puts an English phrase there keeps the phrase.
+func TestParse_TruncatesStatusOnlyForTheICANNURLForm(t *testing.T) {
+	for _, tt := range []struct {
+		name, raw string
+		want      []string
+	}{
+		{
+			name: "icann form with url",
+			raw:  "Domain Status: clientTransferProhibited https://icann.org/epp#clientTransferProhibited\n",
+			want: []string{"clientTransferProhibited"},
+		},
+		{
+			name: "free-text ccTLD phrase survives whole",
+			raw:  "status: Sponsoring registrar change forbidden\n",
+			want: []string{"Sponsoring registrar change forbidden"},
+		},
+		{
+			name: "bare code untouched",
+			raw:  "status: connect\n",
+			want: []string{"connect"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Parse(tt.raw, "example").Statuses; !slices.Equal(got, tt.want) {
+				t.Errorf("statuses = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
