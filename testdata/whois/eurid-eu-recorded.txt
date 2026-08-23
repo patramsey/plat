@@ -1,0 +1,42 @@
+% Recorded live from whois.eu, query "europa.eu", 2026-08-23.
+% Legal preamble trimmed; keys and values otherwise verbatim.
+
+Domain: europa.eu
+Script: LATIN
+
+Registrant:
+        NOT DISCLOSED!
+        Visit www.eurid.eu for the web-based WHOIS.
+
+Technical:
+        Organisation: ClearMedia NV
+        Language: nl
+        Email: support@clearmedia.be
+
+Registrar:
+        Name: ClearMedia NV
+        Website: https://www.clearmedia.be
+
+Name servers:
+        ns2eu.bt.net
+        ns1lux.europa.eu (147.67.12.2)
+        ns3bru.europa.eu (147.67.250.4)
+        ns3bru.europa.eu (2a01:7080:14:101::2)
+        ans2.cw.net
+        ns2bru.europa.eu (147.67.250.3)
+        ans1.cw.net
+        ns1.bt.net
+        ns4az1.europa.eu (2a05:d018:c5f:3701:cc8a:9177:b28:c034)
+        ns4az1.europa.eu (54.154.94.36)
+        ns2lux.europa.eu (147.67.12.3)
+        ns4az2.europa.eu (34.255.155.194)
+        ns4az2.europa.eu (2a05:d018:c5f:3702:4df4:7b41:c0a1:34e4)
+        ns1bru.europa.eu (147.67.250.2)
+        ns3lux.europa.eu (147.67.12.4)
+        ns3lux.europa.eu (2a01:7080:24:101::2)
+
+Keys:
+        flags:KSK protocol:3 algorithm:RSA_SHA256 pubKey:AwEAAfKX5A/wIWblwrXsFCDw8WSAZUaxRmB5tQSlhAiTVkPNwhgcCE5ockRYQey6kdPX6YyVw7fDIAZQjzg5efHoKXzvaRWMK1XC09NXrIrnIkLVE7c6twDnEJBAd61kGablPeKR8sVOOJ7yFiISioat+t5woQCozU9c9w8RNKKHFuhdlega9qsWxxqaRI36ok6cFmEEPpOtEatgL7JoG4hnHf5UqcNbVb08F3Em0W+7WfcpPKXpWs437Q2GydKRoxg6kwxI/pOtzNxQVS8DNEE4XMTqP3SwkUuVMeqKWUYzrIE9wzzmGRff/9xjAzhC76XfCr1KTmd3WnINMDE4rtDacJE=
+        flags:KSK protocol:3 algorithm:RSA_SHA256 pubKey:AwEAAd6ILwCObzteZw4iDDFF5Ab0GGaEvtogmEvjNeZyjczgtq641zpu38BNDMmgRM6tDqoYtphAoqWjEUkI8XiTYW6go+VGtqY06VDdX5+Hl0l2YOAAxKUo6EYlB9nos5wzKD5FeEYaBP2UCmyzk1hZyfTIOcLXkZt1uUQF7l3MmQ1ETB38pOvbwxU0EQVKuG9YmKKogjW7Ujab4JFIVxqyN+Fxhh7isrceHce0ITryL8e64wVwX9GQNA3zLxK7XQvOJswv82ebYwsl8PmIRwi7hkpJMuz+oQe/i5E6xLpAXRfCDENrcHgXi9FbRmC9Vk9RVU82BpYfrsoNZSNSeRDrJl5iftwtacOpf+QvaI1je7O5cd0VwehjteT9Rfs0Gx27WlZ7KBw7ZurwLdosvNUjKzzvLpmUiKvEyicmgZ+5cGYSTAIdhcAri+mKVpN776qeF2v6fOSEtHFK/Bpu7HMO6FQ3e7KtFiQPMdYe6WSaXODA1EoVHX2IcSNhxnMuhvt7QUaPLVfs0kbzhd2XlZH56D07kLLNAsnwl6ZeBnoqbe/vlio8/HXzDFlPmWTTUqLbPNdx0kfqbQEmkc1IRHnB0upy6/Vve86K9cl4FBW2eYdWZprm2c+ZdEJXsVAGo3w4LutKFjHLweABS0y/BNQN0a0Ga8GVTzmKK9csklZRqj3d
+
+Please visit www.eurid.eu for more info.

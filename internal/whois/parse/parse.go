@@ -244,9 +244,19 @@ func tokenizeBrackets(raw string) []kvPair {
 // enclosing section's header as the key, so multiple indented lines
 // under "Name servers:" each become a separate pair sharing that key —
 // exactly like tokenizeKV's repeated "Name Server:" lines do for other
-// registries. Blank lines and any other non-indented, non-header line
-// (e.g. a trailing "WHOIS lookup made on ..." timestamp line) are
-// ignored, the same way tokenizeKV skips comment lines.
+// registries. A non-indented line that already carries its own value
+// under a short, label-like key (e.g. EURid's ".eu" responses open with
+// flat "Domain: europa.eu" / "Script: LATIN" lines before any indented
+// section) is emitted as its own pair immediately rather than treated as
+// a section header, since it has no indented body of its own. The
+// flatKeyPattern check keeps this narrow: it must not swallow prose that
+// happens to contain a colon, like a trailing "WHOIS lookup made on Sun,
+// 12 Jul 2026 at 09:15:00" timestamp line (digits/commas/many words),
+// which tokenizeIndent must keep dropping the same as before. Blank
+// lines and any other non-indented, non-header, non-label-valued line
+// are ignored, the same way tokenizeKV skips comment lines.
+var flatKeyPattern = regexp.MustCompile(`^[A-Za-z]+(?: [A-Za-z]+){0,2}$`)
+
 func tokenizeIndent(raw string) []kvPair {
 	var out []kvPair
 	section := ""
@@ -256,10 +266,19 @@ func tokenizeIndent(raw string) []kvPair {
 			continue
 		}
 		if !strings.HasPrefix(trimmedRight, " ") && !strings.HasPrefix(trimmedRight, "\t") {
-			if strings.HasSuffix(strings.TrimSpace(trimmedRight), ":") {
-				section = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(trimmedRight), ":"))
-			} else {
-				section = ""
+			trimmed := strings.TrimSpace(trimmedRight)
+			section = ""
+			switch {
+			case strings.HasSuffix(trimmed, ":"):
+				section = strings.ToLower(strings.TrimSuffix(trimmed, ":"))
+			default:
+				if idx := strings.Index(trimmed, ":"); idx >= 0 {
+					key := strings.TrimSpace(trimmed[:idx])
+					val := strings.TrimSpace(trimmed[idx+1:])
+					if val != "" && flatKeyPattern.MatchString(key) {
+						out = append(out, kvPair{strings.ToLower(key), val})
+					}
+				}
 			}
 			continue
 		}

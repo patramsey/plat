@@ -32,7 +32,7 @@ func FuzzParse(f *testing.F) {
 		{"expired-example.txt", "com"},
 		{"gdpr-redacted-de.txt", "de"},
 		{"denic-de-example.txt", "de"},
-		{"eurid-eu-example.txt", "eu"},
+		{"eurid-eu-recorded.txt", "eu"},
 		{"jprs-jp-example.txt", "jp"},
 		{"afnic-fr-example.txt", "fr"},
 		{"sidn-nl-example.txt", "nl"},

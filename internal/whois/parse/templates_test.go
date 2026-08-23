@@ -17,7 +17,7 @@ var templateManifest = []struct {
 	{tld: "de", fixture: "denic-de-example.txt", wantDomain: "example.de", wantNSCount: 2},
 	{tld: "jp", fixture: "jprs-jp-example.txt", wantDomain: "EXAMPLE.JP", wantNSCount: 2},
 	{tld: "uk", fixture: "nominet-uk-example.txt", wantDomain: "example.uk", wantNSCount: 2},
-	{tld: "eu", fixture: "eurid-eu-example.txt", wantDomain: "example.eu", wantNSCount: 2},
+	{tld: "eu", fixture: "eurid-eu-recorded.txt", wantDomain: "europa.eu", wantNSCount: 12},
 	{tld: "fr", fixture: "afnic-fr-example.txt", wantDomain: "example.fr", wantNSCount: 2},
 	{tld: "nl", fixture: "sidn-nl-example.txt", wantDomain: "example.nl", wantNSCount: 2},
 }
@@ -73,14 +73,38 @@ func TestParse_EURIDNestedRegistrarSynonymOverride(t *testing.T) {
 	// pair (key "name"), which isn't a registrar synonym anywhere else
 	// (too generic/ambiguous to add globally), so without a eu-specific
 	// override it lands in Unmapped instead of populating Registrar.
-	raw := loadFixture(t, "eurid-eu-example.txt")
+	raw := loadFixture(t, "eurid-eu-recorded.txt")
 	f := Parse(raw, "eu")
 
-	if f.Domain != "example.eu" {
-		t.Errorf("Domain = %q, want example.eu", f.Domain)
+	if f.Domain != "europa.eu" {
+		t.Errorf("Domain = %q, want europa.eu", f.Domain)
 	}
-	if f.Registrar != "Example Registrar B.V." {
-		t.Errorf("Registrar = %q, want %q (synonym override for 'name' -> registrar failed)", f.Registrar, "Example Registrar B.V.")
+	if f.Registrar != "ClearMedia NV" {
+		t.Errorf("Registrar = %q, want %q (synonym override for 'name' -> registrar failed)", f.Registrar, "ClearMedia NV")
+	}
+}
+
+func TestParse_EURIDHasNoStatusOrDates(t *testing.T) {
+	// Verified live against whois.eu: EURid's response for a domain has
+	// no top-level Status field and no Created/Updated/Expires fields at
+	// all -- unlike most registries, it simply never publishes them over
+	// WHOIS. Statuses/Created/Updated/Expires must come back empty here
+	// because the registry doesn't say, not because plat failed to parse
+	// something that was there.
+	raw := loadFixture(t, "eurid-eu-recorded.txt")
+	f := Parse(raw, "eu")
+
+	if len(f.Statuses) != 0 {
+		t.Errorf("Statuses = %v, want none (EURid publishes no status over WHOIS)", f.Statuses)
+	}
+	if f.Created.Parsed {
+		t.Errorf("Created = %+v, want unparsed (EURid publishes no creation date over WHOIS)", f.Created)
+	}
+	if f.Updated.Parsed {
+		t.Errorf("Updated = %+v, want unparsed (EURid publishes no update date over WHOIS)", f.Updated)
+	}
+	if f.Expires.Parsed {
+		t.Errorf("Expires = %+v, want unparsed (EURid publishes no expiry date over WHOIS)", f.Expires)
 	}
 }
 
