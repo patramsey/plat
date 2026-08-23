@@ -556,3 +556,29 @@ func TestParse_TruncatesStatusOnlyForTheICANNURLForm(t *testing.T) {
 		})
 	}
 }
+
+// JPRS prefixes third-level (.ad.jp, .co.jp) record lines with a lettered
+// ordinal -- "a. [Domain Name]" -- which the bracket tokenizer's ^\[ anchor
+// could not match, so those records came back with no domain, status or
+// nameservers at all.
+func TestParse_JPRSOrdinalPrefixedLines(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "whois", "jprs-adjp-recorded.txt"))
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	f := Parse(string(raw), "jp")
+	if f.Domain == "" {
+		t.Error("domain not parsed from an ordinal-prefixed [Domain Name] line")
+	}
+	if len(f.Statuses) == 0 {
+		t.Error("no status parsed; JPRS uses [State] for third-level records")
+	}
+}
+
+func TestTokenizeBrackets_AcceptsOrdinalPrefix(t *testing.T) {
+	got := tokenizeBrackets("a. [Domain Name]                NIC.AD.JP\n[State]   Connected\n")
+	want := []kvPair{{"domain name", "NIC.AD.JP"}, {"state", "Connected"}}
+	if !slices.Equal(got, want) {
+		t.Errorf("pairs = %+v, want %+v", got, want)
+	}
+}

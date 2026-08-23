@@ -63,6 +63,7 @@ var defaultSynonyms = map[string]string{
 	"whois":                                  fRefer,
 	"domain status":                          fStatus,
 	"status":                                 fStatus,
+	"state":                                  fStatus, // .jp third-level records
 	"name server":                            fNameservers,
 	"name servers":                           fNameservers,
 	"domain nameservers":                     fNameservers,
@@ -214,7 +215,11 @@ func firstToken(s string) string {
 }
 
 // tokenizeBrackets handles JPRS-style "[Key]    value" lines.
-var bracketLine = regexp.MustCompile(`^\[([^\]]+)\]\s*(.*)$`)
+//
+// A leading "a. " / "b. " ordinal appears on JPRS's third-level records
+// (.ad.jp, .co.jp) and nowhere else; the optional group keeps second-level
+// .jp records matching exactly as before.
+var bracketLine = regexp.MustCompile(`^(?:[a-z]\.\s+)?\[([^\]]+)\]\s*(.*)$`)
 
 // flatKeyPattern matches a short, letters-only, at-most-three-word label --
 // used by tokenizeIndent to recognize a non-indented "Key: value" line

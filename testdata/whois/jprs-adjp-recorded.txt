@@ -1,0 +1,23 @@
+% Recorded live from whois.jprs.jp, query "nic.ad.jp/e", 2026-08-23.
+% Legal preamble trimmed; keys and values otherwise verbatim.
+
+Domain Information:
+a. [Domain Name]                NIC.AD.JP
+g. [Organization]               Japan Network Information Center
+l. [Organization Type]          Organization of Network Administration
+m. [Administrative Contact]     SS54384JP
+n. [Technical Contact]          HK8068JP
+n. [Technical Contact]          KE2134JP
+n. [Technical Contact]          YK11438JP
+n. [Technical Contact]          NH27225JP
+n. [Technical Contact]          KG13714JP
+p. [Name Server]                ns3.nic.ad.jp
+p. [Name Server]                ns5.nic.ad.jp
+s. [Signing Key]                10306 8 2 (
+                                AD18F839DF772FBC9412E52E83EAF759
+                                34C8B96C906AF4B0D884EEF3D825D2F7 )
+[State]                         Connected (2027/03/31)
+[Lock Status]                   AgentChangeLocked
+[Registered Date]
+[Connected Date]                2015/04/07
+[Last Update]                   2026/08/18 16:38:00 (JST)
