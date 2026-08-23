@@ -1038,3 +1038,30 @@ func TestMerge_DifferentDomainsStillConflict(t *testing.T) {
 		t.Error("two genuinely different domains did not produce a conflict")
 	}
 }
+
+// TestNormalizeDomain_FallsBackWhenPunycodeConversionFails pins the error
+// branch of normalizeDomain, which had no test: coverage showed the function
+// at 75%, and the uncovered statement was the fallback itself.
+//
+// The spec for the IDN fix promised this degrades safely -- a value idna
+// cannot convert must still compare as itself, not vanish or become empty.
+// Without this test, replacing `return n` with `return ""` leaves the suite
+// green while making every unconvertible domain compare equal to every
+// other one, which would merge two genuinely different names into one
+// record with no conflict recorded.
+func TestNormalizeDomain_FallsBackWhenPunycodeConversionFails(t *testing.T) {
+	// idna.Lookup rejects U+005F; ToASCII returns an error and the input
+	// unchanged. Underscores appear in real legacy hostnames, so this is a
+	// value a WHOIS source can genuinely supply.
+	const unconvertible = "exa_mple.com"
+
+	if got := normalizeDomain(unconvertible); got != unconvertible {
+		t.Errorf("normalizeDomain(%q) = %q, want the value unchanged", unconvertible, got)
+	}
+
+	// And the two must not collapse together: a fallback returning a
+	// constant would make these compare equal.
+	if normalizeDomain("exa_mple.com") == normalizeDomain("diff_erent.com") {
+		t.Error("two different unconvertible domains normalised to the same key")
+	}
+}
