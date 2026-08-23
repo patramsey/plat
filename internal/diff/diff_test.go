@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/patramsey/plat/internal/render/machine"
@@ -90,6 +91,40 @@ func TestCompare(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCompare_PureListAdditionAndRemoval pins that a list can register a
+// change while gaining OR losing items alone -- not just both at once.
+// Without this, flipping diff.go's "len(added) == 0 && len(removed) == 0"
+// to "||" silences every one-sided list change and the whole suite stays
+// green -- exit 0 instead of 4, on the question --diff exists to answer.
+func TestCompare_PureListAdditionAndRemoval(t *testing.T) {
+	base := []machine.Field{{Key: "nameservers", Label: "Nameservers", List: []string{"a.example.com"}}}
+
+	t.Run("pure addition", func(t *testing.T) {
+		after := []machine.Field{{Key: "nameservers", Label: "Nameservers", List: []string{"a.example.com", "b.example.com"}}}
+		changes := Compare(base, after)
+		if len(changes) != 1 {
+			t.Fatalf("changes = %+v, want exactly one", changes)
+		}
+		if got := changes[0].AddedItems; !slices.Equal(got, []string{"b.example.com"}) {
+			t.Errorf("AddedItems = %q, want [b.example.com]", got)
+		}
+		if len(changes[0].RemovedItems) != 0 {
+			t.Errorf("RemovedItems = %q, want none", changes[0].RemovedItems)
+		}
+	})
+
+	t.Run("pure removal", func(t *testing.T) {
+		after := []machine.Field{{Key: "nameservers", Label: "Nameservers", List: []string{}}}
+		changes := Compare(base, after)
+		if len(changes) != 1 {
+			t.Fatalf("changes = %+v, want exactly one", changes)
+		}
+		if got := changes[0].RemovedItems; !slices.Equal(got, []string{"a.example.com"}) {
+			t.Errorf("RemovedItems = %q, want [a.example.com]", got)
+		}
+	})
 }
 
 func equalStrings(a, b []string) bool {

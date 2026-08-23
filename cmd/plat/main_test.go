@@ -1712,3 +1712,93 @@ func TestRunLookupPool_PreservesColorForAColorTerminal(t *testing.T) {
 		})
 	}
 }
+
+// TestRunLookup_WHOISPacingFollowsDomainCount pins runLookup's
+// DisableWHOISPacing: len(domains) == 1 wiring: pacing must be off for a
+// lone lookup and on from two names up. Flipping that expression's == to
+// != leaves the rest of the suite green while making bulk runs hammer a
+// single registry with no pacing at all -- the outcome most likely to get
+// a user's IP banned -- and making a lone lookup pay a needless full
+// pacing interval.
+//
+// There is no seam to inspect this directly: plat.Client's pacing state
+// lives on an unexported field in a different package, and runLookup
+// never hands its built *plat.Client back out (see runLookupPool's doc
+// comment on why that split exists at all -- tests that need the client
+// itself use newTestClient, which builds one independently of runLookup
+// and so never exercises this line). The only externally observable
+// effect of pacing is real: a HostLimiter hands out exactly one free
+// slot per server -- deterministically, by call order, not by how long
+// anything actually takes to run -- and makes every later caller to that
+// server wait a full interval (whois.DefaultWHOISInterval, 1s; runLookup
+// never forwards a custom WHOISInterval, so this is always the real
+// default). This test turns that into a pass/fail rather than a duration
+// comparison: the outer context carries a 200ms deadline, a decisive 5x
+// under the 1s interval, so any query stuck waiting on a paced slot is
+// cancelled long before it could complete, while every query that either
+// isn't paced or wins a host's one free slot finishes in well under a
+// millisecond over loopback. So "does the registrar text make it into
+// the output" stands in exactly for "was this query paced" -- it does
+// not depend on measuring how long anything took, only on whether it
+// finished before a fixed, generous deadline.
+//
+// The fake WHOIS server used as whoisIANAServer answers every hop from
+// one shared host: a bare-TLD query (no dot) gets a refer: line pointing
+// back at itself, and a full-domain query (has a dot) gets terminal
+// WHOIS data with a Registrar field. That means even a single domain's
+// own IANA hop and registry hop contend for that one host's pacing slot
+// -- the minimum shape in which pacing has any effect on a lone lookup
+// at all, mirroring plat_test.go's selfReferringWHOIS at the
+// plat.Client.Lookup level, one layer up through runLookup instead.
+func TestRunLookup_WHOISPacingFollowsDomainCount(t *testing.T) {
+	newSharedHostWHOIS := func(t *testing.T) string {
+		t.Helper()
+		var addr string
+		respond := func(query string) string {
+			if strings.Contains(query, ".") {
+				return "Domain Name: " + strings.ToUpper(query) + "\nRegistrar: Shared Host Registrar, Inc.\n"
+			}
+			return "refer: " + addr + "\n"
+		}
+		addr = startFakeWHOISListener(t, respond)
+		return addr
+	}
+
+	run := func(t *testing.T, domains []string) string {
+		t.Helper()
+		ianaAddr := newSharedHostWHOIS(t)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		defer cancel()
+
+		var stdout, stderr bytes.Buffer
+		opts := lookupOptions{
+			whoisIANAServer: ianaAddr,
+			SourceFilter:    "whois", // no RDAP: real bootstrap coverage for a fake TLD must never matter
+			NoFollow:        true,
+			Concurrency:     2,
+			Timeout:         200 * time.Millisecond,
+		}
+		// A cancelled hop is a normal WHOIS source failure, not a fatal
+		// runLookup error (see whois.Client.Lookup's doc comment), so this
+		// may return nil or a non-nil "nothing found" error depending on
+		// which hops made it through in time; only stdout's content is
+		// asserted on below.
+		_ = runLookup(ctx, &stdout, &stderr, domains, opts, uiConfig{})
+		return stdout.String()
+	}
+
+	t.Run("one domain leaves pacing off", func(t *testing.T) {
+		out := run(t, []string{"a.sharedhostone"})
+		if !strings.Contains(out, "Shared Host Registrar") {
+			t.Errorf("registrar data missing for a lone lookup within the 200ms deadline -- its own IANA and registry hops share one host, so a wrongly-paced single lookup would stall past it. output:\n%s", out)
+		}
+	})
+
+	t.Run("two domains turns pacing on", func(t *testing.T) {
+		out := run(t, []string{"a.sharedhosttwo", "b.sharedhostthree"})
+		if strings.Contains(out, "Shared Host Registrar") {
+			t.Errorf("registrar data present for a two-name run within the 200ms deadline -- a correctly-paced shared host hands out only one free slot total across both names' hops, and every other query needs a full 1s wait, so this should never finish that fast. output:\n%s", out)
+		}
+	})
+}
