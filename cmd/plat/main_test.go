@@ -268,6 +268,20 @@ func TestRun_ReservedIPRejectedAtExit2(t *testing.T) {
 	}
 }
 
+// An impossible name is a usage error (exit 2), not a not-found (exit 1).
+// Exit 1 asserts that every source agreed the name does not exist, which
+// is a claim plat cannot make about a name it never looked up.
+func TestImpossibleNameExitsUsageNotNotFound(t *testing.T) {
+	for _, input := range []string{"a..com", "xn--.com"} {
+		t.Run(input, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if code := run([]string{"-o", "json", input}, &stdout, &stderr, uiConfig{}); code != 2 {
+				t.Errorf("run(%q) exit = %d, want 2 (stderr: %s)", input, code, stderr.String())
+			}
+		})
+	}
+}
+
 func TestRun_InvalidOutputFormat(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	got := run([]string{"-o", "bogus", "example.com"}, &stdout, &stderr, uiConfig{})

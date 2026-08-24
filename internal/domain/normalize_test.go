@@ -355,3 +355,63 @@ func TestNormalize_OrdinaryPublicIPsStillAccepted(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeRejectsEmptyLabels(t *testing.T) {
+	for _, input := range []string{"a..com", "xn--.com", ".com", "a...b.com"} {
+		t.Run(input, func(t *testing.T) {
+			got, err := Normalize(input)
+			if !errors.Is(err, ErrEmptyLabel) {
+				t.Fatalf("Normalize(%q) = (%+v, %v), want ErrEmptyLabel", input, got, err)
+			}
+		})
+	}
+}
+
+// TestNormalizeDoesNotRewriteEmptyPunycodeToTLD is the load-bearing half
+// of the fix. idna.Lookup.ToASCII("xn--.com") returns ".com" with a nil
+// error, so before the empty-label check plat did not merely mis-report
+// the exit code -- it looked up a different name than the one asked for.
+func TestNormalizeDoesNotRewriteEmptyPunycodeToTLD(t *testing.T) {
+	got, err := Normalize("xn--.com")
+	if err == nil {
+		t.Fatalf("Normalize(\"xn--.com\") = %+v, want an error; it must never resolve to a lookupable name", got)
+	}
+	if got.Name.Punycode == ".com" || got.Name.Punycode == "com" {
+		t.Fatalf("Normalize(\"xn--.com\") produced Punycode %q -- it rewrote the input into a different, real name", got.Name.Punycode)
+	}
+}
+
+// Control cases: valid names that contain no empty label must be
+// unaffected, including the trailing-dot and IDN forms the new check
+// runs next to.
+func TestNormalizeStillAcceptsValidNames(t *testing.T) {
+	for _, tc := range []struct{ input, wantPunycode string }{
+		{"example.com.", "example.com"},
+		{"bücher.com", "xn--bcher-kva.com"},
+		{"xn--bcher-kva.com", "xn--bcher-kva.com"},
+		{"a.b.c.example.com", "a.b.c.example.com"},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			got, err := Normalize(tc.input)
+			if err != nil {
+				t.Fatalf("Normalize(%q) errored: %v", tc.input, err)
+			}
+			if got.Name.Punycode != tc.wantPunycode {
+				t.Errorf("Normalize(%q).Punycode = %q, want %q", tc.input, got.Name.Punycode, tc.wantPunycode)
+			}
+		})
+	}
+}
+
+// A single-label input keeps its own dedicated error rather than being
+// swept into the empty-label one -- the two mean different things and
+// their messages tell the user different things to fix.
+func TestNormalizeSingleLabelKeepsItsOwnError(t *testing.T) {
+	_, err := Normalize("localhost")
+	if !errors.Is(err, ErrSingleLabel) {
+		t.Fatalf("Normalize(\"localhost\") err = %v, want ErrSingleLabel", err)
+	}
+	if errors.Is(err, ErrEmptyLabel) {
+		t.Fatal("Normalize(\"localhost\") reported ErrEmptyLabel; single-label and empty-label are distinct failures")
+	}
+}
