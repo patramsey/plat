@@ -15,9 +15,12 @@ import (
 func RenderASN(w io.Writer, r model.ASNRecord, opts Options) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 
+	var rows []row
 	for _, fd := range model.ASNFieldOrder {
-		writeASNField(tw, r, fd)
+		writeASNField(&rows, r, fd)
 	}
+	emitRows(tw, rows)
+
 	writeSourceLegend(tw, model.PresentSourcesASN(r))
 
 	if opts.Verbose {
@@ -55,34 +58,34 @@ func RenderASN(w io.Writer, r model.ASNRecord, opts Options) error {
 // single "start - end" row rather than mapping 1:1 to an ASNRecord field,
 // reusing rangeField/unionSourceIDs from ip.go since the shape (two
 // independently-merged Field[string]s combined into one row) is identical.
-func writeASNField(tw *tabwriter.Writer, r model.ASNRecord, fd model.FieldSpec) {
+func writeASNField(rows *[]row, r model.ASNRecord, fd model.FieldSpec) {
 	conflicted := hasConflict(r.Conflicts, fd.Key)
 	switch fd.Key {
 	case model.FieldASNName:
-		stringField(tw, fd.Label, r.Name, conflicted)
+		stringField(rows, fd.Label, r.Name, conflicted)
 	case model.FieldASNHandle:
-		stringField(tw, fd.Label, r.Handle, conflicted)
+		stringField(rows, fd.Label, r.Handle, conflicted)
 	case model.FieldASNStartAutnum:
 		rangeConflicted := hasConflict(r.Conflicts, model.FieldASNStartAutnum) || hasConflict(r.Conflicts, model.FieldASNEndAutnum)
-		rangeField(tw, fd.Label, r.StartAutnum, r.EndAutnum, rangeConflicted)
+		rangeField(rows, fd.Label, r.StartAutnum, r.EndAutnum, rangeConflicted)
 	case model.FieldASNType:
-		stringField(tw, fd.Label, r.Type, conflicted)
+		stringField(rows, fd.Label, r.Type, conflicted)
 	case model.FieldOrgName:
-		stringField(tw, fd.Label, r.Org.Name, conflicted)
+		stringField(rows, fd.Label, r.Org.Name, conflicted)
 	case model.FieldOrgID:
-		stringField(tw, fd.Label, r.Org.ID, conflicted)
+		stringField(rows, fd.Label, r.Org.ID, conflicted)
 	case model.FieldASNCountry:
-		stringField(tw, fd.Label, r.Country, conflicted)
+		stringField(rows, fd.Label, r.Country, conflicted)
 	case model.FieldOrgAbuseEmail:
-		stringField(tw, fd.Label, r.Org.AbuseEmail, conflicted)
+		stringField(rows, fd.Label, r.Org.AbuseEmail, conflicted)
 	case model.FieldOrgAbusePhone:
-		stringField(tw, fd.Label, r.Org.AbusePhone, conflicted)
+		stringField(rows, fd.Label, r.Org.AbusePhone, conflicted)
 	case model.FieldASNStatus:
-		listField(tw, fd.Label, r.Status, false)
+		listField(rows, fd.Label, r.Status, false)
 	case model.FieldASNRegistered:
-		timeField(tw, fd.Label, r.Registered, conflicted)
+		timeField(rows, fd.Label, r.Registered, conflicted)
 	case model.FieldASNUpdated:
-		timeField(tw, fd.Label, r.Updated, conflicted)
+		timeField(rows, fd.Label, r.Updated, conflicted)
 	default:
 		panic(fmt.Sprintf("plain: unhandled model.ASNFieldOrder entry %q", fd.Key))
 	}

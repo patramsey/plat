@@ -38,9 +38,12 @@ type Options struct {
 func Render(w io.Writer, r model.Record, opts Options) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 
+	var rows []row
 	for _, fd := range model.FieldOrder {
-		writeField(tw, r, fd)
+		writeField(&rows, r, fd)
 	}
+	emitRows(tw, rows)
+
 	writeSourceLegend(tw, model.PresentSources(r))
 
 	if opts.Verbose {
@@ -110,52 +113,71 @@ func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult) {
 	}
 }
 
+// row is one collected field line, held until every row exists so a
+// width-aware emitter can size the columns from the actual content. items
+// is non-nil only for list fields, where wrapping must break between whole
+// items rather than mid-hostname.
+type row struct {
+	label string
+	value string
+	items []string
+	src   string
+}
+
+// emitRows writes the collected rows through the tabwriter, exactly as
+// this renderer always has.
+func emitRows(tw *tabwriter.Writer, rows []row) {
+	for _, r := range rows {
+		_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", r.label, r.value, r.src)
+	}
+}
+
 // writeField dispatches one model.FieldOrder entry to the write* helper
 // matching its Record field's type. Status is passed conflicted=false
 // unconditionally -- differing sets are unioned, never flagged -- so it
 // never needs the marker.
-func writeField(tw *tabwriter.Writer, r model.Record, fd model.FieldSpec) {
+func writeField(rows *[]row, r model.Record, fd model.FieldSpec) {
 	conflicted := hasConflict(r.Conflicts, fd.Key)
 	switch fd.Key {
 	case model.FieldDomain:
-		stringField(tw, fd.Label, r.Domain, conflicted)
+		stringField(rows, fd.Label, r.Domain, conflicted)
 	case model.FieldHandle:
-		stringField(tw, fd.Label, r.Handle, conflicted)
+		stringField(rows, fd.Label, r.Handle, conflicted)
 	case model.FieldRegistrarName:
-		stringField(tw, fd.Label, r.Registrar.Name, conflicted)
+		stringField(rows, fd.Label, r.Registrar.Name, conflicted)
 	case model.FieldRegistrarIANAID:
-		stringField(tw, fd.Label, r.Registrar.IANAID, conflicted)
+		stringField(rows, fd.Label, r.Registrar.IANAID, conflicted)
 	case model.FieldRegistrarURL:
-		stringField(tw, fd.Label, r.Registrar.URL, conflicted)
+		stringField(rows, fd.Label, r.Registrar.URL, conflicted)
 	case model.FieldRegistrarAbuseEmail:
-		stringField(tw, fd.Label, r.Registrar.AbuseEmail, conflicted)
+		stringField(rows, fd.Label, r.Registrar.AbuseEmail, conflicted)
 	case model.FieldRegistrarAbusePhone:
-		stringField(tw, fd.Label, r.Registrar.AbusePhone, conflicted)
+		stringField(rows, fd.Label, r.Registrar.AbusePhone, conflicted)
 	case model.FieldStatus:
-		listField(tw, fd.Label, r.Status, false)
+		listField(rows, fd.Label, r.Status, false)
 	case model.FieldCreated:
-		timeField(tw, fd.Label, r.Created, conflicted)
+		timeField(rows, fd.Label, r.Created, conflicted)
 	case model.FieldUpdated:
-		timeField(tw, fd.Label, r.Updated, conflicted)
+		timeField(rows, fd.Label, r.Updated, conflicted)
 	case model.FieldExpires:
-		timeField(tw, fd.Label, r.Expires, conflicted)
+		timeField(rows, fd.Label, r.Expires, conflicted)
 	case model.FieldNameservers:
-		listField(tw, fd.Label, r.Nameservers, conflicted)
+		listField(rows, fd.Label, r.Nameservers, conflicted)
 	case model.FieldDNSSEC:
-		boolField(tw, fd.Label, r.DNSSEC, conflicted)
+		boolField(rows, fd.Label, r.DNSSEC, conflicted)
 	default:
 		panic(fmt.Sprintf("plain: unhandled model.FieldOrder entry %q", fd.Key))
 	}
 }
 
-func stringField(tw *tabwriter.Writer, label string, f model.Field[string], conflicted bool) {
+func stringField(rows *[]row, label string, f model.Field[string], conflicted bool) {
 	if !f.Present() {
 		return
 	}
-	_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", label, f.Value, sourcesCol(f.Sources, conflicted))
+	*rows = append(*rows, row{label: label, value: f.Value, src: sourcesCol(f.Sources, conflicted)})
 }
 
-func listField(tw *tabwriter.Writer, label string, f model.Field[[]string], conflicted bool) {
+func listField(rows *[]row, label string, f model.Field[[]string], conflicted bool) {
 	// Deliberately not f.Present(): a genuine merge conflict (see
 	// internal/merge's nameservers()) can leave Sources empty while Value
 	// stays populated with the merged union -- the row must still print,
@@ -163,10 +185,15 @@ func listField(tw *tabwriter.Writer, label string, f model.Field[[]string], conf
 	if len(f.Value) == 0 {
 		return
 	}
-	_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", label, strings.Join(f.Value, " · "), sourcesCol(f.Sources, conflicted))
+	*rows = append(*rows, row{
+		label: label,
+		value: strings.Join(f.Value, " · "),
+		items: f.Value,
+		src:   sourcesCol(f.Sources, conflicted),
+	})
 }
 
-func boolField(tw *tabwriter.Writer, label string, f model.Field[bool], conflicted bool) {
+func boolField(rows *[]row, label string, f model.Field[bool], conflicted bool) {
 	if !f.Present() {
 		return
 	}
@@ -174,18 +201,18 @@ func boolField(tw *tabwriter.Writer, label string, f model.Field[bool], conflict
 	if f.Value {
 		val = "true"
 	}
-	_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", label, val, sourcesCol(f.Sources, conflicted))
+	*rows = append(*rows, row{label: label, value: val, src: sourcesCol(f.Sources, conflicted)})
 }
 
-func timeField(tw *tabwriter.Writer, label string, f model.Field[model.TimeValue], conflicted bool) {
+func timeField(rows *[]row, label string, f model.Field[model.TimeValue], conflicted bool) {
 	if !f.Present() {
 		return
 	}
 	if f.Value.Parsed {
-		_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", label, f.Value.Time.UTC().Format(time.RFC3339), sourcesCol(f.Sources, conflicted))
+		*rows = append(*rows, row{label: label, value: f.Value.Time.UTC().Format(time.RFC3339), src: sourcesCol(f.Sources, conflicted)})
 		return
 	}
-	_, _ = fmt.Fprintf(tw, "%s:\t%s (unparsed)\t%s\n", label, f.Value.Raw, sourcesCol(f.Sources, conflicted))
+	*rows = append(*rows, row{label: label, value: f.Value.Raw + " (unparsed)", src: sourcesCol(f.Sources, conflicted)})
 }
 
 // hasConflict reports whether field appears in conflicts.

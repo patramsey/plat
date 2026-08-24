@@ -425,3 +425,50 @@ func TestNoLegendWhenRecordHasNoProvenance(t *testing.T) {
 		}
 	}
 }
+
+// TestRenderOutputUnchangedByRowCollection pins the exact bytes Render
+// produces for a representative record. Task 7 restructured how rows reach
+// the writer; this asserts the restructure was invisible. It is also the
+// baseline Task 8's width-aware path must not disturb when Width is 0.
+func TestRenderOutputUnchangedByRowCollection(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Render(&buf, representativeRecord(), Options{Verbose: true, ShowConflicts: true}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	got := buf.String()
+	if got != wantRepresentativeOutput {
+		t.Errorf("output changed.\n--- got ---\n%s\n--- want ---\n%s", got, wantRepresentativeOutput)
+	}
+}
+
+// representativeRecord exercises every row shape the renderer has: a
+// scalar, a list long enough to dominate the value column, a timestamp, a
+// bool, a conflict, and a redaction.
+func representativeRecord() model.Record {
+	return model.Record{
+		Domain:      model.Field[string]{Value: "EXAMPLE.COM", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS}},
+		Registrar:   model.RegistrarInfo{Name: model.Field[string]{Value: "RESERVED-Internet Assigned Numbers Authority", Sources: []model.SourceID{model.SourceRegistryRDAP}}},
+		Status:      model.Field[[]string]{Value: []string{"clientDeleteProhibited", "clientTransferProhibited", "clientUpdateProhibited"}, Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}},
+		Created:     model.Field[model.TimeValue]{Value: model.TimeValue{Parsed: true, Time: time.Date(1995, 8, 14, 4, 0, 0, 0, time.UTC)}, Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}},
+		Nameservers: model.Field[[]string]{Value: []string{"a.iana-servers.net", "b.iana-servers.net"}, Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}},
+		DNSSEC:      model.Field[bool]{Value: true, Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Sources:     []model.SourceResult{{Source: model.SourceRegistryRDAP, OK: true, Latency: 121 * time.Millisecond}},
+		Conflicts:   []model.Conflict{{Field: "created", Values: map[model.SourceID]string{model.SourceRegistryRDAP: "1995-08-14T04:00:00Z", model.SourceRegistryWHOIS: "1995-08-13T04:00:00Z"}}},
+		Redacted:    []model.RedactionNotice{{Field: "registrantName", Source: model.SourceRegistryRDAP, Reason: "gdpr"}},
+	}
+}
+
+const wantRepresentativeOutput = `Domain:       EXAMPLE.COM                                                                 GR, RW, GW
+Registrar:    RESERVED-Internet Assigned Numbers Authority                                GR
+Status:       clientDeleteProhibited · clientTransferProhibited · clientUpdateProhibited  GR, GW
+Created:      1995-08-14T04:00:00Z                                                        GR, GW [conflict]
+Nameservers:  a.iana-servers.net · b.iana-servers.net                                     GR, GW
+DNSSEC:       true                                                                        GR
+GR registry-rdap   RW registrar-whois   GW registry-whois
+---
+registry-rdap:  121ms  ok
+---
+Conflict (created):  GR=1995-08-14T04:00:00Z, GW=1995-08-13T04:00:00Z
+---
+Redacted (registrantName):  registry-rdap (gdpr)
+`

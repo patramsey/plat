@@ -15,9 +15,12 @@ import (
 func RenderIP(w io.Writer, r model.IPRecord, opts Options) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 
+	var rows []row
 	for _, fd := range model.IPFieldOrder {
-		writeIPField(tw, r, fd)
+		writeIPField(&rows, r, fd)
 	}
+	emitRows(tw, rows)
+
 	writeSourceLegend(tw, model.PresentSourcesIP(r))
 
 	if opts.Verbose {
@@ -53,40 +56,40 @@ func RenderIP(w io.Writer, r model.IPRecord, opts Options) error {
 // helper matching its IPRecord field's type. Range is the one
 // non-mechanical entry: it combines StartAddress and EndAddress into a
 // single "start - end" row rather than mapping 1:1 to an IPRecord field.
-func writeIPField(tw *tabwriter.Writer, r model.IPRecord, fd model.FieldSpec) {
+func writeIPField(rows *[]row, r model.IPRecord, fd model.FieldSpec) {
 	conflicted := hasConflict(r.Conflicts, fd.Key)
 	switch fd.Key {
 	case model.FieldIPName:
-		stringField(tw, fd.Label, r.Name, conflicted)
+		stringField(rows, fd.Label, r.Name, conflicted)
 	case model.FieldIPHandle:
-		stringField(tw, fd.Label, r.Handle, conflicted)
+		stringField(rows, fd.Label, r.Handle, conflicted)
 	case model.FieldIPStartAddress:
 		rangeConflicted := hasConflict(r.Conflicts, model.FieldIPStartAddress) || hasConflict(r.Conflicts, model.FieldIPEndAddress)
-		rangeField(tw, fd.Label, r.StartAddress, r.EndAddress, rangeConflicted)
+		rangeField(rows, fd.Label, r.StartAddress, r.EndAddress, rangeConflicted)
 	case model.FieldIPCIDR:
-		stringField(tw, fd.Label, r.CIDR, conflicted)
+		stringField(rows, fd.Label, r.CIDR, conflicted)
 	case model.FieldIPType:
-		stringField(tw, fd.Label, r.Type, conflicted)
+		stringField(rows, fd.Label, r.Type, conflicted)
 	case model.FieldIPVersion:
-		stringField(tw, fd.Label, r.IPVersion, conflicted)
+		stringField(rows, fd.Label, r.IPVersion, conflicted)
 	case model.FieldIPParent:
-		stringField(tw, fd.Label, r.ParentHandle, conflicted)
+		stringField(rows, fd.Label, r.ParentHandle, conflicted)
 	case model.FieldOrgName:
-		stringField(tw, fd.Label, r.Org.Name, conflicted)
+		stringField(rows, fd.Label, r.Org.Name, conflicted)
 	case model.FieldOrgID:
-		stringField(tw, fd.Label, r.Org.ID, conflicted)
+		stringField(rows, fd.Label, r.Org.ID, conflicted)
 	case model.FieldIPCountry:
-		stringField(tw, fd.Label, r.Country, conflicted)
+		stringField(rows, fd.Label, r.Country, conflicted)
 	case model.FieldOrgAbuseEmail:
-		stringField(tw, fd.Label, r.Org.AbuseEmail, conflicted)
+		stringField(rows, fd.Label, r.Org.AbuseEmail, conflicted)
 	case model.FieldOrgAbusePhone:
-		stringField(tw, fd.Label, r.Org.AbusePhone, conflicted)
+		stringField(rows, fd.Label, r.Org.AbusePhone, conflicted)
 	case model.FieldIPStatus:
-		listField(tw, fd.Label, r.Status, false)
+		listField(rows, fd.Label, r.Status, false)
 	case model.FieldIPRegistered:
-		timeField(tw, fd.Label, r.Registered, conflicted)
+		timeField(rows, fd.Label, r.Registered, conflicted)
 	case model.FieldIPUpdated:
-		timeField(tw, fd.Label, r.Updated, conflicted)
+		timeField(rows, fd.Label, r.Updated, conflicted)
 	default:
 		panic(fmt.Sprintf("plain: unhandled model.IPFieldOrder entry %q", fd.Key))
 	}
@@ -101,7 +104,7 @@ func writeIPField(tw *tabwriter.Writer, r model.IPRecord, fd model.FieldSpec) {
 // rather than assuming they ever agree. If only one of the two addresses
 // is present, that address (and just its own sources) renders alone
 // rather than with a dangling " - ".
-func rangeField(tw *tabwriter.Writer, label string, start, end model.Field[string], conflicted bool) {
+func rangeField(rows *[]row, label string, start, end model.Field[string], conflicted bool) {
 	var value string
 	var sources []model.SourceID
 	switch {
@@ -117,7 +120,7 @@ func rangeField(tw *tabwriter.Writer, label string, start, end model.Field[strin
 	default:
 		return
 	}
-	_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", label, value, sourcesCol(sources, conflicted))
+	*rows = append(*rows, row{label: label, value: value, src: sourcesCol(sources, conflicted)})
 }
 
 // unionSourceIDs returns the sources appearing in a or b, deduplicated,
