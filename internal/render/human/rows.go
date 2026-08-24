@@ -262,28 +262,49 @@ func wrapItems(items []string, width int, sep string) []string {
 	return append(lines, cur)
 }
 
-// Legend text decoding sourceCode's abbreviations. Two variants, because
-// which sources can exist depends on the object type: a domain is held by
-// a registrar under a registry, so all four codes are reachable, while an
-// IP allocation or an autonomous system is registered directly with an RIR
-// and has no registrar at all. Listing RR/RW on an IP or ASN record
-// explains badges that can never appear there, which reads as "plat failed
-// to reach the registrar" rather than "no such source exists".
-const (
-	legendWithRegistrar = "RR registrar-rdap   GR registry-rdap   RW registrar-whois   GW registry-whois"
-	legendRegistryOnly  = "GR registry-rdap   GW registry-whois"
-)
+// legendEntry decodes one source into its "XX source-id" legend entry. An
+// unrecognized SourceID (which shouldn't happen given the closed set in
+// internal/model) has no two-letter code -- sourceCode falls back to the
+// raw string -- so it prints once rather than as "foo foo".
+func legendEntry(s model.SourceID) string {
+	code := sourceCode(s)
+	if code == string(s) {
+		return code
+	}
+	return code + " " + string(s)
+}
 
-// writeSourceLegend prints the key decoding sourceCode's abbreviations --
-// unconditionally, not gated by --verbose or --conflicts, since the codes
-// it explains appear in the DEFAULT view; hiding the legend by default
-// would make the default output undecodable, not just less detailed. The
-// widest legend is ~77 columns, wide enough to need the same wrap-safety
-// every other line in this file gets rather than assuming it always fits.
+// buildSourceLegend renders the key decoding the two-letter codes in
+// sources, which callers derive from the record via model.PresentSources*
+// -- so the key explains exactly the badges the reader can see and nothing
+// else. A record whose only answer came from registry WHOIS used to get
+// all four codes explained, which reads as "plat failed to reach the other
+// three" rather than "the other three had nothing to say".
 //
-// legend is the caller's choice of the two constants above: domain records
-// pass legendWithRegistrar, IP and ASN records pass legendRegistryOnly.
-func writeSourceLegend(b *strings.Builder, th Theme, width int, legend string) {
+// Kept in step with the same function in internal/render/plain/plain.go --
+// the two renderers must decode the same codes the same way.
+func buildSourceLegend(sources []model.SourceID) string {
+	if len(sources) == 0 {
+		return ""
+	}
+	parts := make([]string, len(sources))
+	for i, s := range sources {
+		parts[i] = legendEntry(s)
+	}
+	return strings.Join(parts, "   ")
+}
+
+// writeSourceLegend prints the key unconditionally, not gated by --verbose
+// or --conflicts, since the codes it explains appear in the DEFAULT view;
+// hiding it by default would make the default output undecodable, not just
+// less detailed. It stays wrap-safe: a four-code legend is ~77 columns,
+// wide enough to need the same treatment every other line in this file
+// gets rather than assuming it always fits.
+func writeSourceLegend(b *strings.Builder, th Theme, width int, sources []model.SourceID) {
+	legend := buildSourceLegend(sources)
+	if legend == "" {
+		return
+	}
 	b.WriteString("\n")
 	for _, line := range wrapValue(legend, width) {
 		b.WriteString(th.Muted.Render(line) + "\n")

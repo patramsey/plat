@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/render/plain"
 )
 
 func fullRecord() model.Record {
@@ -929,7 +930,8 @@ func TestRender_SourceLegendWrapsAtNarrowWidth(t *testing.T) {
 	// else. It must wrap like everything else in this file rather than
 	// overflow just because it's a one-time legend.
 	rec := model.Record{
-		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP}},
+		Handle: model.Field[string]{Value: "H1", Sources: []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS}},
 	}
 	for _, width := range []int{40, 60, 80} {
 		var buf bytes.Buffer
@@ -1225,14 +1227,14 @@ func TestRender_LifecycleSectionOmitsEstimateWhenAbsent(t *testing.T) {
 // trio, guarding the opposite direction from its IP and ASN siblings
 // (TestRenderIP_LegendOmitsRegistrarSources,
 // TestRenderASN_LegendOmitsRegistrarSources). Those two pin that RIR-held
-// objects must not advertise registrar codes; this pins that domains still
-// must, since a domain genuinely can be sourced from all four. Without it,
-// "fixing" the legend by giving every object type the registry-only
-// variant would pass the whole suite while silently making the default
-// domain view undecodable.
+// objects must not advertise registrar codes; this pins that a domain
+// whose fields are actually sourced from all four still shows all four --
+// it's the data doing the gating now, not a type-based assumption, so the
+// fixture has to give every code a field to attach to.
 func TestRender_DomainLegendKeepsRegistrarSources(t *testing.T) {
 	rec := model.Record{
-		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP}},
+		Handle: model.Field[string]{Value: "H1", Sources: []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS}},
 	}
 	var buf bytes.Buffer
 	if err := Render(&buf, rec, Options{Theme: NewTheme(false), Width: 100}); err != nil {
@@ -1246,6 +1248,49 @@ func TestRender_DomainLegendKeepsRegistrarSources(t *testing.T) {
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("domain legend is missing %q -- all four sources are reachable for a domain:\n%s", want, out)
+		}
+	}
+}
+
+func TestHumanLegendListsOnlyPresentCodes(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "denic.de", Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{Theme: NewTheme(false), Width: 100}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "GW registry-whois") {
+		t.Errorf("legend missing the one code the record does carry; got:\n%s", out)
+	}
+	for _, absent := range []model.SourceID{model.SourceRegistrarRDAP, model.SourceRegistryRDAP, model.SourceRegistrarWHOIS} {
+		if strings.Contains(out, string(absent)) {
+			t.Errorf("legend explains %q, which appears on no field; got:\n%s", absent, out)
+		}
+	}
+}
+
+// Both renderers must derive the same code set for the same record --
+// they decode the same badges, so a divergence means one of them is
+// lying about the other's output.
+func TestHumanAndPlainLegendsAgree(t *testing.T) {
+	rec := model.Record{
+		Domain:      model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Nameservers: model.Field[[]string]{Value: []string{"a.iana-servers.net"}, Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+	}
+	var human, plainBuf bytes.Buffer
+	if err := Render(&human, rec, Options{Theme: NewTheme(false), Width: 100}); err != nil {
+		t.Fatalf("human Render: %v", err)
+	}
+	if err := plain.Render(&plainBuf, rec, plain.Options{}); err != nil {
+		t.Fatalf("plain Render: %v", err)
+	}
+	for _, s := range model.Precedence {
+		inHuman := strings.Contains(human.String(), string(s))
+		inPlain := strings.Contains(plainBuf.String(), string(s))
+		if inHuman != inPlain {
+			t.Errorf("source %q: present in human=%v, plain=%v -- the two legends disagree", s, inHuman, inPlain)
 		}
 	}
 }
