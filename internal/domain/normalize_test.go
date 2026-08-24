@@ -367,10 +367,11 @@ func TestNormalizeRejectsEmptyLabels(t *testing.T) {
 	}
 }
 
-// TestNormalizeDoesNotRewriteEmptyPunycodeToTLD is the load-bearing half
-// of the fix. idna.Lookup.ToASCII("xn--.com") returns ".com" with a nil
-// error, so before the empty-label check plat did not merely mis-report
-// the exit code -- it looked up a different name than the one asked for.
+// TestNormalizeDoesNotRewriteEmptyPunycodeToTLD verifies that idna.Lookup.ToASCII's
+// silent rewrite of "xn--.com" to ".com" does not bypass the empty-label check.
+// The first assertion (err != nil) is what catches the mutation today. The Punycode
+// assertion is a guard against a future refactor of Normalize that might return a
+// populated Query alongside an error -- which is the shape this bug would resurface in.
 func TestNormalizeDoesNotRewriteEmptyPunycodeToTLD(t *testing.T) {
 	got, err := Normalize("xn--.com")
 	if err == nil {

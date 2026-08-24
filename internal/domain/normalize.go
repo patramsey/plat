@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -115,10 +116,8 @@ func Normalize(input string) (Query, error) {
 	if len(labels) < 2 {
 		return Query{}, fmt.Errorf("%w: %q", ErrSingleLabel, input)
 	}
-	for _, l := range labels {
-		if l == "" {
-			return Query{}, fmt.Errorf("%w: %q", ErrEmptyLabel, input)
-		}
+	if slices.Contains(labels, "") {
+		return Query{}, fmt.Errorf("%w: %q", ErrEmptyLabel, input)
 	}
 
 	tld := labels[len(labels)-1]
