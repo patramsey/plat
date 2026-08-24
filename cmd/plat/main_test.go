@@ -18,6 +18,7 @@ import (
 
 	"github.com/charmbracelet/colorprofile"
 
+	"github.com/patramsey/plat"
 	"github.com/patramsey/plat/internal/bootstrap"
 	"github.com/patramsey/plat/internal/domain"
 	"github.com/patramsey/plat/internal/model"
@@ -1319,6 +1320,83 @@ func TestRunLookupPool_BoundsRealLookupOneConcurrency(t *testing.T) {
 	}
 	if got < 2 {
 		t.Errorf("max concurrent lookups = %d, want >= 2 -- the pool never actually overlapped anything", got)
+	}
+}
+
+// twoNameRDAPFixtureClient stands up an httptest RDAP server that always
+// answers with testdata/rdap/com-example.json, and a *plat.Client wired to
+// it via a fake bootstrap resolver -- the same no-network harness
+// TestRunLookupPool_BoundsRealLookupOneConcurrency uses. The task-9 tests
+// below need two names that actually render something (not two names that
+// fail normalization and leave stdout empty, which is why the brief's own
+// version of this test could not discriminate pass from fail), and this is
+// the smallest fixture that renders.
+func twoNameRDAPFixtureClient(t *testing.T, opts lookupOptions) (*plat.Client, []string) {
+	t.Helper()
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixture)
+	}))
+	t.Cleanup(rdapSrv.Close)
+
+	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
+	sources := []model.SourceID{model.SourceRegistryRDAP}
+	client := newTestClient(t, resolver, opts, sources)
+	return client, []string{"name0.com", "name1.com"}
+}
+
+// TestQuietMultiNameIsNotDoubleSpaced replaces the brief's version of this
+// test, which could not fail: with two names that fail normalization
+// (a..com, b..com), each worker's stdout buffer is empty, so the loop
+// writes nothing but the separator itself between them regardless of -q --
+// "\n\n" is absent whether or not the guard exists, so the brief's
+// assertion passed even against the unmodified loop. This version renders
+// real single-line quiet records from an offline RDAP fixture and checks
+// the actual line structure, which does discriminate (see task-9-report.md
+// for the captured before/after run).
+func TestQuietMultiNameIsNotDoubleSpaced(t *testing.T) {
+	opts := lookupOptions{NoFollow: true, Concurrency: 2, Quiet: true}
+	client, domains := twoNameRDAPFixtureClient(t, opts)
+
+	var stdout, stderr bytes.Buffer
+	if err := runLookupPool(context.Background(), &stdout, &stderr, domains, opts, render.FormatPlain, uiConfig{}, client); err != nil {
+		t.Fatalf("runLookupPool: %v\nstderr:\n%s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+	if len(lines) != len(domains) {
+		t.Fatalf("got %d lines, want %d (one quiet summary per name, no blank separator); stdout:\n%q", len(lines), len(domains), out)
+	}
+	for i, line := range lines {
+		if line == "" {
+			t.Errorf("line %d is blank; -q output must not be double-spaced; stdout:\n%q", i, out)
+		}
+	}
+}
+
+// TestNonQuietMultiNameKeepsItsSeparator is the over-correction guard: the
+// same fixture, without -q, must still carry a blank line between the two
+// (now multi-line) rendered records. Also replaces the brief's version,
+// which asserted this on the same empty-stdout two-name case and so failed
+// even after the production fix -- there was nothing between two empty
+// buffers to separate.
+func TestNonQuietMultiNameKeepsItsSeparator(t *testing.T) {
+	opts := lookupOptions{NoFollow: true, Concurrency: 2}
+	client, domains := twoNameRDAPFixtureClient(t, opts)
+
+	var stdout, stderr bytes.Buffer
+	if err := runLookupPool(context.Background(), &stdout, &stderr, domains, opts, render.FormatPlain, uiConfig{}, client); err != nil {
+		t.Fatalf("runLookupPool: %v\nstderr:\n%s", err, stderr.String())
+	}
+
+	if !strings.Contains(stdout.String(), "\n\n") {
+		t.Errorf("non-quiet multi-name output lost its blank separator; got:\n%q", stdout.String())
 	}
 }
 

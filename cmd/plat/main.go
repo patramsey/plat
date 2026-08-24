@@ -558,7 +558,10 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 		if codes[i] > worst {
 			worst = codes[i]
 		}
-		if !render.IsMachine(format) && i < len(domains)-1 {
+		// A quiet record is a single line; a blank line between two of
+		// them double-spaces the whole run for no gain. The separator
+		// exists to keep multi-line records apart.
+		if !render.IsMachine(format) && !opts.Quiet && i < len(domains)-1 {
 			_, _ = fmt.Fprintln(stdout)
 		}
 	}
