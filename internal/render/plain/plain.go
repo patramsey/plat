@@ -6,6 +6,7 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode/utf8"
 
 	"github.com/patramsey/plat/internal/model"
 )
@@ -36,6 +37,12 @@ type Options struct {
 	NotQueried []model.SourceID
 	// NotQueriedReason names the flag(s) responsible, e.g. "--source rdap".
 	NotQueriedReason string
+	// Width is the terminal width to lay out within. Zero -- which is
+	// what term.GetSize reports when stdout is not a terminal -- disables
+	// wrapping entirely and keeps output byte-identical, because this
+	// renderer is also what pipes get, and wrapping a nameserver list
+	// would break grep and awk on it.
+	Width int
 }
 
 // Render writes an unstyled, aligned key/value view of a merged domain
@@ -52,9 +59,9 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 	for _, fd := range model.FieldOrder {
 		writeField(&rows, r, fd)
 	}
-	emitRows(tw, rows)
+	emitRows(tw, rows, opts.Width)
 
-	writeSourceLegend(tw, model.PresentSources(r))
+	writeSourceLegend(tw, model.PresentSources(r), opts.Width)
 
 	if opts.Verbose {
 		writeSourcesBlock(tw, r.Sources, opts.NotQueried, opts.NotQueriedReason)
@@ -148,12 +155,122 @@ type row struct {
 	src   string
 }
 
-// emitRows writes the collected rows through the tabwriter, exactly as
-// this renderer always has.
-func emitRows(tw *tabwriter.Writer, rows []row) {
-	for _, r := range rows {
-		_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", r.label, r.value, r.src)
+// minValueWidth floors how narrow the value column can get, so a very
+// narrow terminal degrades gracefully instead of wrapping every value to
+// almost nothing. Mirrors human.minInnerWidth's reasoning.
+const minValueWidth = 20
+
+// emitRows writes the collected rows. width <= 0 takes the tabwriter path,
+// byte-identical to what this renderer has always produced, keeping piped
+// output safe for grep and awk.
+func emitRows(tw *tabwriter.Writer, rows []row, width int) {
+	if width <= 0 {
+		for _, r := range rows {
+			_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", r.label, r.value, r.src)
+		}
+		return
 	}
+	emitRowsWithin(tw, rows, width)
+}
+
+// emitRowsWithin lays the rows out by hand within width columns.
+//
+// tabwriter pads the value column to its widest cell, so one long Status
+// value inflated EVERY row past the terminal width -- and the terminal's
+// own wrap then orphaned the source column, which is the whole point of
+// the tool, onto its own line for every field. Capping the value column
+// fixes all rows at once.
+//
+// The manual layout is why this does not go through tabwriter's columns:
+// tabwriter sizes columns from content, and the whole job here is to size
+// them from the terminal instead. Rows are written as plain lines with no
+// tabs, which tabwriter passes through untouched.
+func emitRowsWithin(tw *tabwriter.Writer, rows []row, width int) {
+	const gap = 2
+
+	labelCol, srcCol := 0, 0
+	for _, r := range rows {
+		if n := utf8.RuneCountInString(r.label) + 1; n > labelCol { // +1 for the ':'
+			labelCol = n
+		}
+		if n := utf8.RuneCountInString(r.src); n > srcCol {
+			srcCol = n
+		}
+	}
+	labelCol += gap
+
+	valueBudget := width - labelCol - srcCol - gap
+	if valueBudget < minValueWidth {
+		valueBudget = minValueWidth
+	}
+
+	for _, r := range rows {
+		chunks := []string{r.value}
+		switch {
+		case r.items != nil:
+			chunks = wrapItems(r.items, itemSep, valueBudget)
+		case utf8.RuneCountInString(r.value) > valueBudget:
+			// A scalar isn't a list, but a long one (a registrant/registrar
+			// business name, typically) still needs to fit the budget.
+			// Splitting on spaces is safe here in a way item-wrapping
+			// isn't: there's no hostname to mistake for truncated-but-
+			// plausible, just prose that continues on the next line. A
+			// single unbreakable token (a URL, an email) falls through
+			// unwrapped -- same as before -- because there's no space to
+			// break on.
+			chunks = wrapItems(strings.Fields(r.value), " ", valueBudget)
+		}
+		for i, chunk := range chunks {
+			indent := strings.Repeat(" ", labelCol)
+			if i == 0 {
+				indent = pad(r.label+":", labelCol)
+			}
+			// The source column rides the LAST line rather than the
+			// first: a badge next to a value's opening fragment reads as
+			// belonging to that fragment alone.
+			if i == len(chunks)-1 && r.src != "" {
+				_, _ = fmt.Fprintf(tw, "%s%s%s%s\n", indent, pad(chunk, valueBudget), strings.Repeat(" ", gap), r.src)
+				continue
+			}
+			_, _ = fmt.Fprintf(tw, "%s%s\n", indent, strings.TrimRight(chunk, " "))
+		}
+	}
+}
+
+// itemSep joins the values of a list field ("ns1.example.com · ns2...").
+const itemSep = " · "
+
+// wrapItems packs items into lines of at most width columns, breaking only
+// between whole items. Generic word wrapping would break inside a hostname
+// -- and half a nameserver still looks like a nameserver, so the reader
+// cannot tell it was truncated. sep is the caller's join string: itemSep
+// for list values, legendSep for the legend's entries.
+func wrapItems(items []string, sep string, width int) []string {
+	var lines []string
+	cur := ""
+	for _, it := range items {
+		candidate := it
+		if cur != "" {
+			candidate = cur + sep + it
+		}
+		if cur != "" && utf8.RuneCountInString(candidate) > width {
+			lines = append(lines, cur)
+			cur = it
+			continue
+		}
+		cur = candidate
+	}
+	return append(lines, cur)
+}
+
+// pad right-pads s to w columns, counting runes. fmt's %-*s pads by BYTE
+// count, which silently misaligns every row containing a multibyte rune --
+// and the list separator is itself one.
+func pad(s string, w int) string {
+	if n := utf8.RuneCountInString(s); n < w {
+		return s + strings.Repeat(" ", w-n)
+	}
+	return s
 }
 
 // writeField dispatches one model.FieldOrder entry to the write* helper
@@ -341,9 +458,19 @@ func legendEntries(sources []model.SourceID) []string {
 // or --conflicts, since the codes it explains appear in the DEFAULT view;
 // hiding it by default would make the default output undecodable, not just
 // less detailed.
-func writeSourceLegend(tw *tabwriter.Writer, sources []model.SourceID) {
-	if legend := buildSourceLegend(sources); legend != "" {
+func writeSourceLegend(tw *tabwriter.Writer, sources []model.SourceID, width int) {
+	if len(sources) == 0 {
+		return
+	}
+	legend := buildSourceLegend(sources)
+	if width <= 0 || utf8.RuneCountInString(legend) <= width {
 		_, _ = fmt.Fprintln(tw, legend)
+		return
+	}
+	// Wrap by whole entry: "GR registry-rdap" split across two lines
+	// would read as a code with no name and a name with no code.
+	for _, line := range wrapItems(legendEntries(sources), legendSep, width) {
+		_, _ = fmt.Fprintln(tw, line)
 	}
 }
 

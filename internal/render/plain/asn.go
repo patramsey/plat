@@ -19,9 +19,9 @@ func RenderASN(w io.Writer, r model.ASNRecord, opts Options) error {
 	for _, fd := range model.ASNFieldOrder {
 		writeASNField(&rows, r, fd)
 	}
-	emitRows(tw, rows)
+	emitRows(tw, rows, opts.Width)
 
-	writeSourceLegend(tw, model.PresentSourcesASN(r))
+	writeSourceLegend(tw, model.PresentSourcesASN(r), opts.Width)
 
 	if opts.Verbose {
 		writeSourcesBlock(tw, r.Sources, opts.NotQueried, opts.NotQueriedReason)

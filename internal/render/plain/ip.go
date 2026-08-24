@@ -19,9 +19,9 @@ func RenderIP(w io.Writer, r model.IPRecord, opts Options) error {
 	for _, fd := range model.IPFieldOrder {
 		writeIPField(&rows, r, fd)
 	}
-	emitRows(tw, rows)
+	emitRows(tw, rows, opts.Width)
 
-	writeSourceLegend(tw, model.PresentSourcesIP(r))
+	writeSourceLegend(tw, model.PresentSourcesIP(r), opts.Width)
 
 	if opts.Verbose {
 		writeSourcesBlock(tw, r.Sources, opts.NotQueried, opts.NotQueriedReason)

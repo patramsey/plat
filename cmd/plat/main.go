@@ -955,7 +955,7 @@ func renderRecord(w io.Writer, format render.Format, record model.Record, raw, v
 	case render.FormatHuman:
 		return human.Render(w, record, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueried, NotQueriedReason: ui.NotQueriedReason})
 	default: // FormatPlain
-		return plain.Render(w, record, plain.Options{Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueried, NotQueriedReason: ui.NotQueriedReason})
+		return plain.Render(w, record, plain.Options{Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueried, NotQueriedReason: ui.NotQueriedReason})
 	}
 }
 
@@ -978,7 +978,7 @@ func renderIPRecord(w io.Writer, format render.Format, rec model.IPRecord, raw, 
 	case render.FormatHuman:
 		return human.RenderIP(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	default: // FormatPlain
-		return plain.RenderIP(w, rec, plain.Options{Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
+		return plain.RenderIP(w, rec, plain.Options{Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	}
 }
 
@@ -1020,7 +1020,7 @@ func renderASNRecord(w io.Writer, format render.Format, rec model.ASNRecord, raw
 	case render.FormatHuman:
 		return human.RenderASN(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	default: // FormatPlain
-		return plain.RenderASN(w, rec, plain.Options{Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
+		return plain.RenderASN(w, rec, plain.Options{Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	}
 }
 

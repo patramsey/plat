@@ -2,9 +2,11 @@ package plain
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/patramsey/plat/internal/model"
 )
@@ -426,11 +428,13 @@ func TestNoLegendWhenRecordHasNoProvenance(t *testing.T) {
 	}
 }
 
-// TestRenderOutputUnchangedByRowCollection pins the exact bytes Render
-// produces for a representative record. Task 7 restructured how rows reach
-// the writer; this asserts the restructure was invisible. It is also the
-// baseline Task 8's width-aware path must not disturb when Width is 0.
-func TestRenderOutputUnchangedByRowCollection(t *testing.T) {
+// TestWidthZeroIsByteIdenticalToUnwrapped pins the exact bytes Render
+// produces for a representative record at the default Width of 0. Width 0
+// is what term.GetSize reports for a non-terminal stdout, and plain is also
+// the renderer pipes and NO_COLOR get -- so this must stay byte-identical
+// to what the renderer has always produced. Scripts grep these lines; do
+// not weaken this assertion.
+func TestWidthZeroIsByteIdenticalToUnwrapped(t *testing.T) {
 	var buf bytes.Buffer
 	if err := Render(&buf, representativeRecord(), Options{Verbose: true, ShowConflicts: true}); err != nil {
 		t.Fatalf("Render: %v", err)
@@ -472,6 +476,88 @@ Conflict (created):  GR=1995-08-14T04:00:00Z, GW=1995-08-13T04:00:00Z
 ---
 Redacted (registrantName):  registry-rdap (gdpr)
 `
+
+func TestWidthCapsEveryLine(t *testing.T) {
+	for _, width := range []int{60, 80, 100} {
+		t.Run(fmt.Sprintf("width%d", width), func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := Render(&buf, representativeRecord(), Options{Width: width}); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+				if n := utf8.RuneCountInString(line); n > width {
+					t.Errorf("line is %d columns, over the %d budget: %q", n, width, line)
+				}
+			}
+		})
+	}
+}
+
+// Wrapping breaks between whole items, never inside a hostname -- a
+// truncated nameserver is worse than a wrapped one, because it looks like
+// a real (wrong) name.
+func TestWrappingNeverSplitsAnItem(t *testing.T) {
+	rec := model.Record{
+		Nameservers: model.Field[[]string]{
+			Value:   []string{"ns1.verylongnameserverexample.com", "ns2.verylongnameserverexample.com", "ns3.verylongnameserverexample.com"},
+			Sources: []model.SourceID{model.SourceRegistryRDAP},
+		},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{Width: 60}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	out := buf.String()
+	for _, ns := range rec.Nameservers.Value {
+		if !strings.Contains(out, ns) {
+			t.Errorf("nameserver %q was split across lines; got:\n%s", ns, out)
+		}
+	}
+}
+
+// A terminal narrower than the columns themselves must degrade, not panic
+// or loop.
+func TestVeryNarrowWidthDegradesGracefully(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Render(&buf, representativeRecord(), Options{Width: 20}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("narrow render produced no output")
+	}
+}
+
+// Multibyte content must not throw the source column out of alignment --
+// the list separator alone is a 2-byte rune.
+func TestPaddingCountsRunesNotBytes(t *testing.T) {
+	rec := model.Record{
+		Domain:      model.Field[string]{Value: "bücher.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Nameservers: model.Field[[]string]{Value: []string{"ns1.bücher.com", "ns2.bücher.com"}, Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{Width: 60}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	var cols []int
+	for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		// i > 0, not >= 0: Render always appends a source legend line
+		// ("GR registry-rdap"), which itself starts with "GR" at offset
+		// 0 -- a genuine data row's source column can never start at 0,
+		// since the label and padding always precede it. Excluding that
+		// leaves only the rows this test is actually about.
+		if i := strings.Index(line, "GR"); i > 0 {
+			cols = append(cols, utf8.RuneCountInString(line[:i]))
+		}
+	}
+	if len(cols) < 2 {
+		t.Fatalf("expected at least two source-tagged rows, got %d", len(cols))
+	}
+	for _, c := range cols[1:] {
+		if c != cols[0] {
+			t.Errorf("source column starts at differing rune offsets %v -- padding counted bytes", cols)
+		}
+	}
+}
 
 func TestVerboseReportsNotQueriedSources(t *testing.T) {
 	rec := model.Record{
