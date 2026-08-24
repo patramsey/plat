@@ -323,13 +323,16 @@ func TestRender_LifecycleSectionOmitsEstimateWhenAbsent(t *testing.T) {
 }
 
 // TestRender_DomainLegendKeepsRegistrarSources guards the opposite
-// direction from its IP and ASN siblings in this package: domains genuinely
-// can be sourced from all four, so the registrar codes must stay. Without
-// it, giving every object type the registry-only legend would pass the
-// suite while making the default domain view undecodable.
+// direction from its IP and ASN siblings in this package: unlike an IP
+// allocation or ASN, a domain genuinely can be sourced from all four --
+// registrar RDAP/WHOIS are reachable in the chain, not merely defined in
+// the type. When a record's fields actually carry all four, the legend
+// must show all four; it's the data doing the gating now; this fixture
+// gives every code a field to attach to, not a type-based assumption.
 func TestRender_DomainLegendKeepsRegistrarSources(t *testing.T) {
 	rec := model.Record{
-		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP}},
+		Handle: model.Field[string]{Value: "H1", Sources: []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS}},
 	}
 	var buf bytes.Buffer
 	if err := Render(&buf, rec, Options{}); err != nil {
@@ -343,6 +346,82 @@ func TestRender_DomainLegendKeepsRegistrarSources(t *testing.T) {
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("domain legend is missing %q -- all four sources are reachable for a domain:\n%s", want, out)
+		}
+	}
+}
+
+func TestLegendListsOnlyPresentCodes(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		record model.Record
+		want   string
+	}{
+		{
+			name: "single source",
+			record: model.Record{
+				Domain: model.Field[string]{Value: "denic.de", Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+			},
+			want: "GW registry-whois",
+		},
+		{
+			name: "all four",
+			record: model.Record{
+				Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP}},
+				Handle: model.Field[string]{Value: "H1", Sources: []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS}},
+			},
+			want: "RR registrar-rdap   GR registry-rdap   RW registrar-whois   GW registry-whois",
+		},
+		{
+			name: "code reachable only through a conflict",
+			record: model.Record{
+				Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+				Conflicts: []model.Conflict{{
+					Field:  "updated",
+					Values: map[model.SourceID]string{model.SourceRegistrarWHOIS: "a", model.SourceRegistryRDAP: "b"},
+				}},
+			},
+			want: "GR registry-rdap   RW registrar-whois",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := Render(&buf, tc.record, Options{}); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			if !strings.Contains(buf.String(), tc.want) {
+				t.Errorf("legend line missing %q; got:\n%s", tc.want, buf.String())
+			}
+			// The whole point: codes that never appear as a badge must not
+			// be explained.
+			for _, absent := range absentCodes(tc.want) {
+				if strings.Contains(buf.String(), absent) {
+					t.Errorf("legend explains %q, which appears on no field; got:\n%s", absent, buf.String())
+				}
+			}
+		})
+	}
+}
+
+// absentCodes returns the "XX source-id" legend entries NOT in want.
+func absentCodes(want string) []string {
+	var out []string
+	for _, s := range model.Precedence {
+		entry := sourceCode(s) + " " + string(s)
+		if !strings.Contains(want, entry) {
+			out = append(out, entry)
+		}
+	}
+	return out
+}
+
+func TestNoLegendWhenRecordHasNoProvenance(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Render(&buf, model.Record{}, Options{}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	for _, s := range model.Precedence {
+		if strings.Contains(buf.String(), string(s)) {
+			t.Errorf("empty record produced a legend mentioning %q; got:\n%s", s, buf.String())
 		}
 	}
 }
