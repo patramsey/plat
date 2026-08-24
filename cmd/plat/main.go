@@ -595,7 +595,7 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 func lookupOne(ctx context.Context, stdout, stderr io.Writer, client *plat.Client, input string, opts lookupOptions, format render.Format, ui uiConfig) int {
 	q, err := domain.Normalize(input)
 	if err != nil {
-		reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui)
+		reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 		return 2
 	}
 
@@ -609,7 +609,7 @@ func lookupOne(ctx context.Context, stdout, stderr io.Writer, client *plat.Clien
 	if opts.DiffPath != "" {
 		snap, err := loadSnapshot(opts.DiffPath, q)
 		if err != nil {
-			reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui)
+			reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 			return 2
 		}
 		prior = &snap
@@ -785,7 +785,7 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, client *plat
 		work()
 	}
 	if res.Domain == nil {
-		reportLookupError(stderr, format, q.Name.Punycode, lookupErr, nil, opts.Verbose, ui)
+		reportLookupError(stderr, format, q.Name.Punycode, lookupErr, nil, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 		return 3
 	}
 	record := *res.Domain
@@ -797,18 +797,18 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, client *plat
 				return machine.Encode(w, record, machine.Options{})
 			}, ui)
 			if err != nil {
-				reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui)
+				reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 				return 3
 			}
 			return dcode
 		}
 		if err := renderRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
-			reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui)
+			reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 			return 3
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, q.Name.Punycode, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
+	reportLookupError(stderr, format, q.Name.Punycode, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 	return code
 }
 
@@ -831,7 +831,7 @@ func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, client *plat.Cli
 		work()
 	}
 	if res.IP == nil {
-		reportLookupError(stderr, format, q.Input, lookupErr, nil, opts.Verbose, ui)
+		reportLookupError(stderr, format, q.Input, lookupErr, nil, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 		return 3
 	}
 	record := *res.IP
@@ -843,18 +843,18 @@ func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, client *plat.Cli
 				return machine.EncodeIP(w, record, machine.Options{})
 			}, ui)
 			if err != nil {
-				reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+				reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 				return 3
 			}
 			return dcode
 		}
 		if err := renderIPRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
-			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 			return 3
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
+	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 	return code
 }
 
@@ -878,7 +878,7 @@ func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, client *plat.Cl
 		work()
 	}
 	if res.ASN == nil {
-		reportLookupError(stderr, format, q.Input, lookupErr, nil, opts.Verbose, ui)
+		reportLookupError(stderr, format, q.Input, lookupErr, nil, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 		return 3
 	}
 	record := *res.ASN
@@ -890,18 +890,18 @@ func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, client *plat.Cl
 				return machine.EncodeASN(w, record, machine.Options{})
 			}, ui)
 			if err != nil {
-				reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+				reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 				return 3
 			}
 			return dcode
 		}
 		if err := renderASNRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
-			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 			return 3
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
+	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 	return code
 }
 
@@ -1061,7 +1061,12 @@ func asnQuietSummary(rec model.ASNRecord) string {
 // render error) keeps the existing error styling. Plain/JSON stay
 // unstyled either way, matching how every other renderer in this package
 // only colors human output.
-func reportLookupError(stderr io.Writer, format render.Format, domainName string, err error, sources []model.SourceResult, verbose bool, ui uiConfig) {
+// notQueried/notQueriedReason are the caller's choice of ui.NotQueried
+// (domain) or ui.NotQueriedRIR (IP/ASN) -- reportLookupError itself has
+// no way to tell which object kind failed, since by this point all it
+// has is a domain/IP/ASN name string and a []model.SourceResult common
+// to all three.
+func reportLookupError(stderr io.Writer, format render.Format, domainName string, err error, sources []model.SourceResult, verbose bool, ui uiConfig, notQueried []model.SourceID, notQueriedReason string) {
 	if render.IsMachine(format) {
 		_ = machine.EncodeError(stderr, domainName, err)
 		return
@@ -1080,9 +1085,9 @@ func reportLookupError(stderr io.Writer, format render.Format, domainName string
 		return
 	}
 	if format == render.FormatHuman {
-		_ = human.RenderSources(stderr, human.NewTheme(ui.Dark), ui.Width, sources)
+		_ = human.RenderSources(stderr, human.NewTheme(ui.Dark), ui.Width, sources, notQueried, notQueriedReason)
 	} else {
-		_ = plain.RenderSources(stderr, sources)
+		_ = plain.RenderSources(stderr, sources, notQueried, notQueriedReason, ui.Width)
 	}
 }
 
@@ -1149,12 +1154,16 @@ func notQueriedSources(full, filter []model.SourceID, noFollow bool, filterReaso
 	// collect.Options.NoFollow. That hop only exists for a domain lookup
 	// -- an IP/ASN's full source set (rirSources) has no registrar-rdap
 	// member at all -- so --no-follow only earns a place in the reason
-	// string when full actually has something for it to exclude.
-	// Otherwise it would blame itself for an exclusion --source alone
-	// (or nothing at all) produced.
+	// string when it actually removes something --source had not
+	// already removed. Check the prior exclusion state before this
+	// block marks it, or --no-follow would take credit for an exclusion
+	// --source alone produced (e.g. --source whois already excludes
+	// registrar-rdap; --no-follow adds nothing there).
 	if noFollow && slices.Contains(full, model.SourceRegistrarRDAP) {
+		if !excluded[model.SourceRegistrarRDAP] {
+			reasons = append(reasons, "--no-follow")
+		}
 		excluded[model.SourceRegistrarRDAP] = true
-		reasons = append(reasons, "--no-follow")
 	}
 	if len(excluded) == 0 {
 		return nil, ""
