@@ -134,7 +134,7 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 	if opts.ShowConflicts {
 		writeConflicts(&b, th, innerWidth, r.Conflicts)
 	} else {
-		writeConflictsHint(&b, th, r.Conflicts)
+		writeConflictsHint(&b, th, innerWidth, r.Conflicts)
 	}
 	writeRedacted(&b, th, innerWidth, r.Redacted)
 	writeLifecycle(&b, th, innerWidth, r.Lifecycle)

@@ -1294,3 +1294,42 @@ func TestHumanAndPlainLegendsAgree(t *testing.T) {
 		}
 	}
 }
+
+// TestBoxFitsWidth is a regression test (task 10) for a real narrow-terminal
+// overflow: writeConflictsHint used to be the one writer in the box not
+// given width, so its ~51-char unwrapped string became the box's widest
+// line and dragged the border out past the requested width below ~55
+// columns -- but only for a record carrying a conflict, since that's the
+// only case where the hint prints at all. Measured via lipgloss.Width, the
+// same CSI/OSC-8-aware measure the renderer itself uses for every other
+// wrap decision (see wrapValue/writeBadge in rows.go) -- a plain regex here
+// previously produced nonsense by stripping CSI but not OSC 8 hyperlinks.
+func TestBoxFitsWidth(t *testing.T) {
+	withConflict := model.Record{
+		Domain:    model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Conflicts: []model.Conflict{{Field: "updated", Values: map[model.SourceID]string{model.SourceRegistryRDAP: "a", model.SourceRegistryWHOIS: "b"}}},
+	}
+	without := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	for _, tc := range []struct {
+		name string
+		rec  model.Record
+	}{{"with conflict", withConflict}, {"without conflict", without}} {
+		for _, width := range []int{40, 50, 55, 60, 80} {
+			var buf bytes.Buffer
+			if err := Render(&buf, tc.rec, Options{Theme: NewTheme(false), Width: width}); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			widest := 0
+			for _, line := range strings.Split(buf.String(), "\n") {
+				if w := lipgloss.Width(line); w > widest {
+					widest = w
+				}
+			}
+			if widest > width {
+				t.Errorf("%s: width=%d widest=%d -- box exceeded its requested width", tc.name, width, widest)
+			}
+		}
+	}
+}
