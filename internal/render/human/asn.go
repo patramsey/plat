@@ -44,7 +44,7 @@ func RenderASN(w io.Writer, r model.ASNRecord, opts Options) error {
 	writeSourceLegend(&b, th, innerWidth, model.PresentSourcesASN(r))
 
 	if opts.Verbose {
-		writeSources(&b, th, innerWidth, r.Sources)
+		writeSources(&b, th, innerWidth, r.Sources, opts.NotQueried, opts.NotQueriedReason)
 	}
 	if opts.ShowConflicts {
 		writeConflicts(&b, th, innerWidth, r.Conflicts)

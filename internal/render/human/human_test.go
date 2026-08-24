@@ -211,6 +211,28 @@ func TestRender_SourcesBlock(t *testing.T) {
 	}
 }
 
+func TestHumanVerboseReportsNotQueriedSources(t *testing.T) {
+	rec := model.Record{
+		Domain:  model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Sources: []model.SourceResult{{Source: model.SourceRegistryRDAP, OK: true, Latency: 100 * time.Millisecond}},
+	}
+	opts := Options{
+		Theme:            NewTheme(false),
+		Width:            100,
+		Verbose:          true,
+		NotQueried:       []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS},
+		NotQueriedReason: "--source rdap",
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, opts); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	want := "(registry-whois, registrar-whois not queried: --source rdap)"
+	if !strings.Contains(buf.String(), want) {
+		t.Errorf("verbose output missing %q; got:\n%s", want, buf.String())
+	}
+}
+
 func TestRender_SourcesBlockColumnsAlignDespiteVaryingLatencyWidth(t *testing.T) {
 	// Regression test: the Sources block used to be a hand-formatted
 	// "%-20s %s  %s" line that only padded the Source column, so the

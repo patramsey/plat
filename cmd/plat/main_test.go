@@ -11,6 +11,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -208,6 +209,61 @@ func TestParseSourceFilter(t *testing.T) {
 				if got[i] != tt.want[i] {
 					t.Errorf("parseSourceFilter(%q)[%d] = %q, want %q", tt.in, i, got[i], tt.want[i])
 				}
+			}
+		})
+	}
+}
+
+func TestNotQueriedSources(t *testing.T) {
+	full := []model.SourceID{
+		model.SourceRegistrarRDAP, model.SourceRegistryRDAP,
+		model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS,
+	}
+	for _, tc := range []struct {
+		name       string
+		filter     []model.SourceID
+		noFollow   bool
+		wantSrcs   []model.SourceID
+		wantReason string
+	}{
+		{
+			name:       "no flags",
+			wantSrcs:   nil,
+			wantReason: "",
+		},
+		{
+			name:       "source rdap",
+			filter:     []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP},
+			wantSrcs:   []model.SourceID{model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS},
+			wantReason: "--source rdap",
+		},
+		{
+			name:       "no-follow alone",
+			noFollow:   true,
+			wantSrcs:   []model.SourceID{model.SourceRegistrarRDAP},
+			wantReason: "--no-follow",
+		},
+		{
+			// registrar-rdap is excluded by both flags and must be listed
+			// once, not twice.
+			name:       "both flags",
+			filter:     []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP},
+			noFollow:   true,
+			wantSrcs:   []model.SourceID{model.SourceRegistrarRDAP, model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS},
+			wantReason: "--source rdap, --no-follow",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reason := ""
+			if tc.filter != nil {
+				reason = "--source rdap"
+			}
+			gotSrcs, gotReason := notQueriedSources(full, tc.filter, tc.noFollow, reason)
+			if !reflect.DeepEqual(gotSrcs, tc.wantSrcs) {
+				t.Errorf("sources = %v, want %v", gotSrcs, tc.wantSrcs)
+			}
+			if gotReason != tc.wantReason {
+				t.Errorf("reason = %q, want %q", gotReason, tc.wantReason)
 			}
 		})
 	}

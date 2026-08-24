@@ -144,6 +144,15 @@ type uiConfig struct {
 	// put it back. Zero value (Unknown) means "no colour", which is what
 	// every test wants.
 	Profile colorprofile.Profile
+	// NotQueried/NotQueriedReason are resolved once per run from
+	// --source and --no-follow and handed to every renderer; see the
+	// renderers' Options.NotQueried. There are two sets because the full
+	// source set depends on the object kind, which is only known per name
+	// -- so both are computed up front and the render dispatch picks.
+	NotQueried          []model.SourceID
+	NotQueriedReason    string
+	NotQueriedRIR       []model.SourceID
+	NotQueriedRIRReason string
 }
 
 func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
@@ -424,6 +433,8 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 	if err != nil {
 		return usageError{err}
 	}
+	ui.NotQueried, ui.NotQueriedReason = notQueriedSources(domainSources, sources, opts.NoFollow, filterReason(opts.SourceFilter))
+	ui.NotQueriedRIR, ui.NotQueriedRIRReason = notQueriedSources(rirSources, sources, opts.NoFollow, filterReason(opts.SourceFilter))
 
 	// Exactly one Client per run, shared by every name in the pool below.
 	// That is load-bearing, not incidental: the per-server WHOIS pacing
@@ -941,9 +952,9 @@ func renderRecord(w io.Writer, format render.Format, record model.Record, raw, v
 	case render.FormatNDJSON:
 		return machine.EncodeNDJSON(w, record, machine.Options{Raw: raw})
 	case render.FormatHuman:
-		return human.Render(w, record, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts})
+		return human.Render(w, record, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueried, NotQueriedReason: ui.NotQueriedReason})
 	default: // FormatPlain
-		return plain.Render(w, record, plain.Options{Verbose: verbose, ShowConflicts: showConflicts})
+		return plain.Render(w, record, plain.Options{Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueried, NotQueriedReason: ui.NotQueriedReason})
 	}
 }
 
@@ -964,9 +975,9 @@ func renderIPRecord(w io.Writer, format render.Format, rec model.IPRecord, raw, 
 	case render.FormatNDJSON:
 		return machine.EncodeIPNDJSON(w, rec, machine.Options{Raw: raw})
 	case render.FormatHuman:
-		return human.RenderIP(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts})
+		return human.RenderIP(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	default: // FormatPlain
-		return plain.RenderIP(w, rec, plain.Options{Verbose: verbose, ShowConflicts: showConflicts})
+		return plain.RenderIP(w, rec, plain.Options{Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	}
 }
 
@@ -1006,9 +1017,9 @@ func renderASNRecord(w io.Writer, format render.Format, rec model.ASNRecord, raw
 	case render.FormatNDJSON:
 		return machine.EncodeASNNDJSON(w, rec, machine.Options{Raw: raw})
 	case render.FormatHuman:
-		return human.RenderASN(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts})
+		return human.RenderASN(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	default: // FormatPlain
-		return plain.RenderASN(w, rec, plain.Options{Verbose: verbose, ShowConflicts: showConflicts})
+		return plain.RenderASN(w, rec, plain.Options{Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	}
 }
 
@@ -1088,6 +1099,72 @@ func deriveOutcome(sources []model.SourceResult) int {
 	default:
 		return 3
 	}
+}
+
+// domainSources and rirSources are the full source sets by object kind: a
+// domain is held by a registrar under a registry, so all four are
+// reachable, while an IP allocation or an autonomous system is registered
+// directly with an RIR and has no registrar at all. Task 4 removed the
+// renderers' legend constants that used to encode this split, so this is
+// now the single place that states it.
+var (
+	domainSources = []model.SourceID{
+		model.SourceRegistrarRDAP, model.SourceRegistryRDAP,
+		model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS,
+	}
+	rirSources = []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}
+)
+
+// notQueriedSources reports which of full were excluded before the lookup
+// ran, and which flag(s) did it, for the -v block's trailing line. A
+// source excluded by both --source and --no-follow is listed once.
+// filterReason is the pre-formatted "--source X" fragment, or "" when
+// --source was not passed.
+func notQueriedSources(full, filter []model.SourceID, noFollow bool, filterReason string) ([]model.SourceID, string) {
+	excluded := make(map[model.SourceID]bool, len(full))
+	var reasons []string
+
+	if len(filter) > 0 {
+		allowed := make(map[model.SourceID]bool, len(filter))
+		for _, s := range filter {
+			allowed[s] = true
+		}
+		for _, s := range full {
+			if !allowed[s] {
+				excluded[s] = true
+			}
+		}
+		reasons = append(reasons, filterReason)
+	}
+	// --no-follow gates only the registrar RDAP related-link hop; see
+	// collect.Options.NoFollow.
+	if noFollow {
+		for _, s := range full {
+			if s == model.SourceRegistrarRDAP {
+				excluded[s] = true
+			}
+		}
+		reasons = append(reasons, "--no-follow")
+	}
+	if len(excluded) == 0 {
+		return nil, ""
+	}
+	out := make([]model.SourceID, 0, len(excluded))
+	for _, s := range model.Precedence {
+		if excluded[s] {
+			out = append(out, s)
+		}
+	}
+	return out, strings.Join(reasons, ", ")
+}
+
+// filterReason formats the --source flag value back into the fragment
+// shown in the not-queried line, or "" when the flag was not passed.
+func filterReason(sourceFilter string) string {
+	if sourceFilter == "" {
+		return ""
+	}
+	return "--source " + sourceFilter
 }
 
 // parseSourceFilter translates the --source flag's friendly value into

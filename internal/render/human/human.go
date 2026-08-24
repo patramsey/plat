@@ -67,6 +67,16 @@ type Options struct {
 	// with several noisy timestamp/nameserver disagreements otherwise
 	// dominates the box with detail most lookups don't need.
 	ShowConflicts bool
+	// NotQueried lists sources a flag excluded before the lookup ran,
+	// ordered by model.Precedence. Rendered as one trailing line in the
+	// Verbose source block, because a source filtered out by --source
+	// produces no SourceResult at all: without this the two WHOIS rows
+	// simply vanish from a block documented as showing "every source
+	// attempted", which reads as a failure rather than as the filter
+	// working. Empty means nothing was filtered and no line is printed.
+	NotQueried []model.SourceID
+	// NotQueriedReason names the flag(s) responsible, e.g. "--source rdap".
+	NotQueriedReason string
 }
 
 // Render writes a styled, colorized view of r to w: a "plat · domain"
@@ -129,7 +139,7 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 	writeSourceLegend(&b, th, innerWidth, model.PresentSources(r))
 
 	if opts.Verbose {
-		writeSources(&b, th, innerWidth, r.Sources)
+		writeSources(&b, th, innerWidth, r.Sources, opts.NotQueried, opts.NotQueriedReason)
 	}
 	if opts.ShowConflicts {
 		writeConflicts(&b, th, innerWidth, r.Conflicts)
@@ -306,7 +316,7 @@ func RenderSources(w io.Writer, th Theme, width int, sources []model.SourceResul
 		width = defaultWidth
 	}
 	var b strings.Builder
-	writeSources(&b, th, width, sources)
+	writeSources(&b, th, width, sources, nil, "")
 	return writeOut(w, b.String())
 }
 

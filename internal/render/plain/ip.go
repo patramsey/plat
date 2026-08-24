@@ -24,7 +24,7 @@ func RenderIP(w io.Writer, r model.IPRecord, opts Options) error {
 	writeSourceLegend(tw, model.PresentSourcesIP(r))
 
 	if opts.Verbose {
-		writeSourcesBlock(tw, r.Sources)
+		writeSourcesBlock(tw, r.Sources, opts.NotQueried, opts.NotQueriedReason)
 	}
 
 	if len(r.Conflicts) > 0 {

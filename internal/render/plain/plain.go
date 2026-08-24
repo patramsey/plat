@@ -26,6 +26,16 @@ type Options struct {
 	// raw per-source breakdown is opt-in, matching human.Options'
 	// ShowConflicts.
 	ShowConflicts bool
+	// NotQueried lists sources a flag excluded before the lookup ran,
+	// ordered by model.Precedence. Rendered as one trailing line in the
+	// Verbose source block, because a source filtered out by --source
+	// produces no SourceResult at all: without this the two WHOIS rows
+	// simply vanish from a block documented as showing "every source
+	// attempted", which reads as a failure rather than as the filter
+	// working. Empty means nothing was filtered and no line is printed.
+	NotQueried []model.SourceID
+	// NotQueriedReason names the flag(s) responsible, e.g. "--source rdap".
+	NotQueriedReason string
 }
 
 // Render writes an unstyled, aligned key/value view of a merged domain
@@ -47,7 +57,7 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 	writeSourceLegend(tw, model.PresentSources(r))
 
 	if opts.Verbose {
-		writeSourcesBlock(tw, r.Sources)
+		writeSourcesBlock(tw, r.Sources, opts.NotQueried, opts.NotQueriedReason)
 	}
 
 	if len(r.Conflicts) > 0 {
@@ -90,12 +100,12 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 // Record worth rendering in full.
 func RenderSources(w io.Writer, sources []model.SourceResult) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	writeSourcesBlock(tw, sources)
+	writeSourcesBlock(tw, sources, nil, "")
 	return tw.Flush()
 }
 
-func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult) {
-	if len(sources) == 0 {
+func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult, notQueried []model.SourceID, reason string) {
+	if len(sources) == 0 && len(notQueried) == 0 {
 		return
 	}
 	_, _ = fmt.Fprintln(tw, "---")
@@ -111,6 +121,20 @@ func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult) {
 		}
 		_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", s.Source, s.Latency.Round(time.Millisecond), status)
 	}
+	writeNotQueried(tw, notQueried, reason)
+}
+
+// writeNotQueried names the sources a flag excluded before the lookup
+// ran. See Options.NotQueried for why their absence needs saying out loud.
+func writeNotQueried(tw *tabwriter.Writer, notQueried []model.SourceID, reason string) {
+	if len(notQueried) == 0 {
+		return
+	}
+	names := make([]string, len(notQueried))
+	for i, s := range notQueried {
+		names[i] = string(s)
+	}
+	_, _ = fmt.Fprintf(tw, "(%s not queried: %s)\n", strings.Join(names, ", "), reason)
 }
 
 // row is one collected field line, held until every row exists so a

@@ -1,6 +1,7 @@
 package human
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -17,8 +18,8 @@ import (
 // latency strings differed in length (e.g. "85ms" vs "5s"); the table
 // computes every column's width from its actual (ANSI-aware) content, so
 // all three stay aligned regardless of content length.
-func writeSources(b *strings.Builder, th Theme, width int, sources []model.SourceResult) {
-	if len(sources) == 0 {
+func writeSources(b *strings.Builder, th Theme, width int, sources []model.SourceResult, notQueried []model.SourceID, reason string) {
+	if len(sources) == 0 && len(notQueried) == 0 {
 		return
 	}
 	b.WriteString("\n" + th.Label.Render("Sources") + "\n")
@@ -63,6 +64,14 @@ func writeSources(b *strings.Builder, th Theme, width int, sources []model.Sourc
 
 	for line := range strings.SplitSeq(rendered, "\n") {
 		b.WriteString("  " + line + "\n")
+	}
+
+	if len(notQueried) > 0 {
+		names := make([]string, len(notQueried))
+		for i, s := range notQueried {
+			names[i] = string(s)
+		}
+		b.WriteString("  " + th.Muted.Render(fmt.Sprintf("(%s not queried: %s)", strings.Join(names, ", "), reason)) + "\n")
 	}
 }
 

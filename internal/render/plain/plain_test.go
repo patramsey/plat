@@ -472,3 +472,55 @@ Conflict (created):  GR=1995-08-14T04:00:00Z, GW=1995-08-13T04:00:00Z
 ---
 Redacted (registrantName):  registry-rdap (gdpr)
 `
+
+func TestVerboseReportsNotQueriedSources(t *testing.T) {
+	rec := model.Record{
+		Domain:  model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Sources: []model.SourceResult{{Source: model.SourceRegistryRDAP, OK: true, Latency: 100 * time.Millisecond}},
+	}
+	opts := Options{
+		Verbose:          true,
+		NotQueried:       []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS},
+		NotQueriedReason: "--source rdap",
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, opts); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	want := "(registry-whois, registrar-whois not queried: --source rdap)"
+	if !strings.Contains(buf.String(), want) {
+		t.Errorf("verbose output missing %q; got:\n%s", want, buf.String())
+	}
+}
+
+func TestNotQueriedLineIsVerboseOnly(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	opts := Options{
+		Verbose:          false,
+		NotQueried:       []model.SourceID{model.SourceRegistryWHOIS},
+		NotQueriedReason: "--source rdap",
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, opts); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if strings.Contains(buf.String(), "not queried") {
+		t.Errorf("default (non-verbose) output gained a not-queried line; got:\n%s", buf.String())
+	}
+}
+
+func TestNoNotQueriedLineWhenNothingFiltered(t *testing.T) {
+	rec := model.Record{
+		Domain:  model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Sources: []model.SourceResult{{Source: model.SourceRegistryRDAP, OK: true}},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{Verbose: true}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if strings.Contains(buf.String(), "not queried") {
+		t.Errorf("unfiltered verbose run gained a not-queried line; got:\n%s", buf.String())
+	}
+}
