@@ -71,7 +71,15 @@ func writeSources(b *strings.Builder, th Theme, width int, sources []model.Sourc
 		for i, s := range notQueried {
 			names[i] = string(s)
 		}
-		b.WriteString("  " + th.Muted.Render(fmt.Sprintf("(%s not queried: %s)", strings.Join(names, ", "), reason)) + "\n")
+		line := fmt.Sprintf("(%s not queried: %s)", strings.Join(names, ", "), reason)
+		// Wrapped to width-2 like the source table just above (same
+		// 2-col indent budget), not left unwrapped -- this line used to
+		// be the one writer in this box with no width awareness, so a
+		// long reason string (--source + --no-follow together) could
+		// blow the box's border out past its requested width.
+		for _, l := range wrapValue(line, width-2) {
+			b.WriteString("  " + th.Muted.Render(l) + "\n")
+		}
 	}
 }
 

@@ -311,12 +311,17 @@ func expirySummary(th Theme, f model.Field[model.TimeValue]) string {
 // still show why every source was unusable even though there's no merged
 // Record worth rendering in full. width bounds the table's columns the
 // same way Render's own innerWidth does; <=0 falls back to defaultWidth.
-func RenderSources(w io.Writer, th Theme, width int, sources []model.SourceResult) error {
+// notQueried/notQueriedReason carry through the same --source/--no-follow
+// exclusions Render's Options do -- without them this path silently
+// dropped a source a filter had excluded, reading as failure rather than
+// as the filter working, on exactly the path a user hitting a total
+// lookup failure is most likely to be reading.
+func RenderSources(w io.Writer, th Theme, width int, sources []model.SourceResult, notQueried []model.SourceID, notQueriedReason string) error {
 	if width <= 0 {
 		width = defaultWidth
 	}
 	var b strings.Builder
-	writeSources(&b, th, width, sources, nil, "")
+	writeSources(&b, th, width, sources, notQueried, notQueriedReason)
 	return writeOut(w, b.String())
 }
 

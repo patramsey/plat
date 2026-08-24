@@ -124,7 +124,7 @@ func writeWrappedEntry(b *strings.Builder, label string, parts []string, width i
 		valueWidth = 10
 	}
 	var lines []string
-	for _, line := range wrapItems(parts, valueWidth, ", ") {
+	for _, line := range wrapItems(parts, ", ", valueWidth) {
 		if lipgloss.Width(line) > valueWidth {
 			lines = append(lines, wrapValue(line, valueWidth)...)
 		} else {

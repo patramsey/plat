@@ -64,7 +64,7 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 	writeSourceLegend(tw, model.PresentSources(r), opts.Width)
 
 	if opts.Verbose {
-		writeSourcesBlock(tw, r.Sources, opts.NotQueried, opts.NotQueriedReason)
+		writeSourcesBlock(tw, r.Sources, opts.NotQueried, opts.NotQueriedReason, opts.Width)
 	}
 
 	if len(r.Conflicts) > 0 {
@@ -104,14 +104,20 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 // ok/not-found/error status for every source attempted) with no other
 // record fields — used on the CLI's lookup-failure path, where -v should
 // still show why every source was unusable even though there's no merged
-// Record worth rendering in full.
-func RenderSources(w io.Writer, sources []model.SourceResult) error {
+// Record worth rendering in full. notQueried/reason carry through the same
+// --source/--no-follow exclusions Options.NotQueried does -- without them
+// this path silently dropped a source a filter had excluded, reading as
+// failure rather than as the filter working, on exactly the path a user
+// hitting a total lookup failure is most likely to be reading. width
+// bounds the not-queried line the same way Render's Options.Width does;
+// <=0 leaves it unwrapped.
+func RenderSources(w io.Writer, sources []model.SourceResult, notQueried []model.SourceID, reason string, width int) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	writeSourcesBlock(tw, sources, nil, "")
+	writeSourcesBlock(tw, sources, notQueried, reason, width)
 	return tw.Flush()
 }
 
-func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult, notQueried []model.SourceID, reason string) {
+func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult, notQueried []model.SourceID, reason string, width int) {
 	if len(sources) == 0 && len(notQueried) == 0 {
 		return
 	}
@@ -128,12 +134,17 @@ func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult, notQu
 		}
 		_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", s.Source, s.Latency.Round(time.Millisecond), status)
 	}
-	writeNotQueried(tw, notQueried, reason)
+	writeNotQueried(tw, notQueried, reason, width)
 }
 
 // writeNotQueried names the sources a flag excluded before the lookup
 // ran. See Options.NotQueried for why their absence needs saying out loud.
-func writeNotQueried(tw *tabwriter.Writer, notQueried []model.SourceID, reason string) {
+// width <= 0 (the piped/tabwriter path) leaves the line unwrapped, same as
+// emitRows' own width<=0 branch -- this sits outside emitRowsWithin's
+// budget, so without its own wrap a long reason string ("--source rdap,
+// --no-follow") could still stretch a line out past every field row's
+// budget even though those rows individually respect it.
+func writeNotQueried(tw *tabwriter.Writer, notQueried []model.SourceID, reason string, width int) {
 	if len(notQueried) == 0 {
 		return
 	}
@@ -141,7 +152,14 @@ func writeNotQueried(tw *tabwriter.Writer, notQueried []model.SourceID, reason s
 	for i, s := range notQueried {
 		names[i] = string(s)
 	}
-	_, _ = fmt.Fprintf(tw, "(%s not queried: %s)\n", strings.Join(names, ", "), reason)
+	line := fmt.Sprintf("(%s not queried: %s)", strings.Join(names, ", "), reason)
+	if width <= 0 {
+		_, _ = fmt.Fprintln(tw, line)
+		return
+	}
+	for _, l := range wrapText(line, width) {
+		_, _ = fmt.Fprintln(tw, l)
+	}
 }
 
 // row is one collected field line, held until every row exists so a
@@ -261,6 +279,15 @@ func wrapItems(items []string, sep string, width int) []string {
 		cur = candidate
 	}
 	return append(lines, cur)
+}
+
+// wrapText word-wraps free-form prose (not a list of discrete items) to
+// width columns, breaking only between whole words. Reuses wrapItems'
+// item-packing logic with words as items and " " as the separator, since
+// a single free-form string has no caller-supplied separator to preserve
+// the way a list value's itemSep or the legend's legendSep does.
+func wrapText(s string, width int) []string {
+	return wrapItems(strings.Fields(s), " ", width)
 }
 
 // pad right-pads s to w columns, counting runes. fmt's %-*s pads by BYTE

@@ -477,7 +477,14 @@ Conflict (created):  GR=1995-08-14T04:00:00Z, GW=1995-08-13T04:00:00Z
 Redacted (registrantName):  registry-rdap (gdpr)
 `
 
-func TestWidthCapsEveryLine(t *testing.T) {
+// TestWidthCapsFieldRows checks only the field-row budget emitRowsWithin
+// actually enforces -- it does not (and cannot) promise every line in the
+// output stays under width: an unbreakable scalar (a long URL, a status
+// code with no space to wrap on) still overflows by design, and this
+// record has neither Verbose nor ShowConflicts set, so the -v source
+// block, "Conflict (...)" lines, Redacted, and Lifecycle sit outside its
+// reach entirely.
+func TestWidthCapsFieldRows(t *testing.T) {
 	for _, width := range []int{60, 80, 100} {
 		t.Run(fmt.Sprintf("width%d", width), func(t *testing.T) {
 			var buf bytes.Buffer
@@ -594,6 +601,38 @@ func TestNotQueriedLineIsVerboseOnly(t *testing.T) {
 	}
 	if strings.Contains(buf.String(), "not queried") {
 		t.Errorf("default (non-verbose) output gained a not-queried line; got:\n%s", buf.String())
+	}
+}
+
+// TestNotQueriedLineWrapsToWidth is a regression test for the same defect
+// the human package's writeSources had: writeNotQueried used to emit one
+// unwrapped line regardless of Width, so a long reason string ("--source
+// rdap, --no-follow" plus several source names) could sit outside every
+// field row's budget even on a narrow terminal.
+func TestNotQueriedLineWrapsToWidth(t *testing.T) {
+	rec := model.Record{
+		Domain:  model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Sources: []model.SourceResult{{Source: model.SourceRegistryRDAP, OK: true, Latency: 100 * time.Millisecond}},
+	}
+	opts := Options{
+		Verbose:          true,
+		Width:            60,
+		NotQueried:       []model.SourceID{model.SourceRegistrarRDAP, model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS},
+		NotQueriedReason: "--source rdap, --no-follow",
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, opts); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		if n := utf8.RuneCountInString(line); n > opts.Width {
+			t.Errorf("line is %d columns, over the %d budget: %q", n, opts.Width, line)
+		}
+	}
+	// The wrapped text must still be present, just split across lines --
+	// "not" and "queried:" may land on either side of a wrap point.
+	if !strings.Contains(buf.String(), "queried:") {
+		t.Errorf("wrapped output lost the not-queried line entirely; got:\n%s", buf.String())
 	}
 }
 
