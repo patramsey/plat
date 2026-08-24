@@ -56,9 +56,14 @@ coverage:
 # part worth reading: the per-file table naming which files carry the
 # missing lines.
 #
+# `files` rather than `condensed_files`: the condensed variant rendered
+# nothing at all once the header was removed -- the posted comment was the
+# footer and nothing else -- which defeats the point of keeping a comment.
+# Verified on PR #75, where the full `files` table does render standalone.
+#
 # `hide_project_coverage` is deliberately NOT set here. It would trim the
 # comment down to patch coverage alone, and since the `project` status above
 # does not post on this repo, this comment is the only place whole-project
 # coverage surfaces on a pull request at all.
 comment:
-  layout: "condensed_files, condensed_footer"
+  layout: "files, condensed_footer"
