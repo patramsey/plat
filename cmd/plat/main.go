@@ -163,8 +163,22 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var concurrency int
 
 	root := &cobra.Command{
-		Use:           "plat <domain|ip|asn> [domain|ip|asn...]",
-		Short:         "Look up domain, IP, or ASN ownership via RDAP and WHOIS",
+		Use:   "plat <domain|ip|asn> [domain|ip|asn...]",
+		Short: "Look up domain, IP, or ASN ownership via RDAP and WHOIS",
+		Long: `plat looks up who owns a domain, IP address, or autonomous system,
+querying RDAP and WHOIS at the same time and merging the answers into one
+record. Every field is tagged with the sources that supplied it, so you can
+see where the sources disagree rather than having to trust whichever one
+answered first.
+
+Source tags:
+  RR registrar-rdap    GR registry-rdap
+  RW registrar-whois   GW registry-whois`,
+		Example: `  plat example.com
+  plat 8.8.8.8
+  plat AS15169
+  plat example.com -o json | jq .expires.value
+  plat --file names.txt -o ndjson`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args: func(cmd *cobra.Command, cliArgs []string) error {

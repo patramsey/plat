@@ -1818,3 +1818,35 @@ func TestRunLookup_WHOISPacingFollowsDomainCount(t *testing.T) {
 		}
 	})
 }
+
+func TestHelpExplainsToolAndProvenance(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--help"}, &stdout, &stderr, uiConfig{})
+	if code != 0 {
+		t.Fatalf("--help exit = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	out := stdout.String()
+
+	// The Long description must explain the tool's differentiator --
+	// per-field provenance -- since that is what makes the default
+	// output's source tags legible.
+	for _, want := range []string{"RDAP", "WHOIS", "disagree"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("--help output does not mention %q; got:\n%s", want, out)
+		}
+	}
+
+	// Every source ID the renderers can tag a field with must be decoded
+	// in the help text. If sourceCode() ever gains a code that is not
+	// listed here, the help text is lying about its own output.
+	for _, src := range model.Precedence {
+		if !strings.Contains(out, string(src)) {
+			t.Errorf("--help output does not decode source %q; got:\n%s", src, out)
+		}
+	}
+
+	// At least one runnable example line.
+	if !strings.Contains(out, "plat example.com -o json") {
+		t.Errorf("--help output has no json example; got:\n%s", out)
+	}
+}
