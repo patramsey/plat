@@ -10,15 +10,20 @@ follows [Semantic Versioning](https://semver.org/).
 - `--help` now explains what plat does, decodes the `RR`/`GR`/`RW`/`GW`
   source tags that appear in its own output, and shows runnable examples.
 
+### Changed
+- **Breaking:** A name containing an empty label -- `a..com`, `xn--.com`,
+  `.com` -- now exits `2` (usage error) instead of `1` (not found), and
+  `plat.Client.Lookup` returns `ErrInvalidInput` for the same inputs
+  instead of a nil error wrapping a not-found `Result`. Exit `1` claimed
+  every source agreed the name did not exist, about a name plat never
+  actually looked up. `xn--.com` was the clearest case:
+  `idna.Lookup.ToASCII("xn--.com")` returns `.com` with a nil error, so
+  plat queried `.com` -- a different name than the one it was given --
+  got a not-found answer for it, and reported that as the result for
+  `xn--.com`. Scripts and library callers keying on the old behavior for
+  these inputs need updating.
+
 ### Fixed
-- **Exit code change.** A name containing an empty label -- `a..com`,
-  `xn--.com`, `.com` -- now exits `2` (usage error) instead of `1` (not
-  found). Exit `1` claimed every source agreed the name did not exist,
-  about a name plat never looked up. `xn--.com` was worse than a wrong
-  exit code: `idna.Lookup.ToASCII("xn--.com")` returns `.com` with a nil
-  error, so plat previously queried and reported on `.com` -- a
-  different name than the one it was given. Scripts keying on exit `1`
-  for these inputs need updating.
 - The source legend now lists only the tags a record actually carries.
   A `.de` domain answered by registry WHOIS alone no longer gets a key
   explaining three sources that appear nowhere in its output. Both the
