@@ -42,3 +42,23 @@ coverage:
     patch:
       default:
         target: 90%
+
+# The PR comment, configured only to drop its header.
+#
+# Codecov's default comment header renders a red ✗ and "Please review"
+# whenever patch coverage is below 100%, regardless of whether the patch
+# target above was met. A PR hitting 96.6% against a 90% target therefore
+# read, at a glance, as a failure -- while the `codecov/patch` check sitting
+# beside it reported `success`. Only the punctuation disagreed, but the
+# punctuation is what anyone scanning the PR sees first.
+#
+# Omitting the header components from `layout` drops that line and keeps the
+# part worth reading: the per-file table naming which files carry the
+# missing lines.
+#
+# `hide_project_coverage` is deliberately NOT set here. It would trim the
+# comment down to patch coverage alone, and since the `project` status above
+# does not post on this repo, this comment is the only place whole-project
+# coverage surfaces on a pull request at all.
+comment:
+  layout: "condensed_files, condensed_footer"
