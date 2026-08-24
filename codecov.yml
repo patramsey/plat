@@ -43,27 +43,31 @@ coverage:
       default:
         target: 90%
 
-# The PR comment, configured only to drop its header.
+# The PR comment is deliberately left unconfigured -- not because the default
+# is good, but because configuring it does nothing on this repo.
 #
-# Codecov's default comment header renders a red ✗ and "Please review"
-# whenever patch coverage is below 100%, regardless of whether the patch
+# Codecov's default comment header renders a red X and "Please review"
+# whenever patch coverage is below 100%, regardless of whether the `patch`
 # target above was met. A PR hitting 96.6% against a 90% target therefore
-# read, at a glance, as a failure -- while the `codecov/patch` check sitting
-# beside it reported `success`. Only the punctuation disagreed, but the
-# punctuation is what anyone scanning the PR sees first.
+# reads, at a glance, as a failure, while the `codecov/patch` check beside it
+# reports `success`. Only the punctuation disagrees -- but the punctuation is
+# what anyone scanning the PR sees first.
 #
-# Omitting the header components from `layout` drops that line and keeps the
-# part worth reading: the per-file table naming which files carry the
-# missing lines.
+# Tested on PR #75 (2026-08-24). Adding
 #
-# `files` rather than `condensed_files`: the condensed variant rendered
-# nothing at all once the header was removed -- the posted comment was the
-# footer and nothing else -- which defeats the point of keeping a comment.
-# Verified on PR #75, where the full `files` table does render standalone.
+#     comment:
+#       layout: "files, condensed_footer"
 #
-# `hide_project_coverage` is deliberately NOT set here. It would trim the
-# comment down to patch coverage alone, and since the `project` status above
-# does not post on this repo, this comment is the only place whole-project
-# coverage surfaces on a pull request at all.
-comment:
-  layout: "files, condensed_footer"
+# should have dropped that header. Codecov's own validator accepted the file
+# ("Valid!", and it echoed the parsed `comment.layout` back), and Codecov's
+# docs state it "will always use the current YAML on the branch being tested".
+# The config was pushed, Codecov processed two later commits, the stale
+# comment was deleted to force a fresh post, and the comment it then posted at
+# 04:13:15Z still carried the header -- in the DEFAULT layout, not the
+# configured one. So the `comment:` block was ignored outright.
+#
+# That is the same symptom as `project` above never posting, and the second
+# independent piece of evidence that this repository's codecov.yml is not
+# being applied at all. Both point somewhere outside the repo -- an app
+# installation or org-level setting -- and neither is fixable by editing this
+# file. Anything added here should be assumed inert until that is resolved.
