@@ -215,12 +215,14 @@ func TestParseSourceFilter(t *testing.T) {
 }
 
 func TestNotQueriedSources(t *testing.T) {
-	full := []model.SourceID{
+	fullDomain := []model.SourceID{
 		model.SourceRegistrarRDAP, model.SourceRegistryRDAP,
 		model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS,
 	}
+	fullRIR := []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}
 	for _, tc := range []struct {
 		name       string
+		full       []model.SourceID
 		filter     []model.SourceID
 		noFollow   bool
 		wantSrcs   []model.SourceID
@@ -228,29 +230,56 @@ func TestNotQueriedSources(t *testing.T) {
 	}{
 		{
 			name:       "no flags",
+			full:       fullDomain,
 			wantSrcs:   nil,
 			wantReason: "",
 		},
 		{
 			name:       "source rdap",
+			full:       fullDomain,
 			filter:     []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP},
 			wantSrcs:   []model.SourceID{model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS},
 			wantReason: "--source rdap",
 		},
 		{
 			name:       "no-follow alone",
+			full:       fullDomain,
 			noFollow:   true,
 			wantSrcs:   []model.SourceID{model.SourceRegistrarRDAP},
 			wantReason: "--no-follow",
 		},
 		{
 			// registrar-rdap is excluded by both flags and must be listed
-			// once, not twice.
-			name:       "both flags",
+			// once, not twice. --no-follow genuinely excludes something
+			// here (registrar-rdap is a member of fullDomain), so it
+			// legitimately earns a place in the reason string.
+			name:       "both flags, domain",
+			full:       fullDomain,
 			filter:     []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP},
 			noFollow:   true,
 			wantSrcs:   []model.SourceID{model.SourceRegistrarRDAP, model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS},
 			wantReason: "--source rdap, --no-follow",
+		},
+		{
+			// An IP/ASN lookup's full source set has no registrar-rdap
+			// member at all, so --no-follow (which only ever gates the
+			// registrar RDAP related-link hop) excludes nothing here --
+			// it must not be named as a reason even though it was passed.
+			name:       "both flags, RIR",
+			full:       fullRIR,
+			filter:     []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP},
+			noFollow:   true,
+			wantSrcs:   []model.SourceID{model.SourceRegistryWHOIS},
+			wantReason: "--source rdap",
+		},
+		{
+			// noFollow alone against an RIR source set excludes nothing,
+			// so there is no line at all -- not an empty-reason line.
+			name:       "no-follow alone, RIR",
+			full:       fullRIR,
+			noFollow:   true,
+			wantSrcs:   nil,
+			wantReason: "",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -258,7 +287,7 @@ func TestNotQueriedSources(t *testing.T) {
 			if tc.filter != nil {
 				reason = "--source rdap"
 			}
-			gotSrcs, gotReason := notQueriedSources(full, tc.filter, tc.noFollow, reason)
+			gotSrcs, gotReason := notQueriedSources(tc.full, tc.filter, tc.noFollow, reason)
 			if !reflect.DeepEqual(gotSrcs, tc.wantSrcs) {
 				t.Errorf("sources = %v, want %v", gotSrcs, tc.wantSrcs)
 			}

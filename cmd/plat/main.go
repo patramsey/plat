@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1129,21 +1130,30 @@ func notQueriedSources(full, filter []model.SourceID, noFollow bool, filterReaso
 		for _, s := range filter {
 			allowed[s] = true
 		}
+		filterExcludedAny := false
 		for _, s := range full {
 			if !allowed[s] {
 				excluded[s] = true
+				filterExcludedAny = true
 			}
 		}
-		reasons = append(reasons, filterReason)
+		// A --source value that happens to allow every member of full
+		// (e.g. --source registry against rirSources, which is already
+		// exactly {registry-rdap, registry-whois}) excludes nothing, so
+		// it must not be named as a reason for a line that isn't printed.
+		if filterExcludedAny {
+			reasons = append(reasons, filterReason)
+		}
 	}
 	// --no-follow gates only the registrar RDAP related-link hop; see
-	// collect.Options.NoFollow.
-	if noFollow {
-		for _, s := range full {
-			if s == model.SourceRegistrarRDAP {
-				excluded[s] = true
-			}
-		}
+	// collect.Options.NoFollow. That hop only exists for a domain lookup
+	// -- an IP/ASN's full source set (rirSources) has no registrar-rdap
+	// member at all -- so --no-follow only earns a place in the reason
+	// string when full actually has something for it to exclude.
+	// Otherwise it would blame itself for an exclusion --source alone
+	// (or nothing at all) produced.
+	if noFollow && slices.Contains(full, model.SourceRegistrarRDAP) {
+		excluded[model.SourceRegistrarRDAP] = true
 		reasons = append(reasons, "--no-follow")
 	}
 	if len(excluded) == 0 {
