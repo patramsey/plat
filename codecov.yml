@@ -51,16 +51,25 @@ coverage:
 # target therefore reads, at a glance, as a failure, while the
 # `codecov/patch` check beside it reports `success`.
 #
-# That line is NOT one of the `layout` components. Setting
+# That line is not something `layout` controls. With
 #
 #     comment:
 #       layout: "files, condensed_footer"
 #
-# does exactly what it says -- the rendered comment contained the files table
-# and the footer and nothing else -- and the X preamble still appeared above
-# them, because it is fixed chrome rather than a section `layout` can drop.
-# `comment: false` suppresses the whole comment and is the only lever that
-# removes it.
+# in place on the branch, the comment Codecov posted still carried the X
+# above the table -- so no layout setting removes it. `comment: false`
+# suppresses the whole comment and is the only lever that does.
+#
+# (Whether that `layout` value was honoured is undetermined and does not
+# matter here: the comment it produced -- files table, footer, nothing else
+# -- is also what this repo's DEFAULT comment renders, as PR #74 shows. The
+# two are indistinguishable from the output, so do not read the trimmed
+# shape of a past comment as proof that layout applied.)
+#
+# The X is not a verdict on the `patch` target above. It is a binary
+# "is patch coverage 100%?" marker: PR #74, at 100%, got a green check from
+# the same default config. Nothing configurable sits between those two
+# states.
 #
 # Verified on PR #75 (2026-08-24), including that this file is read at all:
 # temporarily setting `patch.target` to 1% on the branch made
