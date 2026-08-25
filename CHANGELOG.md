@@ -4,7 +4,7 @@ All notable changes to `plat` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project
 follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.7.0] - 2026-08-25
 
 ### Added
 - `--help` now explains what plat does, decodes the `RR`/`GR`/`RW`/`GW`
@@ -399,7 +399,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/patramsey/plat/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/patramsey/plat/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/patramsey/plat/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/patramsey/plat/compare/v0.3.2...v0.4.0
