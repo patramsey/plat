@@ -6,6 +6,7 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode/utf8"
 
 	"github.com/patramsey/plat/internal/model"
 )
@@ -26,6 +27,22 @@ type Options struct {
 	// raw per-source breakdown is opt-in, matching human.Options'
 	// ShowConflicts.
 	ShowConflicts bool
+	// NotQueried lists sources a flag excluded before the lookup ran,
+	// ordered by model.Precedence. Rendered as one trailing line in the
+	// Verbose source block, because a source filtered out by --source
+	// produces no SourceResult at all: without this the two WHOIS rows
+	// simply vanish from a block documented as showing "every source
+	// attempted", which reads as a failure rather than as the filter
+	// working. Empty means nothing was filtered and no line is printed.
+	NotQueried []model.SourceID
+	// NotQueriedReason names the flag(s) responsible, e.g. "--source rdap".
+	NotQueriedReason string
+	// Width is the terminal width to lay out within. Zero -- which is
+	// what term.GetSize reports when stdout is not a terminal -- disables
+	// wrapping entirely and keeps output byte-identical, because this
+	// renderer is also what pipes get, and wrapping a nameserver list
+	// would break grep and awk on it.
+	Width int
 }
 
 // Render writes an unstyled, aligned key/value view of a merged domain
@@ -38,13 +55,16 @@ type Options struct {
 func Render(w io.Writer, r model.Record, opts Options) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 
+	var rows []row
 	for _, fd := range model.FieldOrder {
-		writeField(tw, r, fd)
+		writeField(&rows, r, fd)
 	}
-	writeSourceLegend(tw, legendWithRegistrar)
+	emitRows(tw, rows, opts.Width)
+
+	writeSourceLegend(tw, model.PresentSources(r), opts.Width)
 
 	if opts.Verbose {
-		writeSourcesBlock(tw, r.Sources)
+		writeSourcesBlock(tw, r.Sources, opts.NotQueried, opts.NotQueriedReason, opts.Width)
 	}
 
 	if len(r.Conflicts) > 0 {
@@ -84,15 +104,21 @@ func Render(w io.Writer, r model.Record, opts Options) error {
 // ok/not-found/error status for every source attempted) with no other
 // record fields — used on the CLI's lookup-failure path, where -v should
 // still show why every source was unusable even though there's no merged
-// Record worth rendering in full.
-func RenderSources(w io.Writer, sources []model.SourceResult) error {
+// Record worth rendering in full. notQueried/reason carry through the same
+// --source/--no-follow exclusions Options.NotQueried does -- without them
+// this path silently dropped a source a filter had excluded, reading as
+// failure rather than as the filter working, on exactly the path a user
+// hitting a total lookup failure is most likely to be reading. width
+// bounds the not-queried line the same way Render's Options.Width does;
+// <=0 leaves it unwrapped.
+func RenderSources(w io.Writer, sources []model.SourceResult, notQueried []model.SourceID, reason string, width int) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	writeSourcesBlock(tw, sources)
+	writeSourcesBlock(tw, sources, notQueried, reason, width)
 	return tw.Flush()
 }
 
-func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult) {
-	if len(sources) == 0 {
+func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult, notQueried []model.SourceID, reason string, width int) {
+	if len(sources) == 0 && len(notQueried) == 0 {
 		return
 	}
 	_, _ = fmt.Fprintln(tw, "---")
@@ -108,54 +134,218 @@ func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult) {
 		}
 		_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", s.Source, s.Latency.Round(time.Millisecond), status)
 	}
+	writeNotQueried(tw, notQueried, reason, width)
+}
+
+// writeNotQueried names the sources a flag excluded before the lookup
+// ran. See Options.NotQueried for why their absence needs saying out loud.
+// width <= 0 (the piped/tabwriter path) leaves the line unwrapped, same as
+// emitRows' own width<=0 branch -- this sits outside emitRowsWithin's
+// budget, so without its own wrap a long reason string ("--source rdap,
+// --no-follow") could still stretch a line out past every field row's
+// budget even though those rows individually respect it.
+func writeNotQueried(tw *tabwriter.Writer, notQueried []model.SourceID, reason string, width int) {
+	if len(notQueried) == 0 {
+		return
+	}
+	names := make([]string, len(notQueried))
+	for i, s := range notQueried {
+		names[i] = string(s)
+	}
+	line := fmt.Sprintf("(%s not queried: %s)", strings.Join(names, ", "), reason)
+	if width <= 0 {
+		_, _ = fmt.Fprintln(tw, line)
+		return
+	}
+	for _, l := range wrapText(line, width) {
+		_, _ = fmt.Fprintln(tw, l)
+	}
+}
+
+// row is one collected field line, held until every row exists so a
+// width-aware emitter can size the columns from the actual content. items
+// is non-nil only for list fields, where wrapping must break between whole
+// items rather than mid-hostname.
+type row struct {
+	label string
+	value string
+	items []string
+	src   string
+}
+
+// minValueWidth floors how narrow the value column can get, so a very
+// narrow terminal degrades gracefully instead of wrapping every value to
+// almost nothing. Mirrors human.minInnerWidth's reasoning.
+const minValueWidth = 20
+
+// emitRows writes the collected rows. width <= 0 takes the tabwriter path,
+// byte-identical to what this renderer has always produced, keeping piped
+// output safe for grep and awk.
+func emitRows(tw *tabwriter.Writer, rows []row, width int) {
+	if width <= 0 {
+		for _, r := range rows {
+			_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", r.label, r.value, r.src)
+		}
+		return
+	}
+	emitRowsWithin(tw, rows, width)
+}
+
+// emitRowsWithin lays the rows out by hand within width columns.
+//
+// tabwriter pads the value column to its widest cell, so one long Status
+// value inflated EVERY row past the terminal width -- and the terminal's
+// own wrap then orphaned the source column, which is the whole point of
+// the tool, onto its own line for every field. Capping the value column
+// fixes all rows at once.
+//
+// The manual layout is why this does not go through tabwriter's columns:
+// tabwriter sizes columns from content, and the whole job here is to size
+// them from the terminal instead. Rows are written as plain lines with no
+// tabs, which tabwriter passes through untouched.
+func emitRowsWithin(tw *tabwriter.Writer, rows []row, width int) {
+	const gap = 2
+
+	labelCol, srcCol := 0, 0
+	for _, r := range rows {
+		if n := utf8.RuneCountInString(r.label) + 1; n > labelCol { // +1 for the ':'
+			labelCol = n
+		}
+		if n := utf8.RuneCountInString(r.src); n > srcCol {
+			srcCol = n
+		}
+	}
+	labelCol += gap
+
+	valueBudget := width - labelCol - srcCol - gap
+	if valueBudget < minValueWidth {
+		valueBudget = minValueWidth
+	}
+
+	for _, r := range rows {
+		chunks := []string{r.value}
+		switch {
+		case r.items != nil:
+			chunks = wrapItems(r.items, itemSep, valueBudget)
+		case utf8.RuneCountInString(r.value) > valueBudget:
+			// A scalar isn't a list, but a long one (a registrant/registrar
+			// business name, typically) still needs to fit the budget.
+			// Splitting on spaces is safe here in a way item-wrapping
+			// isn't: there's no hostname to mistake for truncated-but-
+			// plausible, just prose that continues on the next line. A
+			// single unbreakable token (a URL, an email) falls through
+			// unwrapped -- same as before -- because there's no space to
+			// break on.
+			chunks = wrapItems(strings.Fields(r.value), " ", valueBudget)
+		}
+		for i, chunk := range chunks {
+			indent := strings.Repeat(" ", labelCol)
+			if i == 0 {
+				indent = pad(r.label+":", labelCol)
+			}
+			// The source column rides the LAST line rather than the
+			// first: a badge next to a value's opening fragment reads as
+			// belonging to that fragment alone.
+			if i == len(chunks)-1 && r.src != "" {
+				_, _ = fmt.Fprintf(tw, "%s%s%s%s\n", indent, pad(chunk, valueBudget), strings.Repeat(" ", gap), r.src)
+				continue
+			}
+			_, _ = fmt.Fprintf(tw, "%s%s\n", indent, strings.TrimRight(chunk, " "))
+		}
+	}
+}
+
+// itemSep joins the values of a list field ("ns1.example.com · ns2...").
+const itemSep = " · "
+
+// wrapItems packs items into lines of at most width columns, breaking only
+// between whole items. Generic word wrapping would break inside a hostname
+// -- and half a nameserver still looks like a nameserver, so the reader
+// cannot tell it was truncated. sep is the caller's join string: itemSep
+// for list values, legendSep for the legend's entries.
+func wrapItems(items []string, sep string, width int) []string {
+	var lines []string
+	cur := ""
+	for _, it := range items {
+		candidate := it
+		if cur != "" {
+			candidate = cur + sep + it
+		}
+		if cur != "" && utf8.RuneCountInString(candidate) > width {
+			lines = append(lines, cur)
+			cur = it
+			continue
+		}
+		cur = candidate
+	}
+	return append(lines, cur)
+}
+
+// wrapText word-wraps free-form prose (not a list of discrete items) to
+// width columns, breaking only between whole words. Reuses wrapItems'
+// item-packing logic with words as items and " " as the separator, since
+// a single free-form string has no caller-supplied separator to preserve
+// the way a list value's itemSep or the legend's legendSep does.
+func wrapText(s string, width int) []string {
+	return wrapItems(strings.Fields(s), " ", width)
+}
+
+// pad right-pads s to w columns, counting runes. fmt's %-*s pads by BYTE
+// count, which silently misaligns every row containing a multibyte rune --
+// and the list separator is itself one.
+func pad(s string, w int) string {
+	if n := utf8.RuneCountInString(s); n < w {
+		return s + strings.Repeat(" ", w-n)
+	}
+	return s
 }
 
 // writeField dispatches one model.FieldOrder entry to the write* helper
 // matching its Record field's type. Status is passed conflicted=false
 // unconditionally -- differing sets are unioned, never flagged -- so it
 // never needs the marker.
-func writeField(tw *tabwriter.Writer, r model.Record, fd model.FieldSpec) {
+func writeField(rows *[]row, r model.Record, fd model.FieldSpec) {
 	conflicted := hasConflict(r.Conflicts, fd.Key)
 	switch fd.Key {
 	case model.FieldDomain:
-		stringField(tw, fd.Label, r.Domain, conflicted)
+		stringField(rows, fd.Label, r.Domain, conflicted)
 	case model.FieldHandle:
-		stringField(tw, fd.Label, r.Handle, conflicted)
+		stringField(rows, fd.Label, r.Handle, conflicted)
 	case model.FieldRegistrarName:
-		stringField(tw, fd.Label, r.Registrar.Name, conflicted)
+		stringField(rows, fd.Label, r.Registrar.Name, conflicted)
 	case model.FieldRegistrarIANAID:
-		stringField(tw, fd.Label, r.Registrar.IANAID, conflicted)
+		stringField(rows, fd.Label, r.Registrar.IANAID, conflicted)
 	case model.FieldRegistrarURL:
-		stringField(tw, fd.Label, r.Registrar.URL, conflicted)
+		stringField(rows, fd.Label, r.Registrar.URL, conflicted)
 	case model.FieldRegistrarAbuseEmail:
-		stringField(tw, fd.Label, r.Registrar.AbuseEmail, conflicted)
+		stringField(rows, fd.Label, r.Registrar.AbuseEmail, conflicted)
 	case model.FieldRegistrarAbusePhone:
-		stringField(tw, fd.Label, r.Registrar.AbusePhone, conflicted)
+		stringField(rows, fd.Label, r.Registrar.AbusePhone, conflicted)
 	case model.FieldStatus:
-		listField(tw, fd.Label, r.Status, false)
+		listField(rows, fd.Label, r.Status, false)
 	case model.FieldCreated:
-		timeField(tw, fd.Label, r.Created, conflicted)
+		timeField(rows, fd.Label, r.Created, conflicted)
 	case model.FieldUpdated:
-		timeField(tw, fd.Label, r.Updated, conflicted)
+		timeField(rows, fd.Label, r.Updated, conflicted)
 	case model.FieldExpires:
-		timeField(tw, fd.Label, r.Expires, conflicted)
+		timeField(rows, fd.Label, r.Expires, conflicted)
 	case model.FieldNameservers:
-		listField(tw, fd.Label, r.Nameservers, conflicted)
+		listField(rows, fd.Label, r.Nameservers, conflicted)
 	case model.FieldDNSSEC:
-		boolField(tw, fd.Label, r.DNSSEC, conflicted)
+		boolField(rows, fd.Label, r.DNSSEC, conflicted)
 	default:
 		panic(fmt.Sprintf("plain: unhandled model.FieldOrder entry %q", fd.Key))
 	}
 }
 
-func stringField(tw *tabwriter.Writer, label string, f model.Field[string], conflicted bool) {
+func stringField(rows *[]row, label string, f model.Field[string], conflicted bool) {
 	if !f.Present() {
 		return
 	}
-	_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", label, f.Value, sourcesCol(f.Sources, conflicted))
+	*rows = append(*rows, row{label: label, value: f.Value, src: sourcesCol(f.Sources, conflicted)})
 }
 
-func listField(tw *tabwriter.Writer, label string, f model.Field[[]string], conflicted bool) {
+func listField(rows *[]row, label string, f model.Field[[]string], conflicted bool) {
 	// Deliberately not f.Present(): a genuine merge conflict (see
 	// internal/merge's nameservers()) can leave Sources empty while Value
 	// stays populated with the merged union -- the row must still print,
@@ -163,10 +353,15 @@ func listField(tw *tabwriter.Writer, label string, f model.Field[[]string], conf
 	if len(f.Value) == 0 {
 		return
 	}
-	_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", label, strings.Join(f.Value, " · "), sourcesCol(f.Sources, conflicted))
+	*rows = append(*rows, row{
+		label: label,
+		value: strings.Join(f.Value, " · "),
+		items: f.Value,
+		src:   sourcesCol(f.Sources, conflicted),
+	})
 }
 
-func boolField(tw *tabwriter.Writer, label string, f model.Field[bool], conflicted bool) {
+func boolField(rows *[]row, label string, f model.Field[bool], conflicted bool) {
 	if !f.Present() {
 		return
 	}
@@ -174,18 +369,18 @@ func boolField(tw *tabwriter.Writer, label string, f model.Field[bool], conflict
 	if f.Value {
 		val = "true"
 	}
-	_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", label, val, sourcesCol(f.Sources, conflicted))
+	*rows = append(*rows, row{label: label, value: val, src: sourcesCol(f.Sources, conflicted)})
 }
 
-func timeField(tw *tabwriter.Writer, label string, f model.Field[model.TimeValue], conflicted bool) {
+func timeField(rows *[]row, label string, f model.Field[model.TimeValue], conflicted bool) {
 	if !f.Present() {
 		return
 	}
 	if f.Value.Parsed {
-		_, _ = fmt.Fprintf(tw, "%s:\t%s\t%s\n", label, f.Value.Time.UTC().Format(time.RFC3339), sourcesCol(f.Sources, conflicted))
+		*rows = append(*rows, row{label: label, value: f.Value.Time.UTC().Format(time.RFC3339), src: sourcesCol(f.Sources, conflicted)})
 		return
 	}
-	_, _ = fmt.Fprintf(tw, "%s:\t%s (unparsed)\t%s\n", label, f.Value.Raw, sourcesCol(f.Sources, conflicted))
+	*rows = append(*rows, row{label: label, value: f.Value.Raw + " (unparsed)", src: sourcesCol(f.Sources, conflicted)})
 }
 
 // hasConflict reports whether field appears in conflicts.
@@ -243,30 +438,67 @@ func formatSources(sources []model.SourceID) string {
 	return strings.Join(strs, ", ")
 }
 
-// Legend text decoding sourceCode's abbreviations. Two variants, because
-// which sources can exist depends on the object type: a domain is held by
-// a registrar under a registry, so all four codes are reachable, while an
-// IP allocation or an autonomous system is registered directly with an RIR
-// and has no registrar at all. Listing RR/RW on an IP or ASN record
-// explains badges that can never appear there, which reads as "plat failed
-// to reach the registrar" rather than "no such source exists".
-//
-// Kept in step with the same pair in internal/render/human/rows.go -- the
-// two renderers must decode the same codes the same way.
-const (
-	legendWithRegistrar = "RR registrar-rdap   GR registry-rdap   RW registrar-whois   GW registry-whois"
-	legendRegistryOnly  = "GR registry-rdap   GW registry-whois"
-)
+// legendEntry decodes one source into its "XX source-id" legend entry. An
+// unrecognized SourceID (which shouldn't happen given the closed set in
+// internal/model) has no two-letter code -- sourceCode falls back to the
+// raw string -- so it prints once rather than as "foo foo".
+func legendEntry(s model.SourceID) string {
+	code := sourceCode(s)
+	if code == string(s) {
+		return code
+	}
+	return code + " " + string(s)
+}
 
-// writeSourceLegend prints the key decoding sourceCode's abbreviations --
-// unconditionally, not gated by --verbose or --conflicts, since the codes
-// it explains appear in the DEFAULT view; hiding the legend by default
-// would make the default output undecodable, not just less detailed.
+// buildSourceLegend renders the key decoding the two-letter codes in
+// sources, which callers derive from the record via model.PresentSources*
+// -- so the key explains exactly the badges the reader can see and nothing
+// else. A record whose only answer came from registry WHOIS used to get
+// all four codes explained, which reads as "plat failed to reach the other
+// three" rather than "the other three had nothing to say".
 //
-// legend is the caller's choice of the two constants above: domain records
-// pass legendWithRegistrar, IP and ASN records pass legendRegistryOnly.
-func writeSourceLegend(tw *tabwriter.Writer, legend string) {
-	_, _ = fmt.Fprintln(tw, legend)
+// Returns "" for an empty set, so a record with no provenance at all gets
+// no legend line rather than an empty one.
+//
+// Kept in step with the same function in internal/render/human/rows.go --
+// the two renderers must decode the same codes the same way.
+func buildSourceLegend(sources []model.SourceID) string {
+	return strings.Join(legendEntries(sources), legendSep)
+}
+
+// legendSep separates legend entries. Wide enough that "GR registry-rdap"
+// reads as one unit rather than four loose words.
+const legendSep = "   "
+
+// legendEntries returns one entry per source, in the order given. Task 8
+// wraps these by whole entry rather than by word, for the same reason
+// nameservers wrap by whole item.
+func legendEntries(sources []model.SourceID) []string {
+	entries := make([]string, len(sources))
+	for i, s := range sources {
+		entries[i] = legendEntry(s)
+	}
+	return entries
+}
+
+// writeSourceLegend prints the key unconditionally, not gated by --verbose
+// or --conflicts, since the codes it explains appear in the DEFAULT view;
+// hiding it by default would make the default output undecodable, not just
+// less detailed.
+func writeSourceLegend(tw *tabwriter.Writer, sources []model.SourceID, width int) {
+	if len(sources) == 0 {
+		return
+	}
+	legend := buildSourceLegend(sources)
+	if width <= 0 || utf8.RuneCountInString(legend) <= width {
+		_, _ = fmt.Fprintln(tw, legend)
+		return
+	}
+	// Wrap by whole entry: "GR registry-rdap" split across two lines
+	// would read as a code with no name and a name with no code.
+	for _, line := range wrapItems(legendEntries(sources), legendSep, width) {
+		_, _ = fmt.Fprintln(tw, line)
+	}
 }
 
 // formatConflictValues renders a Conflict's map in model.Precedence order

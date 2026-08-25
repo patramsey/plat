@@ -11,6 +11,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/charmbracelet/colorprofile"
 
+	"github.com/patramsey/plat"
 	"github.com/patramsey/plat/internal/bootstrap"
 	"github.com/patramsey/plat/internal/domain"
 	"github.com/patramsey/plat/internal/model"
@@ -212,6 +214,105 @@ func TestParseSourceFilter(t *testing.T) {
 	}
 }
 
+func TestNotQueriedSources(t *testing.T) {
+	fullDomain := []model.SourceID{
+		model.SourceRegistrarRDAP, model.SourceRegistryRDAP,
+		model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS,
+	}
+	fullRIR := []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}
+	for _, tc := range []struct {
+		name         string
+		full         []model.SourceID
+		filter       []model.SourceID
+		filterReason string
+		noFollow     bool
+		wantSrcs     []model.SourceID
+		wantReason   string
+	}{
+		{
+			name:       "no flags",
+			full:       fullDomain,
+			wantSrcs:   nil,
+			wantReason: "",
+		},
+		{
+			name:         "source rdap",
+			full:         fullDomain,
+			filter:       []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP},
+			filterReason: "--source rdap",
+			wantSrcs:     []model.SourceID{model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS},
+			wantReason:   "--source rdap",
+		},
+		{
+			name:       "no-follow alone",
+			full:       fullDomain,
+			noFollow:   true,
+			wantSrcs:   []model.SourceID{model.SourceRegistrarRDAP},
+			wantReason: "--no-follow",
+		},
+		{
+			// registrar-rdap is excluded by both flags and must be listed
+			// once, not twice. --no-follow genuinely excludes something
+			// here (registrar-rdap is a member of fullDomain), so it
+			// legitimately earns a place in the reason string.
+			name:         "both flags, domain",
+			full:         fullDomain,
+			filter:       []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP},
+			filterReason: "--source rdap",
+			noFollow:     true,
+			wantSrcs:     []model.SourceID{model.SourceRegistrarRDAP, model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS},
+			wantReason:   "--source rdap, --no-follow",
+		},
+		{
+			// --source whois already excludes registrar-rdap on its own;
+			// --no-follow adds nothing and must not be named. This is the
+			// exact case eeadc75 missed: it only asked whether full had a
+			// registrar-rdap member (i.e. "is this a domain lookup?"),
+			// not whether --no-follow actually removed something --source
+			// had not already removed.
+			name:         "source whois, no-follow adds nothing",
+			full:         fullDomain,
+			filter:       []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS},
+			filterReason: "--source whois",
+			noFollow:     true,
+			wantSrcs:     []model.SourceID{model.SourceRegistrarRDAP, model.SourceRegistryRDAP},
+			wantReason:   "--source whois",
+		},
+		{
+			// An IP/ASN lookup's full source set has no registrar-rdap
+			// member at all, so --no-follow (which only ever gates the
+			// registrar RDAP related-link hop) excludes nothing here --
+			// it must not be named as a reason even though it was passed.
+			name:         "both flags, RIR",
+			full:         fullRIR,
+			filter:       []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP},
+			filterReason: "--source rdap",
+			noFollow:     true,
+			wantSrcs:     []model.SourceID{model.SourceRegistryWHOIS},
+			wantReason:   "--source rdap",
+		},
+		{
+			// noFollow alone against an RIR source set excludes nothing,
+			// so there is no line at all -- not an empty-reason line.
+			name:       "no-follow alone, RIR",
+			full:       fullRIR,
+			noFollow:   true,
+			wantSrcs:   nil,
+			wantReason: "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gotSrcs, gotReason := notQueriedSources(tc.full, tc.filter, tc.noFollow, tc.filterReason)
+			if !reflect.DeepEqual(gotSrcs, tc.wantSrcs) {
+				t.Errorf("sources = %v, want %v", gotSrcs, tc.wantSrcs)
+			}
+			if gotReason != tc.wantReason {
+				t.Errorf("reason = %q, want %q", gotReason, tc.wantReason)
+			}
+		})
+	}
+}
+
 func TestRun_AcceptsMultipleDomainArgs(t *testing.T) {
 	// A single malformed domain among several still yields a usage-level
 	// per-domain error (exit code 2 contributes to the overall worst
@@ -263,6 +364,20 @@ func TestRun_ReservedIPRejectedAtExit2(t *testing.T) {
 			errMsg := stderr.String()
 			if strings.Contains(errMsg, "no sources could be reached") || strings.Contains(errMsg, "unreachable") {
 				t.Errorf("run([%s]) stderr = %q, must not claim sources were unreachable (whois.iana.org answers just fine for these)", input, errMsg)
+			}
+		})
+	}
+}
+
+// An impossible name is a usage error (exit 2), not a not-found (exit 1).
+// Exit 1 asserts that every source agreed the name does not exist, which
+// is a claim plat cannot make about a name it never looked up.
+func TestImpossibleNameExitsUsageNotNotFound(t *testing.T) {
+	for _, input := range []string{"a..com", "xn--.com"} {
+		t.Run(input, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if code := run([]string{"-o", "json", input}, &stdout, &stderr, uiConfig{}); code != 2 {
+				t.Errorf("run(%q) exit = %d, want 2 (stderr: %s)", input, code, stderr.String())
 			}
 		})
 	}
@@ -511,7 +626,7 @@ func TestRenderRecord_DispatchesJSONAndNDJSON(t *testing.T) {
 func TestReportLookupError_MachineFormatEncodesJSON(t *testing.T) {
 	var stderr bytes.Buffer
 	sources := []model.SourceResult{{Source: model.SourceRegistryRDAP, Err: "timeout", Latency: 5 * time.Second}}
-	reportLookupError(&stderr, render.FormatJSON, "example.com", fmt.Errorf("boom"), sources, true, uiConfig{})
+	reportLookupError(&stderr, render.FormatJSON, "example.com", fmt.Errorf("boom"), sources, true, uiConfig{}, nil, "")
 	out := stderr.String()
 	if !strings.Contains(out, `"domain":"example.com"`) {
 		t.Errorf("expected a JSON error object with the domain field, got:\n%s", out)
@@ -526,7 +641,7 @@ func TestReportLookupError_MachineFormatEncodesJSON(t *testing.T) {
 
 func TestReportLookupError_HumanFormatPrintsPlainLine(t *testing.T) {
 	var stderr bytes.Buffer
-	reportLookupError(&stderr, render.FormatPlain, "example.com", fmt.Errorf("boom"), nil, false, uiConfig{})
+	reportLookupError(&stderr, render.FormatPlain, "example.com", fmt.Errorf("boom"), nil, false, uiConfig{}, nil, "")
 	out := stderr.String()
 	if !strings.HasPrefix(out, "plat: example.com: boom") {
 		t.Errorf("expected a plain \"plat: domain: err\" line, got: %q", out)
@@ -545,7 +660,7 @@ func TestReportLookupError_NotRegisteredUsesOKStyleInHumanFormat(t *testing.T) {
 	th := human.NewTheme(false)
 
 	var notRegistered bytes.Buffer
-	reportLookupError(&notRegistered, render.FormatHuman, "example.com", lookupOutcomeError(1, sources), sources, false, uiConfig{})
+	reportLookupError(&notRegistered, render.FormatHuman, "example.com", lookupOutcomeError(1, sources), sources, false, uiConfig{}, nil, "")
 	wantOK := th.OK.Render("plat: example.com: is not registered (checked: registry-rdap)") + "\n"
 	if notRegistered.String() != wantOK {
 		t.Errorf("not-registered output = %q, want th.OK-styled %q", notRegistered.String(), wantOK)
@@ -553,7 +668,7 @@ func TestReportLookupError_NotRegisteredUsesOKStyleInHumanFormat(t *testing.T) {
 
 	failedSources := []model.SourceResult{{Source: model.SourceRegistryRDAP, Err: "timeout"}}
 	var failed bytes.Buffer
-	reportLookupError(&failed, render.FormatHuman, "example.com", lookupOutcomeError(3, failedSources), failedSources, false, uiConfig{})
+	reportLookupError(&failed, render.FormatHuman, "example.com", lookupOutcomeError(3, failedSources), failedSources, false, uiConfig{}, nil, "")
 	wantErr := th.Err.Render("plat: example.com: lookup inconclusive -- 1 of 1 sources failed, so non-existence can't be confirmed (checked: registry-rdap)") + "\n"
 	if failed.String() != wantErr {
 		t.Errorf("total-failure output = %q, want th.Err-styled %q", failed.String(), wantErr)
@@ -568,14 +683,43 @@ func TestReportLookupError_VerboseIncludesSourceDiagnostics(t *testing.T) {
 
 	for _, format := range []render.Format{render.FormatHuman, render.FormatPlain} {
 		var quiet, verbose bytes.Buffer
-		reportLookupError(&quiet, format, "example.com", fmt.Errorf("no usable data for example.com"), sources, false, uiConfig{})
-		reportLookupError(&verbose, format, "example.com", fmt.Errorf("no usable data for example.com"), sources, true, uiConfig{})
+		reportLookupError(&quiet, format, "example.com", fmt.Errorf("no usable data for example.com"), sources, false, uiConfig{}, nil, "")
+		reportLookupError(&verbose, format, "example.com", fmt.Errorf("no usable data for example.com"), sources, true, uiConfig{}, nil, "")
 
 		if strings.Contains(quiet.String(), "dial tcp: timeout") {
 			t.Errorf("format %v: non-verbose error output unexpectedly contains source diagnostics:\n%s", format, quiet.String())
 		}
 		if !strings.Contains(verbose.String(), "dial tcp: timeout") {
 			t.Errorf("format %v: verbose error output missing source diagnostics, got:\n%s", format, verbose.String())
+		}
+	}
+}
+
+// TestReportLookupError_VerboseIncludesNotQueriedSources is a regression
+// test for the failure-path counterpart of the -v not-queried line: both
+// human.RenderSources and plain.RenderSources used to hard-code nil/"" for
+// notQueried/reason, so `plat -v --source rdap <name that fails
+// everywhere>` silently dropped the two WHOIS rows from a block
+// documented as showing "every source attempted" -- reading as though
+// WHOIS itself failed rather than as the filter working, on exactly the
+// path a user hitting a total lookup failure is most likely to be
+// reading.
+func TestReportLookupError_VerboseIncludesNotQueriedSources(t *testing.T) {
+	sources := []model.SourceResult{
+		{Source: model.SourceRegistryRDAP, Err: "timeout", Latency: 5 * time.Second},
+	}
+	notQueried := []model.SourceID{model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS}
+	reason := "--source rdap"
+
+	for _, format := range []render.Format{render.FormatHuman, render.FormatPlain} {
+		var buf bytes.Buffer
+		reportLookupError(&buf, format, "example.com", fmt.Errorf("no usable data for example.com"), sources, true, uiConfig{}, notQueried, reason)
+		out := buf.String()
+		if !strings.Contains(out, string(model.SourceRegistrarWHOIS)) || !strings.Contains(out, string(model.SourceRegistryWHOIS)) {
+			t.Errorf("format %v: verbose failure output missing not-queried WHOIS sources, got:\n%s", format, out)
+		}
+		if !strings.Contains(out, reason) {
+			t.Errorf("format %v: verbose failure output missing the --source reason, got:\n%s", format, out)
 		}
 	}
 }
@@ -1308,6 +1452,83 @@ func TestRunLookupPool_BoundsRealLookupOneConcurrency(t *testing.T) {
 	}
 }
 
+// twoNameRDAPFixtureClient stands up an httptest RDAP server that always
+// answers with testdata/rdap/com-example.json, and a *plat.Client wired to
+// it via a fake bootstrap resolver -- the same no-network harness
+// TestRunLookupPool_BoundsRealLookupOneConcurrency uses. The task-9 tests
+// below need two names that actually render something (not two names that
+// fail normalization and leave stdout empty, which is why the brief's own
+// version of this test could not discriminate pass from fail), and this is
+// the smallest fixture that renders.
+func twoNameRDAPFixtureClient(t *testing.T, opts lookupOptions) (*plat.Client, []string) {
+	t.Helper()
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(fixture)
+	}))
+	t.Cleanup(rdapSrv.Close)
+
+	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
+	sources := []model.SourceID{model.SourceRegistryRDAP}
+	client := newTestClient(t, resolver, opts, sources)
+	return client, []string{"name0.com", "name1.com"}
+}
+
+// TestQuietMultiNameIsNotDoubleSpaced replaces the brief's version of this
+// test, which could not fail: with two names that fail normalization
+// (a..com, b..com), each worker's stdout buffer is empty, so the loop
+// writes nothing but the separator itself between them regardless of -q --
+// "\n\n" is absent whether or not the guard exists, so the brief's
+// assertion passed even against the unmodified loop. This version renders
+// real single-line quiet records from an offline RDAP fixture and checks
+// the actual line structure, which does discriminate (see task-9-report.md
+// for the captured before/after run).
+func TestQuietMultiNameIsNotDoubleSpaced(t *testing.T) {
+	opts := lookupOptions{NoFollow: true, Concurrency: 2, Quiet: true}
+	client, domains := twoNameRDAPFixtureClient(t, opts)
+
+	var stdout, stderr bytes.Buffer
+	if err := runLookupPool(context.Background(), &stdout, &stderr, domains, opts, render.FormatPlain, uiConfig{}, client); err != nil {
+		t.Fatalf("runLookupPool: %v\nstderr:\n%s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+	if len(lines) != len(domains) {
+		t.Fatalf("got %d lines, want %d (one quiet summary per name, no blank separator); stdout:\n%q", len(lines), len(domains), out)
+	}
+	for i, line := range lines {
+		if line == "" {
+			t.Errorf("line %d is blank; -q output must not be double-spaced; stdout:\n%q", i, out)
+		}
+	}
+}
+
+// TestNonQuietMultiNameKeepsItsSeparator is the over-correction guard: the
+// same fixture, without -q, must still carry a blank line between the two
+// (now multi-line) rendered records. Also replaces the brief's version,
+// which asserted this on the same empty-stdout two-name case and so failed
+// even after the production fix -- there was nothing between two empty
+// buffers to separate.
+func TestNonQuietMultiNameKeepsItsSeparator(t *testing.T) {
+	opts := lookupOptions{NoFollow: true, Concurrency: 2}
+	client, domains := twoNameRDAPFixtureClient(t, opts)
+
+	var stdout, stderr bytes.Buffer
+	if err := runLookupPool(context.Background(), &stdout, &stderr, domains, opts, render.FormatPlain, uiConfig{}, client); err != nil {
+		t.Fatalf("runLookupPool: %v\nstderr:\n%s", err, stderr.String())
+	}
+
+	if !strings.Contains(stdout.String(), "\n\n") {
+		t.Errorf("non-quiet multi-name output lost its blank separator; got:\n%q", stdout.String())
+	}
+}
+
 // TestRunLookup_ConcurrencyMustBeAtLeastOne is I2's usage-error coverage
 // for the "< 1" guard in runLookup: 0 and negative values must be
 // rejected as a usage error (exit 2, a message naming --concurrency)
@@ -1817,4 +2038,36 @@ func TestRunLookup_WHOISPacingFollowsDomainCount(t *testing.T) {
 			t.Errorf("registrar data present for a two-name run within the 200ms deadline -- a correctly-paced shared host hands out only one free slot total across both names' hops, and every other query needs a full 1s wait, so this should never finish that fast. output:\n%s", out)
 		}
 	})
+}
+
+func TestHelpExplainsToolAndProvenance(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--help"}, &stdout, &stderr, uiConfig{})
+	if code != 0 {
+		t.Fatalf("--help exit = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	out := stdout.String()
+
+	// The Long description must explain the tool's differentiator --
+	// per-field provenance -- since that is what makes the default
+	// output's source tags legible.
+	for _, want := range []string{"RDAP", "WHOIS", "disagree"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("--help output does not mention %q; got:\n%s", want, out)
+		}
+	}
+
+	// Every source ID the renderers can tag a field with must be decoded
+	// in the help text. If sourceCode() ever gains a code that is not
+	// listed here, the help text is lying about its own output.
+	for _, src := range model.Precedence {
+		if !strings.Contains(out, string(src)) {
+			t.Errorf("--help output does not decode source %q; got:\n%s", src, out)
+		}
+	}
+
+	// At least one runnable example line.
+	if !strings.Contains(out, "plat example.com -o json") {
+		t.Errorf("--help output has no json example; got:\n%s", out)
+	}
 }

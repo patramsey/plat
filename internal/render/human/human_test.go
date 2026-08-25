@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/render/plain"
 )
 
 func fullRecord() model.Record {
@@ -207,6 +208,28 @@ func TestRender_SourcesBlock(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("sources block missing %q, got:\n%s", want, out)
 		}
+	}
+}
+
+func TestHumanVerboseReportsNotQueriedSources(t *testing.T) {
+	rec := model.Record{
+		Domain:  model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Sources: []model.SourceResult{{Source: model.SourceRegistryRDAP, OK: true, Latency: 100 * time.Millisecond}},
+	}
+	opts := Options{
+		Theme:            NewTheme(false),
+		Width:            100,
+		Verbose:          true,
+		NotQueried:       []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS},
+		NotQueriedReason: "--source rdap",
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, opts); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	want := "(registry-whois, registrar-whois not queried: --source rdap)"
+	if !strings.Contains(buf.String(), want) {
+		t.Errorf("verbose output missing %q; got:\n%s", want, buf.String())
 	}
 }
 
@@ -929,8 +952,14 @@ func TestRender_SourceLegendWrapsAtNarrowWidth(t *testing.T) {
 	// else. It must wrap like everything else in this file rather than
 	// overflow just because it's a one-time legend.
 	rec := model.Record{
-		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP}},
+		Handle: model.Field[string]{Value: "H1", Sources: []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS}},
 	}
+	// Every code and every full name it decodes -- writeSourceLegend now
+	// wraps by whole entry (wrapItems), not lipgloss's generic word-wrap,
+	// so unlike before, a name is never split mid-hyphen and a code is
+	// never orphaned from its name.
+	wantWhole := []string{"RR registrar-rdap", "GR registry-rdap", "RW registrar-whois", "GW registry-whois"}
 	for _, width := range []int{40, 60, 80} {
 		var buf bytes.Buffer
 		if err := Render(&buf, rec, Options{Theme: NewTheme(false), Width: width}); err != nil {
@@ -942,16 +971,41 @@ func TestRender_SourceLegendWrapsAtNarrowWidth(t *testing.T) {
 				t.Errorf("width %d: line exceeds it (got %d visible columns): %q", width, w, l)
 			}
 		}
-		// Only check the four short codes, not the full words next to
-		// them -- at narrow widths lipgloss's word-wrap legitimately
-		// breaks even a single long word mid-hyphen (e.g. "registrar-
-		// whois" -> "registrar-" / "whois" across two lines), so a full
-		// word is never guaranteed to survive as one contiguous
-		// substring. The 2-letter codes are short enough to never need
-		// splitting themselves.
-		for _, want := range []string{"RR", "GR", "RW", "GW"} {
+		for _, want := range wantWhole {
 			if !strings.Contains(out, want) {
-				t.Errorf("width %d: expected code %q to still appear, got:\n%s", width, want, out)
+				t.Errorf("width %d: expected whole entry %q to survive unsplit, got:\n%s", width, want, out)
+			}
+		}
+	}
+}
+
+// TestSourceLegendNeverSplitsAnEntry exercises writeSourceLegend directly
+// (not the full box) so the check isn't diluted by unrelated field rows,
+// and asserts every wrapped line is built entirely out of whole legend
+// entries -- catching both an orphaned bare code (its name pushed to the
+// next line) and a mid-hyphen break (e.g. "registry-" / "whois" across
+// two lines, what plain word-wrap produced at width 76-80 before this
+// fix), neither of which a substring-only check reliably catches.
+func TestSourceLegendNeverSplitsAnEntry(t *testing.T) {
+	sources := []model.SourceID{model.SourceRegistrarRDAP, model.SourceRegistryRDAP, model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS}
+	wantEntries := []string{"RR registrar-rdap", "GR registry-rdap", "RW registrar-whois", "GW registry-whois"}
+	for width := 15; width <= 80; width++ {
+		var b strings.Builder
+		writeSourceLegend(&b, NewTheme(false), width, sources)
+		for _, line := range strings.Split(strings.TrimRight(b.String(), "\n"), "\n") {
+			trimmed := strings.TrimSpace(ansi.Strip(line))
+			if trimmed == "" {
+				continue
+			}
+			remainder := trimmed
+			for _, entry := range wantEntries {
+				remainder = strings.ReplaceAll(remainder, entry, "")
+			}
+			// Fields, not TrimSpace: legendSep's internal runs of spaces
+			// between two removed entries sit in the MIDDLE of remainder,
+			// not just its edges.
+			if fields := strings.Fields(remainder); len(fields) != 0 {
+				t.Errorf("width %d: line %q is not composed entirely of whole legend entries (leftover %q)", width, line, remainder)
 			}
 		}
 	}
@@ -959,10 +1013,10 @@ func TestRender_SourceLegendWrapsAtNarrowWidth(t *testing.T) {
 
 func TestWrapItems_NeverStartsALineWithTheSeparator(t *testing.T) {
 	items := []string{"clientUpdateProhibited", "clientTransferProhibited", "clientDeleteProhibited", "serverUpdateProhibited", "serverTransferProhibited", "serverDeleteProhibited"}
-	for _, line := range wrapItems(items, 30, " · ") {
+	for _, line := range wrapItems(items, " · ", 30) {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "·") {
-			t.Errorf("wrapped line starts with the bare separator: %q\nall lines: %v", line, wrapItems(items, 30, " · "))
+			t.Errorf("wrapped line starts with the bare separator: %q\nall lines: %v", line, wrapItems(items, " · ", 30))
 		}
 	}
 }
@@ -971,7 +1025,7 @@ func TestWrapItems_PreservesANSIStyledItems(t *testing.T) {
 	th := NewTheme(false)
 	styled := th.OK.Render("ok") + " and more"
 	items := []string{styled, "plain"}
-	lines := wrapItems(items, 100, " · ")
+	lines := wrapItems(items, " · ", 100)
 	if len(lines) != 1 || lines[0] != styled+" · plain" {
 		t.Errorf("wrapItems altered a pre-styled item, got %q", lines)
 	}
@@ -1225,14 +1279,14 @@ func TestRender_LifecycleSectionOmitsEstimateWhenAbsent(t *testing.T) {
 // trio, guarding the opposite direction from its IP and ASN siblings
 // (TestRenderIP_LegendOmitsRegistrarSources,
 // TestRenderASN_LegendOmitsRegistrarSources). Those two pin that RIR-held
-// objects must not advertise registrar codes; this pins that domains still
-// must, since a domain genuinely can be sourced from all four. Without it,
-// "fixing" the legend by giving every object type the registry-only
-// variant would pass the whole suite while silently making the default
-// domain view undecodable.
+// objects must not advertise registrar codes; this pins that a domain
+// whose fields are actually sourced from all four still shows all four --
+// it's the data doing the gating now, not a type-based assumption, so the
+// fixture has to give every code a field to attach to.
 func TestRender_DomainLegendKeepsRegistrarSources(t *testing.T) {
 	rec := model.Record{
-		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP}},
+		Handle: model.Field[string]{Value: "H1", Sources: []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS}},
 	}
 	var buf bytes.Buffer
 	if err := Render(&buf, rec, Options{Theme: NewTheme(false), Width: 100}); err != nil {
@@ -1246,6 +1300,110 @@ func TestRender_DomainLegendKeepsRegistrarSources(t *testing.T) {
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("domain legend is missing %q -- all four sources are reachable for a domain:\n%s", want, out)
+		}
+	}
+}
+
+func TestHumanLegendListsOnlyPresentCodes(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "denic.de", Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{Theme: NewTheme(false), Width: 100}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "GW registry-whois") {
+		t.Errorf("legend missing the one code the record does carry; got:\n%s", out)
+	}
+	for _, absent := range []model.SourceID{model.SourceRegistrarRDAP, model.SourceRegistryRDAP, model.SourceRegistrarWHOIS} {
+		if strings.Contains(out, string(absent)) {
+			t.Errorf("legend explains %q, which appears on no field; got:\n%s", absent, out)
+		}
+	}
+}
+
+// Both renderers must derive the same code set for the same record --
+// they decode the same badges, so a divergence means one of them is
+// lying about the other's output.
+func TestHumanAndPlainLegendsAgree(t *testing.T) {
+	rec := model.Record{
+		Domain:      model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Nameservers: model.Field[[]string]{Value: []string{"a.iana-servers.net"}, Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+	}
+	var human, plainBuf bytes.Buffer
+	if err := Render(&human, rec, Options{Theme: NewTheme(false), Width: 100}); err != nil {
+		t.Fatalf("human Render: %v", err)
+	}
+	if err := plain.Render(&plainBuf, rec, plain.Options{}); err != nil {
+		t.Fatalf("plain Render: %v", err)
+	}
+	for _, s := range model.Precedence {
+		inHuman := strings.Contains(human.String(), string(s))
+		inPlain := strings.Contains(plainBuf.String(), string(s))
+		if inHuman != inPlain {
+			t.Errorf("source %q: present in human=%v, plain=%v -- the two legends disagree", s, inHuman, inPlain)
+		}
+	}
+}
+
+// TestBoxFitsWidth is a regression test (task 10) for a real narrow-terminal
+// overflow: writeConflictsHint used to be the one writer in the box not
+// given width, so its ~51-char unwrapped string became the box's widest
+// line and dragged the border out past the requested width below ~55
+// columns -- but only for a record carrying a conflict, since that's the
+// only case where the hint prints at all. Measured via lipgloss.Width, the
+// same CSI/OSC-8-aware measure the renderer itself uses for every other
+// wrap decision (see wrapValue/writeBadge in rows.go) -- a plain regex here
+// previously produced nonsense by stripping CSI but not OSC 8 hyperlinks.
+func TestBoxFitsWidth(t *testing.T) {
+	withConflict := model.Record{
+		Domain:    model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Conflicts: []model.Conflict{{Field: "updated", Values: map[model.SourceID]string{model.SourceRegistryRDAP: "a", model.SourceRegistryWHOIS: "b"}}},
+	}
+	without := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	// verboseNotQueried carries no Sources at all, so writeSources' only
+	// content is the not-queried line -- exercising the exact writer
+	// (tables.go's writeSources) that used to skip wrapValue entirely and
+	// print that line unwrapped, blowing the box out to ~95 columns
+	// regardless of the requested width. Neither withConflict nor without
+	// sets Verbose, so without this case the loop below never reached
+	// writeSources' not-queried branch at all.
+	verboseNotQueried := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	for _, tc := range []struct {
+		name string
+		rec  model.Record
+		opts Options
+	}{
+		{"with conflict", withConflict, Options{}},
+		{"without conflict", without, Options{}},
+		{"verbose not-queried", verboseNotQueried, Options{
+			Verbose:          true,
+			NotQueried:       []model.SourceID{model.SourceRegistrarRDAP, model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS},
+			NotQueriedReason: "--source rdap, --no-follow",
+		}},
+	} {
+		for _, width := range []int{40, 50, 55, 60, 80} {
+			var buf bytes.Buffer
+			opts := tc.opts
+			opts.Theme = NewTheme(false)
+			opts.Width = width
+			if err := Render(&buf, tc.rec, opts); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			widest := 0
+			for _, line := range strings.Split(buf.String(), "\n") {
+				if w := lipgloss.Width(line); w > widest {
+					widest = w
+				}
+			}
+			if widest > width {
+				t.Errorf("%s: width=%d widest=%d -- box exceeded its requested width", tc.name, width, widest)
+			}
 		}
 	}
 }

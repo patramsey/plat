@@ -6,6 +6,50 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `--help` now explains what plat does, decodes the `RR`/`GR`/`RW`/`GW`
+  source tags that appear in its own output, and shows runnable examples.
+
+### Changed
+- **Breaking:** A name containing an empty label -- `a..com`, `xn--.com`,
+  `.com` -- now exits `2` (usage error) instead of `1` (not found), and
+  `plat.Client.Lookup` returns `ErrInvalidInput` for the same inputs
+  instead of a nil error wrapping a not-found `Result`. Exit `1` claimed
+  every source agreed the name did not exist, about a name plat never
+  actually looked up. `xn--.com` was the clearest case:
+  `idna.Lookup.ToASCII("xn--.com")` returns `.com` with a nil error, so
+  plat queried `.com` -- a different name than the one it was given --
+  got a not-found answer for it, and reported that as the result for
+  `xn--.com`. Scripts and library callers keying on the old behavior for
+  these inputs need updating.
+
+### Fixed
+- The source legend now lists only the tags a record actually carries.
+  A `.de` domain answered by registry WHOIS alone no longer gets a key
+  explaining three sources that appear nowhere in its output. Both the
+  human and plain renderers.
+- `-v` now names the sources `--source` and `--no-follow` excluded,
+  instead of silently omitting them from a block documented as showing
+  every source attempted. A flag is only named when it genuinely
+  excluded something -- `--no-follow` gates just the registrar RDAP
+  hop, so it's not listed for an IP or ASN lookup, which has no
+  registrar to begin with.
+- `-o plain` caps its value column to the terminal width. Previously one
+  long `Status` value padded every row past 80 columns, and the
+  terminal's own wrap orphaned the source tags onto their own line.
+  Values wrap at whitespace, so a long registrar name wraps while an
+  unbreakable token like a URL stays intact on one line and may still
+  exceed the width. Piped output is unchanged -- wrapping only applies
+  when stdout is a terminal, so `grep` and `awk` still see whole
+  nameserver lists.
+- `-q` no longer double-spaces its one-line summaries in multi-name runs.
+- A conflict-carrying record's box no longer overflows a narrow
+  terminal. `writeConflictsHint` was the only writer inside the box not
+  given the requested width, so its 51-rune hint string -- plus 4
+  columns of border and padding -- pinned the box at 55 display columns
+  regardless of how narrow it was asked to be; a record with no conflict
+  tracked the requested width correctly.
+
 ## [0.6.0] - 2026-08-23
 
 ### Fixed

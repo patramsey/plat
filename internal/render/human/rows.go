@@ -216,7 +216,7 @@ func writeStyledListRow(b *strings.Builder, th Theme, width int, label string, i
 	// pass over any still-too-wide line catches that, same as
 	// writeWrappedEntry already does for the Conflicts block.
 	var lines []string
-	for _, line := range wrapItems(items, valueWidth, " · ") {
+	for _, line := range wrapItems(items, " · ", valueWidth) {
 		if lipgloss.Width(line) > valueWidth {
 			lines = append(lines, wrapValue(line, valueWidth)...)
 		} else {
@@ -244,7 +244,12 @@ func writeStyledListRow(b *strings.Builder, th Theme, width int, label string, i
 // generic word-wrap, which treats sep as its own breakable word and can
 // leave one alone at the start of a wrapped line, this only ever breaks
 // between items, so a wrapped line always starts with a real item.
-func wrapItems(items []string, width int, sep string) []string {
+//
+// Parameter order (items, sep, width) matches internal/render/plain's
+// wrapItems -- they used to be transposed, which meant copying a call
+// between the two packages silently swapped two ints instead of failing
+// to compile.
+func wrapItems(items []string, sep string, width int) []string {
 	if len(items) == 0 {
 		return []string{""}
 	}
@@ -262,30 +267,73 @@ func wrapItems(items []string, width int, sep string) []string {
 	return append(lines, cur)
 }
 
-// Legend text decoding sourceCode's abbreviations. Two variants, because
-// which sources can exist depends on the object type: a domain is held by
-// a registrar under a registry, so all four codes are reachable, while an
-// IP allocation or an autonomous system is registered directly with an RIR
-// and has no registrar at all. Listing RR/RW on an IP or ASN record
-// explains badges that can never appear there, which reads as "plat failed
-// to reach the registrar" rather than "no such source exists".
-const (
-	legendWithRegistrar = "RR registrar-rdap   GR registry-rdap   RW registrar-whois   GW registry-whois"
-	legendRegistryOnly  = "GR registry-rdap   GW registry-whois"
-)
+// legendEntry decodes one source into its "XX source-id" legend entry. An
+// unrecognized SourceID (which shouldn't happen given the closed set in
+// internal/model) has no two-letter code -- sourceCode falls back to the
+// raw string -- so it prints once rather than as "foo foo".
+func legendEntry(s model.SourceID) string {
+	code := sourceCode(s)
+	if code == string(s) {
+		return code
+	}
+	return code + " " + string(s)
+}
 
-// writeSourceLegend prints the key decoding sourceCode's abbreviations --
-// unconditionally, not gated by --verbose or --conflicts, since the codes
-// it explains appear in the DEFAULT view; hiding the legend by default
-// would make the default output undecodable, not just less detailed. The
-// widest legend is ~77 columns, wide enough to need the same wrap-safety
-// every other line in this file gets rather than assuming it always fits.
+// buildSourceLegend renders the key decoding the two-letter codes in
+// sources, which callers derive from the record via model.PresentSources*
+// -- so the key explains exactly the badges the reader can see and nothing
+// else. A record whose only answer came from registry WHOIS used to get
+// all four codes explained, which reads as "plat failed to reach the other
+// three" rather than "the other three had nothing to say".
 //
-// legend is the caller's choice of the two constants above: domain records
-// pass legendWithRegistrar, IP and ASN records pass legendRegistryOnly.
-func writeSourceLegend(b *strings.Builder, th Theme, width int, legend string) {
+// Kept in step with the same function in internal/render/plain/plain.go --
+// the two renderers must decode the same codes the same way.
+func buildSourceLegend(sources []model.SourceID) string {
+	return strings.Join(legendEntries(sources), legendSep)
+}
+
+// legendSep separates legend entries. Wide enough that "GR registry-rdap"
+// reads as one unit rather than four loose words.
+//
+// Kept in step with the same constant in internal/render/plain/plain.go.
+const legendSep = "   "
+
+// legendEntries returns one entry per source, in the order given. Wrapped
+// by whole entry (see writeSourceLegend), the same reason nameservers wrap
+// by whole item rather than by word.
+func legendEntries(sources []model.SourceID) []string {
+	entries := make([]string, len(sources))
+	for i, s := range sources {
+		entries[i] = legendEntry(s)
+	}
+	return entries
+}
+
+// writeSourceLegend prints the key unconditionally, not gated by --verbose
+// or --conflicts, since the codes it explains appear in the DEFAULT view;
+// hiding it by default would make the default output undecodable, not just
+// less detailed. It stays wrap-safe: a four-code legend is ~77 columns,
+// wide enough to need the same treatment every other line in this file
+// gets rather than assuming it always fits.
+//
+// Wraps by whole entry via wrapItems, not generic word-wrap: at an
+// ordinary 80-column terminal (and at the defaultWidth fallback) plain
+// wrapValue word-wrapping split "registry-whois" across two lines, and at
+// narrower widths could orphan a bare "GR" from its name -- the same
+// "code with no name, name with no code" problem plain's legend wrapping
+// already avoids (see plain.go's writeSourceLegend). Kept structurally
+// parallel to that function, not just behaviourally equal.
+func writeSourceLegend(b *strings.Builder, th Theme, width int, sources []model.SourceID) {
+	if len(sources) == 0 {
+		return
+	}
+	legend := buildSourceLegend(sources)
 	b.WriteString("\n")
-	for _, line := range wrapValue(legend, width) {
+	if lipgloss.Width(legend) <= width {
+		b.WriteString(th.Muted.Render(legend) + "\n")
+		return
+	}
+	for _, line := range wrapItems(legendEntries(sources), legendSep, width) {
 		b.WriteString(th.Muted.Render(line) + "\n")
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,14 @@ import (
 // ErrSingleLabel is returned when the input has no dot at all (e.g.
 // "localhost"), which can never be a registrable domain.
 var ErrSingleLabel = errors.New("domain: single-label input is not a valid domain")
+
+// ErrEmptyLabel is returned when a name contains a zero-length label
+// ("a..com", ".com"). idna.Lookup.ToASCII accepts these without error --
+// and rewrites "xn--.com" to ".com", which the len(labels) < 2 guard then
+// waves through as a two-label name, so plat would look up .com instead of
+// the name it was given. The check therefore has to happen here, after the
+// split, rather than being left to idna.
+var ErrEmptyLabel = errors.New("domain: domain name contains an empty label")
 
 // ErrReservedIP is returned when input names a reserved, private, or
 // otherwise special-purpose IP address (RFC 1918/4193 private space,
@@ -106,6 +115,9 @@ func Normalize(input string) (Query, error) {
 	labels := strings.Split(punycode, ".")
 	if len(labels) < 2 {
 		return Query{}, fmt.Errorf("%w: %q", ErrSingleLabel, input)
+	}
+	if slices.Contains(labels, "") {
+		return Query{}, fmt.Errorf("%w: %q", ErrEmptyLabel, input)
 	}
 
 	tld := labels[len(labels)-1]

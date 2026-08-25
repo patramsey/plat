@@ -2,9 +2,11 @@ package plain
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/patramsey/plat/internal/model"
 )
@@ -323,13 +325,16 @@ func TestRender_LifecycleSectionOmitsEstimateWhenAbsent(t *testing.T) {
 }
 
 // TestRender_DomainLegendKeepsRegistrarSources guards the opposite
-// direction from its IP and ASN siblings in this package: domains genuinely
-// can be sourced from all four, so the registrar codes must stay. Without
-// it, giving every object type the registry-only legend would pass the
-// suite while making the default domain view undecodable.
+// direction from its IP and ASN siblings in this package: unlike an IP
+// allocation or ASN, a domain genuinely can be sourced from all four --
+// registrar RDAP/WHOIS are reachable in the chain, not merely defined in
+// the type. When a record's fields actually carry all four, the legend
+// must show all four; it's the data doing the gating now; this fixture
+// gives every code a field to attach to, not a type-based assumption.
 func TestRender_DomainLegendKeepsRegistrarSources(t *testing.T) {
 	rec := model.Record{
-		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP}},
+		Handle: model.Field[string]{Value: "H1", Sources: []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS}},
 	}
 	var buf bytes.Buffer
 	if err := Render(&buf, rec, Options{}); err != nil {
@@ -344,5 +349,303 @@ func TestRender_DomainLegendKeepsRegistrarSources(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("domain legend is missing %q -- all four sources are reachable for a domain:\n%s", want, out)
 		}
+	}
+}
+
+func TestLegendListsOnlyPresentCodes(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		record model.Record
+		want   string
+	}{
+		{
+			name: "single source",
+			record: model.Record{
+				Domain: model.Field[string]{Value: "denic.de", Sources: []model.SourceID{model.SourceRegistryWHOIS}},
+			},
+			want: "GW registry-whois",
+		},
+		{
+			name: "all four",
+			record: model.Record{
+				Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP}},
+				Handle: model.Field[string]{Value: "H1", Sources: []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS}},
+			},
+			want: "RR registrar-rdap   GR registry-rdap   RW registrar-whois   GW registry-whois",
+		},
+		{
+			name: "code reachable only through a conflict",
+			record: model.Record{
+				Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+				Conflicts: []model.Conflict{{
+					Field:  "updated",
+					Values: map[model.SourceID]string{model.SourceRegistrarWHOIS: "a", model.SourceRegistryRDAP: "b"},
+				}},
+			},
+			want: "GR registry-rdap   RW registrar-whois",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := Render(&buf, tc.record, Options{}); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			if !strings.Contains(buf.String(), tc.want) {
+				t.Errorf("legend line missing %q; got:\n%s", tc.want, buf.String())
+			}
+			// The whole point: codes that never appear as a badge must not
+			// be explained.
+			for _, absent := range absentCodes(tc.want) {
+				if strings.Contains(buf.String(), absent) {
+					t.Errorf("legend explains %q, which appears on no field; got:\n%s", absent, buf.String())
+				}
+			}
+		})
+	}
+}
+
+// absentCodes returns the "XX source-id" legend entries NOT in want.
+func absentCodes(want string) []string {
+	var out []string
+	for _, s := range model.Precedence {
+		entry := sourceCode(s) + " " + string(s)
+		if !strings.Contains(want, entry) {
+			out = append(out, entry)
+		}
+	}
+	return out
+}
+
+func TestNoLegendWhenRecordHasNoProvenance(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Render(&buf, model.Record{}, Options{}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	for _, s := range model.Precedence {
+		if strings.Contains(buf.String(), string(s)) {
+			t.Errorf("empty record produced a legend mentioning %q; got:\n%s", s, buf.String())
+		}
+	}
+}
+
+// TestWidthZeroIsByteIdenticalToUnwrapped pins the exact bytes Render
+// produces for a representative record at the default Width of 0. Width 0
+// is what term.GetSize reports for a non-terminal stdout, and plain is also
+// the renderer pipes and NO_COLOR get -- so this must stay byte-identical
+// to what the renderer has always produced. Scripts grep these lines; do
+// not weaken this assertion.
+func TestWidthZeroIsByteIdenticalToUnwrapped(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Render(&buf, representativeRecord(), Options{Verbose: true, ShowConflicts: true}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	got := buf.String()
+	if got != wantRepresentativeOutput {
+		t.Errorf("output changed.\n--- got ---\n%s\n--- want ---\n%s", got, wantRepresentativeOutput)
+	}
+}
+
+// representativeRecord exercises every row shape the renderer has: a
+// scalar, a list long enough to dominate the value column, a timestamp, a
+// bool, a conflict, and a redaction.
+func representativeRecord() model.Record {
+	return model.Record{
+		Domain:      model.Field[string]{Value: "EXAMPLE.COM", Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS}},
+		Registrar:   model.RegistrarInfo{Name: model.Field[string]{Value: "RESERVED-Internet Assigned Numbers Authority", Sources: []model.SourceID{model.SourceRegistryRDAP}}},
+		Status:      model.Field[[]string]{Value: []string{"clientDeleteProhibited", "clientTransferProhibited", "clientUpdateProhibited"}, Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}},
+		Created:     model.Field[model.TimeValue]{Value: model.TimeValue{Parsed: true, Time: time.Date(1995, 8, 14, 4, 0, 0, 0, time.UTC)}, Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}},
+		Nameservers: model.Field[[]string]{Value: []string{"a.iana-servers.net", "b.iana-servers.net"}, Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}},
+		DNSSEC:      model.Field[bool]{Value: true, Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Sources:     []model.SourceResult{{Source: model.SourceRegistryRDAP, OK: true, Latency: 121 * time.Millisecond}},
+		Conflicts:   []model.Conflict{{Field: "created", Values: map[model.SourceID]string{model.SourceRegistryRDAP: "1995-08-14T04:00:00Z", model.SourceRegistryWHOIS: "1995-08-13T04:00:00Z"}}},
+		Redacted:    []model.RedactionNotice{{Field: "registrantName", Source: model.SourceRegistryRDAP, Reason: "gdpr"}},
+	}
+}
+
+const wantRepresentativeOutput = `Domain:       EXAMPLE.COM                                                                 GR, RW, GW
+Registrar:    RESERVED-Internet Assigned Numbers Authority                                GR
+Status:       clientDeleteProhibited · clientTransferProhibited · clientUpdateProhibited  GR, GW
+Created:      1995-08-14T04:00:00Z                                                        GR, GW [conflict]
+Nameservers:  a.iana-servers.net · b.iana-servers.net                                     GR, GW
+DNSSEC:       true                                                                        GR
+GR registry-rdap   RW registrar-whois   GW registry-whois
+---
+registry-rdap:  121ms  ok
+---
+Conflict (created):  GR=1995-08-14T04:00:00Z, GW=1995-08-13T04:00:00Z
+---
+Redacted (registrantName):  registry-rdap (gdpr)
+`
+
+// TestWidthCapsFieldRows checks only the field-row budget emitRowsWithin
+// actually enforces -- it does not (and cannot) promise every line in the
+// output stays under width: an unbreakable scalar (a long URL, a status
+// code with no space to wrap on) still overflows by design, and this
+// record has neither Verbose nor ShowConflicts set, so the -v source
+// block, "Conflict (...)" lines, Redacted, and Lifecycle sit outside its
+// reach entirely.
+func TestWidthCapsFieldRows(t *testing.T) {
+	for _, width := range []int{60, 80, 100} {
+		t.Run(fmt.Sprintf("width%d", width), func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := Render(&buf, representativeRecord(), Options{Width: width}); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+				if n := utf8.RuneCountInString(line); n > width {
+					t.Errorf("line is %d columns, over the %d budget: %q", n, width, line)
+				}
+			}
+		})
+	}
+}
+
+// Wrapping breaks between whole items, never inside a hostname -- a
+// truncated nameserver is worse than a wrapped one, because it looks like
+// a real (wrong) name.
+func TestWrappingNeverSplitsAnItem(t *testing.T) {
+	rec := model.Record{
+		Nameservers: model.Field[[]string]{
+			Value:   []string{"ns1.verylongnameserverexample.com", "ns2.verylongnameserverexample.com", "ns3.verylongnameserverexample.com"},
+			Sources: []model.SourceID{model.SourceRegistryRDAP},
+		},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{Width: 60}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	out := buf.String()
+	for _, ns := range rec.Nameservers.Value {
+		if !strings.Contains(out, ns) {
+			t.Errorf("nameserver %q was split across lines; got:\n%s", ns, out)
+		}
+	}
+}
+
+// A terminal narrower than the columns themselves must degrade, not panic
+// or loop.
+func TestVeryNarrowWidthDegradesGracefully(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Render(&buf, representativeRecord(), Options{Width: 20}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("narrow render produced no output")
+	}
+}
+
+// Multibyte content must not throw the source column out of alignment --
+// the list separator alone is a 2-byte rune.
+func TestPaddingCountsRunesNotBytes(t *testing.T) {
+	rec := model.Record{
+		Domain:      model.Field[string]{Value: "bücher.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Nameservers: model.Field[[]string]{Value: []string{"ns1.bücher.com", "ns2.bücher.com"}, Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{Width: 60}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	var cols []int
+	for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		// i > 0, not >= 0: Render always appends a source legend line
+		// ("GR registry-rdap"), which itself starts with "GR" at offset
+		// 0 -- a genuine data row's source column can never start at 0,
+		// since the label and padding always precede it. Excluding that
+		// leaves only the rows this test is actually about.
+		if i := strings.Index(line, "GR"); i > 0 {
+			cols = append(cols, utf8.RuneCountInString(line[:i]))
+		}
+	}
+	if len(cols) < 2 {
+		t.Fatalf("expected at least two source-tagged rows, got %d", len(cols))
+	}
+	for _, c := range cols[1:] {
+		if c != cols[0] {
+			t.Errorf("source column starts at differing rune offsets %v -- padding counted bytes", cols)
+		}
+	}
+}
+
+func TestVerboseReportsNotQueriedSources(t *testing.T) {
+	rec := model.Record{
+		Domain:  model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Sources: []model.SourceResult{{Source: model.SourceRegistryRDAP, OK: true, Latency: 100 * time.Millisecond}},
+	}
+	opts := Options{
+		Verbose:          true,
+		NotQueried:       []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS},
+		NotQueriedReason: "--source rdap",
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, opts); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	want := "(registry-whois, registrar-whois not queried: --source rdap)"
+	if !strings.Contains(buf.String(), want) {
+		t.Errorf("verbose output missing %q; got:\n%s", want, buf.String())
+	}
+}
+
+func TestNotQueriedLineIsVerboseOnly(t *testing.T) {
+	rec := model.Record{
+		Domain: model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+	}
+	opts := Options{
+		Verbose:          false,
+		NotQueried:       []model.SourceID{model.SourceRegistryWHOIS},
+		NotQueriedReason: "--source rdap",
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, opts); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if strings.Contains(buf.String(), "not queried") {
+		t.Errorf("default (non-verbose) output gained a not-queried line; got:\n%s", buf.String())
+	}
+}
+
+// TestNotQueriedLineWrapsToWidth is a regression test for the same defect
+// the human package's writeSources had: writeNotQueried used to emit one
+// unwrapped line regardless of Width, so a long reason string ("--source
+// rdap, --no-follow" plus several source names) could sit outside every
+// field row's budget even on a narrow terminal.
+func TestNotQueriedLineWrapsToWidth(t *testing.T) {
+	rec := model.Record{
+		Domain:  model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Sources: []model.SourceResult{{Source: model.SourceRegistryRDAP, OK: true, Latency: 100 * time.Millisecond}},
+	}
+	opts := Options{
+		Verbose:          true,
+		Width:            60,
+		NotQueried:       []model.SourceID{model.SourceRegistrarRDAP, model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS},
+		NotQueriedReason: "--source rdap, --no-follow",
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, opts); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		if n := utf8.RuneCountInString(line); n > opts.Width {
+			t.Errorf("line is %d columns, over the %d budget: %q", n, opts.Width, line)
+		}
+	}
+	// The wrapped text must still be present, just split across lines --
+	// "not" and "queried:" may land on either side of a wrap point.
+	if !strings.Contains(buf.String(), "queried:") {
+		t.Errorf("wrapped output lost the not-queried line entirely; got:\n%s", buf.String())
+	}
+}
+
+func TestNoNotQueriedLineWhenNothingFiltered(t *testing.T) {
+	rec := model.Record{
+		Domain:  model.Field[string]{Value: "example.com", Sources: []model.SourceID{model.SourceRegistryRDAP}},
+		Sources: []model.SourceResult{{Source: model.SourceRegistryRDAP, OK: true}},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, rec, Options{Verbose: true}); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if strings.Contains(buf.String(), "not queried") {
+		t.Errorf("unfiltered verbose run gained a not-queried line; got:\n%s", buf.String())
 	}
 }

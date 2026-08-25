@@ -45,7 +45,15 @@ func hasConflict(conflicts []model.Conflict, field string) bool {
 // conflict is only visible via the top summary's count and each field's ⚠
 // marker, with no indication anywhere that a flag exists to see the actual
 // disagreeing values.
-func writeConflictsHint(b *strings.Builder, th Theme, conflicts []model.Conflict) {
+//
+// This was previously the one writer in the box not given width, printing
+// its ~51-char string unwrapped regardless of how narrow the box was asked
+// to be. A record's other lines all wrap (or, without a conflict, simply
+// stay short), so below ~55 columns this hint alone became the box's
+// widest line and dragged its border out past the requested width —
+// wrapValue here fixes that the same way every other writer in this
+// package already degrades.
+func writeConflictsHint(b *strings.Builder, th Theme, width int, conflicts []model.Conflict) {
 	if len(conflicts) == 0 {
 		return
 	}
@@ -53,7 +61,11 @@ func writeConflictsHint(b *strings.Builder, th Theme, conflicts []model.Conflict
 	if len(conflicts) != 1 {
 		noun = "conflicts"
 	}
-	b.WriteString("\n" + th.Muted.Render(fmt.Sprintf("%d %s hidden — pass --conflicts to see details", len(conflicts), noun)) + "\n")
+	hint := fmt.Sprintf("%d %s hidden — pass --conflicts to see details", len(conflicts), noun)
+	b.WriteString("\n")
+	for _, line := range wrapValue(hint, width) {
+		b.WriteString(th.Muted.Render(line) + "\n")
+	}
 }
 
 // writeRedacted renders each redaction notice wrapped to width the same
@@ -112,7 +124,7 @@ func writeWrappedEntry(b *strings.Builder, label string, parts []string, width i
 		valueWidth = 10
 	}
 	var lines []string
-	for _, line := range wrapItems(parts, valueWidth, ", ") {
+	for _, line := range wrapItems(parts, ", ", valueWidth) {
 		if lipgloss.Width(line) > valueWidth {
 			lines = append(lines, wrapValue(line, valueWidth)...)
 		} else {

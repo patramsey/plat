@@ -41,15 +41,15 @@ func RenderIP(w io.Writer, r model.IPRecord, opts Options) error {
 	for _, fd := range model.IPFieldOrder {
 		writeIPField(&b, th, innerWidth, r, fd)
 	}
-	writeSourceLegend(&b, th, innerWidth, legendRegistryOnly)
+	writeSourceLegend(&b, th, innerWidth, model.PresentSourcesIP(r))
 
 	if opts.Verbose {
-		writeSources(&b, th, innerWidth, r.Sources)
+		writeSources(&b, th, innerWidth, r.Sources, opts.NotQueried, opts.NotQueriedReason)
 	}
 	if opts.ShowConflicts {
 		writeConflicts(&b, th, innerWidth, r.Conflicts)
 	} else {
-		writeConflictsHint(&b, th, r.Conflicts)
+		writeConflictsHint(&b, th, innerWidth, r.Conflicts)
 	}
 	writeRedacted(&b, th, innerWidth, r.Redacted)
 

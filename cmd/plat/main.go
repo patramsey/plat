@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -144,6 +145,15 @@ type uiConfig struct {
 	// put it back. Zero value (Unknown) means "no colour", which is what
 	// every test wants.
 	Profile colorprofile.Profile
+	// NotQueried/NotQueriedReason are resolved once per run from
+	// --source and --no-follow and handed to every renderer; see the
+	// renderers' Options.NotQueried. There are two sets because the full
+	// source set depends on the object kind, which is only known per name
+	// -- so both are computed up front and the render dispatch picks.
+	NotQueried          []model.SourceID
+	NotQueriedReason    string
+	NotQueriedRIR       []model.SourceID
+	NotQueriedRIRReason string
 }
 
 func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
@@ -163,8 +173,22 @@ func run(args []string, stdout, stderr io.Writer, ui uiConfig) int {
 	var concurrency int
 
 	root := &cobra.Command{
-		Use:           "plat <domain|ip|asn> [domain|ip|asn...]",
-		Short:         "Look up domain, IP, or ASN ownership via RDAP and WHOIS",
+		Use:   "plat <domain|ip|asn> [domain|ip|asn...]",
+		Short: "Look up domain, IP, or ASN ownership via RDAP and WHOIS",
+		Long: `plat looks up who owns a domain, IP address, or autonomous system,
+querying RDAP and WHOIS at the same time and merging the answers into one
+record. Every field is tagged with the sources that supplied it, so you can
+see where the sources disagree rather than having to trust whichever one
+answered first.
+
+Source tags:
+  RR registrar-rdap    GR registry-rdap
+  RW registrar-whois   GW registry-whois`,
+		Example: `  plat example.com
+  plat 8.8.8.8
+  plat AS15169
+  plat example.com -o json | jq .expires.value
+  plat --file names.txt -o ndjson`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args: func(cmd *cobra.Command, cliArgs []string) error {
@@ -410,6 +434,8 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 	if err != nil {
 		return usageError{err}
 	}
+	ui.NotQueried, ui.NotQueriedReason = notQueriedSources(domainSources, sources, opts.NoFollow, filterReason(opts.SourceFilter))
+	ui.NotQueriedRIR, ui.NotQueriedRIRReason = notQueriedSources(rirSources, sources, opts.NoFollow, filterReason(opts.SourceFilter))
 
 	// Exactly one Client per run, shared by every name in the pool below.
 	// That is load-bearing, not incidental: the per-server WHOIS pacing
@@ -544,7 +570,10 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 		if codes[i] > worst {
 			worst = codes[i]
 		}
-		if !render.IsMachine(format) && i < len(domains)-1 {
+		// A quiet record is a single line; a blank line between two of
+		// them double-spaces the whole run for no gain. The separator
+		// exists to keep multi-line records apart.
+		if !render.IsMachine(format) && !opts.Quiet && i < len(domains)-1 {
 			_, _ = fmt.Fprintln(stdout)
 		}
 	}
@@ -566,7 +595,7 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 func lookupOne(ctx context.Context, stdout, stderr io.Writer, client *plat.Client, input string, opts lookupOptions, format render.Format, ui uiConfig) int {
 	q, err := domain.Normalize(input)
 	if err != nil {
-		reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui)
+		reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 		return 2
 	}
 
@@ -580,7 +609,7 @@ func lookupOne(ctx context.Context, stdout, stderr io.Writer, client *plat.Clien
 	if opts.DiffPath != "" {
 		snap, err := loadSnapshot(opts.DiffPath, q)
 		if err != nil {
-			reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui)
+			reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 			return 2
 		}
 		prior = &snap
@@ -756,7 +785,7 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, client *plat
 		work()
 	}
 	if res.Domain == nil {
-		reportLookupError(stderr, format, q.Name.Punycode, lookupErr, nil, opts.Verbose, ui)
+		reportLookupError(stderr, format, q.Name.Punycode, lookupErr, nil, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 		return 3
 	}
 	record := *res.Domain
@@ -768,18 +797,18 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, client *plat
 				return machine.Encode(w, record, machine.Options{})
 			}, ui)
 			if err != nil {
-				reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui)
+				reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 				return 3
 			}
 			return dcode
 		}
 		if err := renderRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
-			reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui)
+			reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 			return 3
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, q.Name.Punycode, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
+	reportLookupError(stderr, format, q.Name.Punycode, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 	return code
 }
 
@@ -802,7 +831,7 @@ func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, client *plat.Cli
 		work()
 	}
 	if res.IP == nil {
-		reportLookupError(stderr, format, q.Input, lookupErr, nil, opts.Verbose, ui)
+		reportLookupError(stderr, format, q.Input, lookupErr, nil, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 		return 3
 	}
 	record := *res.IP
@@ -814,18 +843,18 @@ func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, client *plat.Cli
 				return machine.EncodeIP(w, record, machine.Options{})
 			}, ui)
 			if err != nil {
-				reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+				reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 				return 3
 			}
 			return dcode
 		}
 		if err := renderIPRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
-			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 			return 3
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
+	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 	return code
 }
 
@@ -849,7 +878,7 @@ func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, client *plat.Cl
 		work()
 	}
 	if res.ASN == nil {
-		reportLookupError(stderr, format, q.Input, lookupErr, nil, opts.Verbose, ui)
+		reportLookupError(stderr, format, q.Input, lookupErr, nil, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 		return 3
 	}
 	record := *res.ASN
@@ -861,18 +890,18 @@ func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, client *plat.Cl
 				return machine.EncodeASN(w, record, machine.Options{})
 			}, ui)
 			if err != nil {
-				reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+				reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 				return 3
 			}
 			return dcode
 		}
 		if err := renderASNRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
-			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui)
+			reportLookupError(stderr, format, q.Input, err, record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 			return 3
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui)
+	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 	return code
 }
 
@@ -924,9 +953,9 @@ func renderRecord(w io.Writer, format render.Format, record model.Record, raw, v
 	case render.FormatNDJSON:
 		return machine.EncodeNDJSON(w, record, machine.Options{Raw: raw})
 	case render.FormatHuman:
-		return human.Render(w, record, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts})
+		return human.Render(w, record, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueried, NotQueriedReason: ui.NotQueriedReason})
 	default: // FormatPlain
-		return plain.Render(w, record, plain.Options{Verbose: verbose, ShowConflicts: showConflicts})
+		return plain.Render(w, record, plain.Options{Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueried, NotQueriedReason: ui.NotQueriedReason})
 	}
 }
 
@@ -947,9 +976,9 @@ func renderIPRecord(w io.Writer, format render.Format, rec model.IPRecord, raw, 
 	case render.FormatNDJSON:
 		return machine.EncodeIPNDJSON(w, rec, machine.Options{Raw: raw})
 	case render.FormatHuman:
-		return human.RenderIP(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts})
+		return human.RenderIP(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	default: // FormatPlain
-		return plain.RenderIP(w, rec, plain.Options{Verbose: verbose, ShowConflicts: showConflicts})
+		return plain.RenderIP(w, rec, plain.Options{Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	}
 }
 
@@ -989,9 +1018,9 @@ func renderASNRecord(w io.Writer, format render.Format, rec model.ASNRecord, raw
 	case render.FormatNDJSON:
 		return machine.EncodeASNNDJSON(w, rec, machine.Options{Raw: raw})
 	case render.FormatHuman:
-		return human.RenderASN(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts})
+		return human.RenderASN(w, rec, human.Options{Theme: human.NewTheme(ui.Dark), Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	default: // FormatPlain
-		return plain.RenderASN(w, rec, plain.Options{Verbose: verbose, ShowConflicts: showConflicts})
+		return plain.RenderASN(w, rec, plain.Options{Width: ui.Width, Verbose: verbose, ShowConflicts: showConflicts, NotQueried: ui.NotQueriedRIR, NotQueriedReason: ui.NotQueriedRIRReason})
 	}
 }
 
@@ -1032,7 +1061,12 @@ func asnQuietSummary(rec model.ASNRecord) string {
 // render error) keeps the existing error styling. Plain/JSON stay
 // unstyled either way, matching how every other renderer in this package
 // only colors human output.
-func reportLookupError(stderr io.Writer, format render.Format, domainName string, err error, sources []model.SourceResult, verbose bool, ui uiConfig) {
+// notQueried/notQueriedReason are the caller's choice of ui.NotQueried
+// (domain) or ui.NotQueriedRIR (IP/ASN) -- reportLookupError itself has
+// no way to tell which object kind failed, since by this point all it
+// has is a domain/IP/ASN name string and a []model.SourceResult common
+// to all three.
+func reportLookupError(stderr io.Writer, format render.Format, domainName string, err error, sources []model.SourceResult, verbose bool, ui uiConfig, notQueried []model.SourceID, notQueriedReason string) {
 	if render.IsMachine(format) {
 		_ = machine.EncodeError(stderr, domainName, err)
 		return
@@ -1051,9 +1085,9 @@ func reportLookupError(stderr io.Writer, format render.Format, domainName string
 		return
 	}
 	if format == render.FormatHuman {
-		_ = human.RenderSources(stderr, human.NewTheme(ui.Dark), ui.Width, sources)
+		_ = human.RenderSources(stderr, human.NewTheme(ui.Dark), ui.Width, sources, notQueried, notQueriedReason)
 	} else {
-		_ = plain.RenderSources(stderr, sources)
+		_ = plain.RenderSources(stderr, sources, notQueried, notQueriedReason, ui.Width)
 	}
 }
 
@@ -1071,6 +1105,85 @@ func deriveOutcome(sources []model.SourceResult) int {
 	default:
 		return 3
 	}
+}
+
+// domainSources and rirSources are the full source sets by object kind: a
+// domain is held by a registrar under a registry, so all four are
+// reachable, while an IP allocation or an autonomous system is registered
+// directly with an RIR and has no registrar at all. Task 4 removed the
+// renderers' legend constants that used to encode this split, so this is
+// now the single place that states it.
+var (
+	domainSources = []model.SourceID{
+		model.SourceRegistrarRDAP, model.SourceRegistryRDAP,
+		model.SourceRegistrarWHOIS, model.SourceRegistryWHOIS,
+	}
+	rirSources = []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}
+)
+
+// notQueriedSources reports which of full were excluded before the lookup
+// ran, and which flag(s) did it, for the -v block's trailing line. A
+// source excluded by both --source and --no-follow is listed once.
+// filterReason is the pre-formatted "--source X" fragment, or "" when
+// --source was not passed.
+func notQueriedSources(full, filter []model.SourceID, noFollow bool, filterReason string) ([]model.SourceID, string) {
+	excluded := make(map[model.SourceID]bool, len(full))
+	var reasons []string
+
+	if len(filter) > 0 {
+		allowed := make(map[model.SourceID]bool, len(filter))
+		for _, s := range filter {
+			allowed[s] = true
+		}
+		filterExcludedAny := false
+		for _, s := range full {
+			if !allowed[s] {
+				excluded[s] = true
+				filterExcludedAny = true
+			}
+		}
+		// A --source value that happens to allow every member of full
+		// (e.g. --source registry against rirSources, which is already
+		// exactly {registry-rdap, registry-whois}) excludes nothing, so
+		// it must not be named as a reason for a line that isn't printed.
+		if filterExcludedAny {
+			reasons = append(reasons, filterReason)
+		}
+	}
+	// --no-follow gates only the registrar RDAP related-link hop; see
+	// collect.Options.NoFollow. That hop only exists for a domain lookup
+	// -- an IP/ASN's full source set (rirSources) has no registrar-rdap
+	// member at all -- so --no-follow only earns a place in the reason
+	// string when it actually removes something --source had not
+	// already removed. Check the prior exclusion state before this
+	// block marks it, or --no-follow would take credit for an exclusion
+	// --source alone produced (e.g. --source whois already excludes
+	// registrar-rdap; --no-follow adds nothing there).
+	if noFollow && slices.Contains(full, model.SourceRegistrarRDAP) {
+		if !excluded[model.SourceRegistrarRDAP] {
+			reasons = append(reasons, "--no-follow")
+		}
+		excluded[model.SourceRegistrarRDAP] = true
+	}
+	if len(excluded) == 0 {
+		return nil, ""
+	}
+	out := make([]model.SourceID, 0, len(excluded))
+	for _, s := range model.Precedence {
+		if excluded[s] {
+			out = append(out, s)
+		}
+	}
+	return out, strings.Join(reasons, ", ")
+}
+
+// filterReason formats the --source flag value back into the fragment
+// shown in the not-queried line, or "" when the flag was not passed.
+func filterReason(sourceFilter string) string {
+	if sourceFilter == "" {
+		return ""
+	}
+	return "--source " + sourceFilter
 }
 
 // parseSourceFilter translates the --source flag's friendly value into
