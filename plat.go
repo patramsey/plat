@@ -230,6 +230,15 @@ func (c *Client) Lookup(ctx context.Context, input string) (Result, error) {
 		res.Kind, res.ASN, sources = KindASN, &rec, rec.Sources
 	}
 
+	// A cancelled or expired context is not a lookup failure, and must not
+	// be reported as one: a caller retrying on ErrLookupFailed would retry
+	// the cancellation. Returned bare rather than wrapped for that reason.
+	// The partial Result still goes back, so whatever merged before the
+	// context ended stays inspectable.
+	if err := ctx.Err(); err != nil {
+		return res, err
+	}
+
 	switch model.Classify(sources) {
 	case model.OutcomeNotFound:
 		return res, ErrNotFound

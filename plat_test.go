@@ -585,3 +585,43 @@ func TestResolverConfig_CoversEveryCombination(t *testing.T) {
 		})
 	}
 }
+
+// A cancelled context is not a lookup failure. A caller retrying on
+// ErrLookupFailed must not retry a cancellation, so the context error is
+// returned bare rather than wrapped.
+func TestLookupReturnsContextErrorOnCancel(t *testing.T) {
+	// Resolver is supplied explicitly (as every other test in this file
+	// does) so New does not fall through to bootstrap.Load's live IANA
+	// fetch -- DisableCache only skips the on-disk cache, not that fetch
+	// attempt. Without it this test would reach the real network.
+	c, err := New(context.Background(), Options{DisableCache: true, Resolver: NewResolver(ResolverConfig{Domains: map[string]string{}})})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, lookupErr := c.Lookup(ctx, "example.com")
+	if !errors.Is(lookupErr, context.Canceled) {
+		t.Errorf("err = %v, want it to match context.Canceled", lookupErr)
+	}
+	if errors.Is(lookupErr, ErrLookupFailed) {
+		t.Errorf("err = %v, must NOT match ErrLookupFailed -- a retry loop keyed on it would retry a cancellation", lookupErr)
+	}
+}
+
+func TestLookupReturnsContextErrorOnDeadline(t *testing.T) {
+	// See TestLookupReturnsContextErrorOnCancel: Resolver is supplied so
+	// New doesn't reach the live IANA bootstrap over the network.
+	c, err := New(context.Background(), Options{DisableCache: true, Resolver: NewResolver(ResolverConfig{Domains: map[string]string{}})})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+	defer cancel()
+
+	_, lookupErr := c.Lookup(ctx, "example.com")
+	if !errors.Is(lookupErr, context.DeadlineExceeded) {
+		t.Errorf("err = %v, want it to match context.DeadlineExceeded", lookupErr)
+	}
+}
