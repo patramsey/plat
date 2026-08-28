@@ -9,7 +9,7 @@ import (
 )
 
 // FromWHOIS adapts a WHOIS lookup's hop chain into per-hop
-// model.SourceRecords. It skips Hops[0] (the IANA referral hop — never a
+// source.SourceRecords. It skips Hops[0] (the IANA referral hop — never a
 // data source, per whois.Client.Lookup's documented hop order) and maps
 // the registry hop (Hops[1], if present) to SourceRegistryWHOIS and the
 // registrar hop (Hops[2], if present) to SourceRegistrarWHOIS.

@@ -74,7 +74,7 @@ type IPSourceRecord struct {
 	Redactions     []model.RedactionNotice
 }
 
-// See the SourceRecord versions in record.go for why these exist and why
+// See SourceRecord's IsPresent/SourceID above for why these exist and why
 // IsPresent is not called Present.
 func (r IPSourceRecord) IsPresent() bool          { return r.Present }
 func (r IPSourceRecord) SourceID() model.SourceID { return r.Meta.Source }
@@ -108,11 +108,11 @@ type ASNSourceRecord struct {
 	Redactions     []model.RedactionNotice
 }
 
-// See the SourceRecord versions in record.go for why these exist and why
+// See SourceRecord's IsPresent/SourceID above for why these exist and why
 // IsPresent is not called Present.
 func (r ASNSourceRecord) IsPresent() bool          { return r.Present }
 func (r ASNSourceRecord) SourceID() model.SourceID { return r.Meta.Source }
 
-// See the IPSourceRecord version in ip.go. SourceRecord deliberately
-// does not get this method.
+// See IPSourceRecord's Statuses above. SourceRecord deliberately does not
+// get this method.
 func (r ASNSourceRecord) Statuses() []string { return r.Status }

@@ -101,7 +101,7 @@ var statusWarn = map[string]bool{
 	"transferPeriod":  true,
 }
 
-// statusStyle classifies an EPP status code (see internal/model.
+// statusStyle classifies an EPP status code (see internal/source.
 // NormalizeEPPStatus) into a color: green for a protective/locked-down
 // status, red for one meaning something is actively wrong, yellow for a
 // transitional/grace-period state, and the default value style for
