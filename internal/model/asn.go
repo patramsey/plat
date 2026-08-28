@@ -72,34 +72,3 @@ type ASNRecord struct {
 	Sources     []SourceResult
 	Conflicts   []Conflict
 }
-
-// ASNSourceRecord is MergeASN's input shape -- one per source attempted,
-// produced by internal/collect's ASN adapters.
-type ASNSourceRecord struct {
-	Meta           SourceResult
-	Present        bool
-	Handle         string
-	Name           string
-	Type           string
-	StartAutnum    string
-	EndAutnum      string
-	Country        string
-	OrgName        string
-	OrgID          string
-	AbuseEmail     string
-	AbusePhone     string
-	Status         []string // RIR's own status strings, passed through unchanged (not EPP vocabulary)
-	Registered     TimeValue
-	Updated        TimeValue
-	RedactedFields map[string]bool
-	Redactions     []RedactionNotice
-}
-
-// See the SourceRecord versions in record.go for why these exist and why
-// IsPresent is not called Present.
-func (r ASNSourceRecord) IsPresent() bool    { return r.Present }
-func (r ASNSourceRecord) SourceID() SourceID { return r.Meta.Source }
-
-// See the IPSourceRecord version in ip.go. SourceRecord deliberately
-// does not get this method.
-func (r ASNSourceRecord) Statuses() []string { return r.Status }

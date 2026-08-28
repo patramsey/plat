@@ -6,11 +6,12 @@ import (
 
 	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
+	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/internal/whois/parse"
 )
 
-// fromIPRDAP adapts an RDAP IP-network response into a model.IPSourceRecord
+// fromIPRDAP adapts an RDAP IP-network response into a source.IPSourceRecord
 // tagged as src. Mirrors FromRDAP's shape and redaction handling, but for
 // IPNetworkResponse instead of DomainResponse: org identity comes from the
 // "registrant" entity's vCard full name, abuse contact from the "abuse"
@@ -18,13 +19,13 @@ import (
 // IPNetworkResponse (internal/rdap/types.go), added alongside this task
 // since DomainResponse's RegistrarEntity/AbuseEntity/Created/Updated are
 // bound to *DomainResponse and can't be called on an IPNetworkResponse.
-func fromIPRDAP(meta model.SourceResult, resp *rdap.IPNetworkResponse) model.IPSourceRecord {
+func fromIPRDAP(meta model.SourceResult, resp *rdap.IPNetworkResponse) source.IPSourceRecord {
 	if resp == nil {
 		meta.OK = false
-		return model.IPSourceRecord{Meta: meta}
+		return source.IPSourceRecord{Meta: meta}
 	}
 
-	sr := model.IPSourceRecord{
+	sr := source.IPSourceRecord{
 		Meta:           meta,
 		Handle:         resp.Handle,
 		Name:           resp.Name,
@@ -44,7 +45,7 @@ func fromIPRDAP(meta model.SourceResult, resp *rdap.IPNetworkResponse) model.IPS
 	// Unlike a domain's status list (RFC 8056 EPP vocabulary), an IP
 	// network's status is RIR-specific vocabulary (RIPE's "ASSIGNED PA",
 	// APNIC's "ALLOCATED NON-PORTABLE", ARIN's lowercase "active"...) --
-	// running it through model.NormalizeEPPStatus mangled multi-word
+	// running it through source.NormalizeEPPStatus mangled multi-word
 	// values into meaningless tokens ("assignedPa") that match nothing a
 	// user would search for. RIR statuses pass through unchanged, per
 	// docs/schema.md's documented contract.
@@ -58,7 +59,7 @@ func fromIPRDAP(meta model.SourceResult, resp *rdap.IPNetworkResponse) model.IPS
 	}
 
 	if regEntity, ok := resp.RegistrantEntity(); ok {
-		if model.IsRedactedPlaceholder(regEntity.VCardArray.FullName) {
+		if source.IsRedactedPlaceholder(regEntity.VCardArray.FullName) {
 			sr.RedactedFields[model.FieldOrgName] = true
 		} else {
 			sr.OrgName = regEntity.VCardArray.FullName
@@ -75,7 +76,7 @@ func fromIPRDAP(meta model.SourceResult, resp *rdap.IPNetworkResponse) model.IPS
 
 // ipRDAPPresent reports whether resp yielded any non-empty field, mirroring
 // how FromRDAP implicitly treats a successfully-decoded Domain as present.
-func ipRDAPPresent(sr model.IPSourceRecord) bool {
+func ipRDAPPresent(sr source.IPSourceRecord) bool {
 	return sr.Handle != "" || sr.Name != "" || sr.Type != "" || sr.StartAddress != "" ||
 		sr.EndAddress != "" || sr.CIDR != "" || sr.IPVersion != "" || sr.ParentHandle != "" ||
 		sr.Country != "" || sr.OrgName != "" || sr.AbuseEmail != "" || sr.AbusePhone != "" ||
@@ -84,7 +85,7 @@ func ipRDAPPresent(sr model.IPSourceRecord) bool {
 }
 
 // fromIPHop adapts one WHOIS hop's parsed IP fields into a
-// model.IPSourceRecord tagged as src. Mirrors fromHop's shape, using
+// source.IPSourceRecord tagged as src. Mirrors fromHop's shape, using
 // parse.ParseDate for Registered/Updated -- the same tolerant multi-format
 // date parser the domain WHOIS adapter uses -- so IP dates get the same
 // handling domain dates do.
@@ -92,7 +93,7 @@ func ipRDAPPresent(sr model.IPSourceRecord) bool {
 // f.NetRange and f.Parent are deliberately left untouched by parse.ParseIP
 // (it stores each vocabulary's line as-is, since that's the only sense in
 // which it is a faithful WHOIS parser rather than a merge-comparability
-// layer). But model.IPSourceRecord.StartAddress/EndAddress/ParentHandle
+// layer). But source.IPSourceRecord.StartAddress/EndAddress/ParentHandle
 // are meant to hold the same shape of value RDAP's fromIPRDAP produces
 // (a bare start address, a bare end address, a bare parent handle) so
 // merge.MergeIP is comparing like with like across sources -- ARIN/RIPE's
@@ -104,14 +105,14 @@ func ipRDAPPresent(sr model.IPSourceRecord) bool {
 // spelled differently) or "fixed" by loosening merge's own comparison
 // (which would blur a genuine cross-source disagreement on these same
 // fields, and merge is shared with the domain path).
-func fromIPHop(meta model.SourceResult, hop whois.Hop) model.IPSourceRecord {
+func fromIPHop(meta model.SourceResult, hop whois.Hop) source.IPSourceRecord {
 	if hop.Err != nil {
 		meta.OK = false
-		return model.IPSourceRecord{Meta: meta}
+		return source.IPSourceRecord{Meta: meta}
 	}
 	if hop.IPFields == nil {
 		meta.OK = false
-		return model.IPSourceRecord{Meta: meta}
+		return source.IPSourceRecord{Meta: meta}
 	}
 	// hop.Fields (not IPFields) is where parse.Parse's refusal signals
 	// land -- ipHop populates it alongside IPFields purely so the
@@ -125,18 +126,18 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) model.IPSourceRecord {
 	if hop.Fields.Unsupported {
 		meta.OK = false
 		meta.Err = "registry does not support WHOIS for this network"
-		return model.IPSourceRecord{Meta: meta}
+		return source.IPSourceRecord{Meta: meta}
 	}
 	if hop.Fields.RateLimited {
 		meta.OK = false
 		meta.Err = "WHOIS server rate-limited this query"
-		return model.IPSourceRecord{Meta: meta}
+		return source.IPSourceRecord{Meta: meta}
 	}
 	meta.OK = true
 	f := hop.IPFields
 	start, end, cidr := rangeAndCIDRFromNetRange(f.NetRange, f.CIDR)
 
-	sr := model.IPSourceRecord{
+	sr := source.IPSourceRecord{
 		Meta:           meta,
 		Handle:         f.Handle,
 		Name:           f.NetName,
@@ -152,7 +153,7 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) model.IPSourceRecord {
 		RedactedFields: map[string]bool{},
 	}
 
-	if model.IsRedactedPlaceholder(f.OrgName) {
+	if source.IsRedactedPlaceholder(f.OrgName) {
 		sr.RedactedFields[model.FieldOrgName] = true
 	} else {
 		sr.OrgName = f.OrgName
@@ -160,7 +161,7 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) model.IPSourceRecord {
 
 	// See fromIPRDAP's identical reasoning: RIR status vocabulary isn't
 	// EPP, so it passes through unchanged rather than being mangled by
-	// model.NormalizeEPPStatus.
+	// source.NormalizeEPPStatus.
 	sr.Status = append(sr.Status, f.Statuses...)
 
 	if registered := parse.ParseDate(f.Registered); registered.Raw != "" {
@@ -176,7 +177,7 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) model.IPSourceRecord {
 
 // ipHopPresent reports whether hop yielded any non-empty field, mirroring
 // ipRDAPPresent's reasoning for the WHOIS side.
-func ipHopPresent(sr model.IPSourceRecord) bool {
+func ipHopPresent(sr source.IPSourceRecord) bool {
 	return sr.Handle != "" || sr.Name != "" || sr.Type != "" || sr.StartAddress != "" ||
 		sr.EndAddress != "" || sr.CIDR != "" || sr.IPVersion != "" || sr.ParentHandle != "" ||
 		sr.Country != "" || sr.OrgName != "" || sr.OrgID != "" || sr.AbuseEmail != "" || sr.AbusePhone != "" ||

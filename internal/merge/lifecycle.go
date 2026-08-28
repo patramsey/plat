@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/source"
 )
 
 const (
@@ -36,7 +37,7 @@ var lifecycleStatusPriority = []struct {
 // nil for ccTLDs (2-letter TLDs, which set independent policies ERRP
 // doesn't govern) and for gTLDs with no recognized lifecycle-relevant
 // status.
-func deriveLifecycle(rec model.Record, present []model.SourceRecord) *model.LifecycleInfo {
+func deriveLifecycle(rec model.Record, present []source.SourceRecord) *model.LifecycleInfo {
 	if !isGTLD(rec.Domain.Value) {
 		return nil
 	}
@@ -150,7 +151,7 @@ func pendingRestoreInfo() *model.LifecycleInfo {
 	}
 }
 
-func autoRenewGraceInfo(present []model.SourceRecord) *model.LifecycleInfo {
+func autoRenewGraceInfo(present []source.SourceRecord) *model.LifecycleInfo {
 	info := &model.LifecycleInfo{
 		Stage:       model.LifecycleAutoRenewGrace,
 		Label:       "Auto-Renew Grace Period",
@@ -176,7 +177,7 @@ func autoRenewGraceInfo(present []model.SourceRecord) *model.LifecycleInfo {
 // showed the true original expiration and the autoRenewPeriod status).
 // Verisign's own WHOIS notice text says as much: "consult the sponsoring
 // registrar's Whois database" for the actual date.
-func registrarExpires(present []model.SourceRecord) (time.Time, bool) {
+func registrarExpires(present []source.SourceRecord) (time.Time, bool) {
 	for _, s := range present {
 		if s.Meta.Source != model.SourceRegistrarRDAP && s.Meta.Source != model.SourceRegistrarWHOIS {
 			continue

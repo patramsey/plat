@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
 )
 
@@ -19,12 +20,12 @@ import (
 // from a TLD that simply has no WHOIS coverage (both would otherwise hit
 // the len(Hops) < 2 case below), unlike the RDAP branch, which always
 // surfaces a fetch error as its own SourceRecord (see FromRDAP).
-func FromWHOIS(result *whois.Result) []model.SourceRecord {
+func FromWHOIS(result *whois.Result) []source.SourceRecord {
 	if result == nil || len(result.Hops) == 0 {
 		return nil
 	}
 	if ianaHop := result.Hops[0]; ianaHop.Err != nil {
-		return []model.SourceRecord{{Meta: model.SourceResult{
+		return []source.SourceRecord{{Meta: model.SourceResult{
 			Source:  model.SourceRegistryWHOIS,
 			Latency: ianaHop.Latency,
 			OK:      false,
@@ -34,7 +35,7 @@ func FromWHOIS(result *whois.Result) []model.SourceRecord {
 	if len(result.Hops) < 2 {
 		return nil
 	}
-	var out []model.SourceRecord
+	var out []source.SourceRecord
 	out = append(out, fromHop(model.SourceRegistryWHOIS, result.Hops[1]))
 	if len(result.Hops) >= 3 {
 		out = append(out, fromHop(model.SourceRegistrarWHOIS, result.Hops[2]))
@@ -42,7 +43,7 @@ func FromWHOIS(result *whois.Result) []model.SourceRecord {
 	return out
 }
 
-func fromHop(src model.SourceID, hop whois.Hop) model.SourceRecord {
+func fromHop(src model.SourceID, hop whois.Hop) source.SourceRecord {
 	meta := model.SourceResult{
 		Source:  src,
 		Latency: hop.Latency,
@@ -51,7 +52,7 @@ func fromHop(src model.SourceID, hop whois.Hop) model.SourceRecord {
 	if hop.Err != nil {
 		meta.OK = false
 		meta.Err = hop.Err.Error()
-		return model.SourceRecord{Meta: meta}
+		return source.SourceRecord{Meta: meta}
 	}
 	f := hop.Fields
 	if f.Unsupported {
@@ -63,7 +64,7 @@ func fromHop(src model.SourceID, hop whois.Hop) model.SourceRecord {
 		// domain confirmedly doesn't exist).
 		meta.OK = false
 		meta.Err = "registry does not support WHOIS for this TLD"
-		return model.SourceRecord{Meta: meta}
+		return source.SourceRecord{Meta: meta}
 	}
 	if f.RateLimited {
 		// Same reasoning as Unsupported above: a rate-limit refusal is a
@@ -72,26 +73,26 @@ func fromHop(src model.SourceID, hop whois.Hop) model.SourceRecord {
 		// indistinguishable from a genuine successful response.
 		meta.OK = false
 		meta.Err = "WHOIS server rate-limited this query"
-		return model.SourceRecord{Meta: meta}
+		return source.SourceRecord{Meta: meta}
 	}
 	meta.OK = !f.NotFound
 	meta.NotFound = f.NotFound
 
-	sr := model.SourceRecord{
+	sr := source.SourceRecord{
 		Meta:           meta,
 		Present:        true,
 		Domain:         f.Domain,
 		RedactedFields: map[string]bool{},
 	}
 
-	if model.IsRedactedPlaceholder(f.Registrar) {
+	if source.IsRedactedPlaceholder(f.Registrar) {
 		sr.RedactedFields[model.FieldRegistrarName] = true
 	} else {
 		sr.Registrar.Name = f.Registrar
 	}
 
 	for _, st := range f.Statuses {
-		sr.Status = append(sr.Status, model.NormalizeEPPStatus(st))
+		sr.Status = append(sr.Status, source.NormalizeEPPStatus(st))
 	}
 
 	sr.Created = model.TimeValue{Time: f.Created.Time, Raw: f.Created.Raw, Parsed: f.Created.Parsed}

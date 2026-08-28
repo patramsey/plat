@@ -8,6 +8,7 @@ import (
 
 	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
+	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
 )
 
@@ -21,8 +22,8 @@ import (
 // Like CollectIP, records come back in a fixed order (registry-rdap,
 // registry-whois) regardless of which goroutine finished first, so
 // callers see a stable order across runs.
-func CollectASN(ctx context.Context, asn uint32, baseURL, whoisIANAServer string, opts Options) []model.ASNSourceRecord {
-	var rdapOut, whoisOut []model.ASNSourceRecord
+func CollectASN(ctx context.Context, asn uint32, baseURL, whoisIANAServer string, opts Options) []source.ASNSourceRecord {
+	var rdapOut, whoisOut []source.ASNSourceRecord
 
 	needRDAP := baseURL != "" && opts.allows(model.SourceRegistryRDAP)
 	needWHOIS := opts.allows(model.SourceRegistryWHOIS)
@@ -40,13 +41,13 @@ func CollectASN(ctx context.Context, asn uint32, baseURL, whoisIANAServer string
 	}
 	wg.Wait()
 
-	out := make([]model.ASNSourceRecord, 0, len(rdapOut)+len(whoisOut))
+	out := make([]source.ASNSourceRecord, 0, len(rdapOut)+len(whoisOut))
 	out = append(out, rdapOut...)
 	out = append(out, whoisOut...)
 	return out
 }
 
-func collectASNRDAP(ctx context.Context, asn uint32, baseURL string, opts Options) []model.ASNSourceRecord {
+func collectASNRDAP(ctx context.Context, asn uint32, baseURL string, opts Options) []source.ASNSourceRecord {
 	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient}
 	start := time.Now()
 	result, err := rdapClient.ASN(ctx, baseURL, asn)
@@ -59,7 +60,7 @@ func collectASNRDAP(ctx context.Context, asn uint32, baseURL string, opts Option
 		meta.OK = false
 		meta.Err = err.Error()
 		meta.NotFound = errors.Is(err, rdap.ErrDomainNotFound)
-		return []model.ASNSourceRecord{fromASNRDAP(meta, nil)}
+		return []source.ASNSourceRecord{fromASNRDAP(meta, nil)}
 	}
 	meta.OK = true
 
@@ -67,10 +68,10 @@ func collectASNRDAP(ctx context.Context, asn uint32, baseURL string, opts Option
 	if result != nil {
 		resp = result.ASN
 	}
-	return []model.ASNSourceRecord{fromASNRDAP(meta, resp)}
+	return []source.ASNSourceRecord{fromASNRDAP(meta, resp)}
 }
 
-func collectASNWHOIS(ctx context.Context, asn uint32, whoisIANAServer string, opts Options) []model.ASNSourceRecord {
+func collectASNWHOIS(ctx context.Context, asn uint32, whoisIANAServer string, opts Options) []source.ASNSourceRecord {
 	timeout := opts.Timeout
 	if timeout <= 0 {
 		timeout = 5 * time.Second // matches whois.Client.timeout()'s own default
@@ -85,7 +86,7 @@ func collectASNWHOIS(ctx context.Context, asn uint32, whoisIANAServer string, op
 }
 
 // fromASNWHOIS adapts a LookupASN result's hop chain into a single
-// SourceRegistryWHOIS model.ASNSourceRecord, mirroring fromIPWHOIS's
+// SourceRegistryWHOIS source.ASNSourceRecord, mirroring fromIPWHOIS's
 // hop-selection logic. LookupASN's chain has at most two hops (IANA, then
 // the RIR) -- there is no third, registrar hop for ASN lookups either.
 // Hops[0] (IANA) is never itself a data source; if it failed outright,
@@ -103,12 +104,12 @@ func collectASNWHOIS(ctx context.Context, asn uint32, whoisIANAServer string, op
 // fromASNHop call to correct Meta.OK/NotFound/Present for a "no
 // match"-style response, the same outcome fromHop reaches directly for
 // domains.
-func fromASNWHOIS(result *whois.Result) []model.ASNSourceRecord {
+func fromASNWHOIS(result *whois.Result) []source.ASNSourceRecord {
 	if result == nil || len(result.Hops) == 0 {
 		return nil
 	}
 	if ianaHop := result.Hops[0]; ianaHop.Err != nil {
-		return []model.ASNSourceRecord{{Meta: model.SourceResult{
+		return []source.ASNSourceRecord{{Meta: model.SourceResult{
 			Source:  model.SourceRegistryWHOIS,
 			Latency: ianaHop.Latency,
 			OK:      false,
@@ -127,5 +128,5 @@ func fromASNWHOIS(result *whois.Result) []model.ASNSourceRecord {
 		sr.Meta.NotFound = true
 		sr.Present = false
 	}
-	return []model.ASNSourceRecord{sr}
+	return []source.ASNSourceRecord{sr}
 }

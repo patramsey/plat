@@ -8,6 +8,7 @@ import (
 	"golang.org/x/net/idna"
 
 	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/source"
 )
 
 const clockSkew = 24 * time.Hour
@@ -15,7 +16,7 @@ const clockSkew = 24 * time.Hour
 // Merge combines per-source records into one unified, provenance-
 // annotated Record. It is a pure function — no I/O — and never errors: a
 // source with no usable data simply doesn't contribute to any field.
-func Merge(sources []model.SourceRecord) model.Record {
+func Merge(sources []source.SourceRecord) model.Record {
 	var rec model.Record
 	for _, s := range sources {
 		rec.Sources = append(rec.Sources, s.Meta)
@@ -24,17 +25,17 @@ func Merge(sources []model.SourceRecord) model.Record {
 	present := presentSorted(sources)
 	st := &mergeState{}
 
-	rec.Domain = st.scalar(model.FieldDomain, scalarCandidates(present, model.FieldDomain, func(s model.SourceRecord) string { return s.Domain }))
-	rec.Handle = st.scalar(model.FieldHandle, scalarCandidates(present, model.FieldHandle, func(s model.SourceRecord) string { return s.Handle }))
-	rec.Registrar.Name = st.scalar(model.FieldRegistrarName, scalarCandidates(present, model.FieldRegistrarName, func(s model.SourceRecord) string { return s.Registrar.Name }))
-	rec.Registrar.IANAID = st.scalar(model.FieldRegistrarIANAID, scalarCandidates(present, model.FieldRegistrarIANAID, func(s model.SourceRecord) string { return s.Registrar.IANAID }))
-	rec.Registrar.URL = st.scalar(model.FieldRegistrarURL, scalarCandidates(present, model.FieldRegistrarURL, func(s model.SourceRecord) string { return s.Registrar.URL }))
-	rec.Registrar.AbuseEmail = st.scalar(model.FieldRegistrarAbuseEmail, scalarCandidates(present, model.FieldRegistrarAbuseEmail, func(s model.SourceRecord) string { return s.Registrar.AbuseEmail }))
-	rec.Registrar.AbusePhone = st.scalar(model.FieldRegistrarAbusePhone, scalarCandidates(present, model.FieldRegistrarAbusePhone, func(s model.SourceRecord) string { return s.Registrar.AbusePhone }))
+	rec.Domain = st.scalar(model.FieldDomain, scalarCandidates(present, model.FieldDomain, func(s source.SourceRecord) string { return s.Domain }))
+	rec.Handle = st.scalar(model.FieldHandle, scalarCandidates(present, model.FieldHandle, func(s source.SourceRecord) string { return s.Handle }))
+	rec.Registrar.Name = st.scalar(model.FieldRegistrarName, scalarCandidates(present, model.FieldRegistrarName, func(s source.SourceRecord) string { return s.Registrar.Name }))
+	rec.Registrar.IANAID = st.scalar(model.FieldRegistrarIANAID, scalarCandidates(present, model.FieldRegistrarIANAID, func(s source.SourceRecord) string { return s.Registrar.IANAID }))
+	rec.Registrar.URL = st.scalar(model.FieldRegistrarURL, scalarCandidates(present, model.FieldRegistrarURL, func(s source.SourceRecord) string { return s.Registrar.URL }))
+	rec.Registrar.AbuseEmail = st.scalar(model.FieldRegistrarAbuseEmail, scalarCandidates(present, model.FieldRegistrarAbuseEmail, func(s source.SourceRecord) string { return s.Registrar.AbuseEmail }))
+	rec.Registrar.AbusePhone = st.scalar(model.FieldRegistrarAbusePhone, scalarCandidates(present, model.FieldRegistrarAbusePhone, func(s source.SourceRecord) string { return s.Registrar.AbusePhone }))
 
-	rec.Created = st.timestamp(model.FieldCreated, timeCandidates(present, func(s model.SourceRecord) model.TimeValue { return s.Created }))
-	rec.Updated = st.timestamp(model.FieldUpdated, timeCandidates(present, func(s model.SourceRecord) model.TimeValue { return s.Updated }))
-	rec.Expires = st.timestamp(model.FieldExpires, timeCandidates(present, func(s model.SourceRecord) model.TimeValue { return s.Expires }))
+	rec.Created = st.timestamp(model.FieldCreated, timeCandidates(present, func(s source.SourceRecord) model.TimeValue { return s.Created }))
+	rec.Updated = st.timestamp(model.FieldUpdated, timeCandidates(present, func(s source.SourceRecord) model.TimeValue { return s.Updated }))
+	rec.Expires = st.timestamp(model.FieldExpires, timeCandidates(present, func(s source.SourceRecord) model.TimeValue { return s.Expires }))
 
 	rec.Nameservers = st.nameservers(present)
 	rec.Status = st.status(present)
@@ -102,7 +103,7 @@ type statusSource interface {
 // vocabulary; RIR statuses carry no such convention and are passed
 // through unchanged (see the Status field comment in model/ip.go).
 // Sharing one function would either drop that step for domains or apply
-// an EPP rule to RIR data. model.SourceRecord has no Statuses method, so
+// an EPP rule to RIR data. source.SourceRecord has no Statuses method, so
 // passing a domain record here is a compile error rather than a silent
 // behavior change.
 func statusUnion[T statusSource](present []T) model.Field[[]string] {
@@ -137,7 +138,7 @@ type scalarCandidate struct {
 	Redacted bool
 }
 
-func scalarCandidates(present []model.SourceRecord, field string, get func(model.SourceRecord) string) []scalarCandidate {
+func scalarCandidates(present []source.SourceRecord, field string, get func(source.SourceRecord) string) []scalarCandidate {
 	out := make([]scalarCandidate, len(present))
 	for i, s := range present {
 		out[i] = scalarCandidate{Source: s.Meta.Source, Value: get(s), Redacted: s.RedactedFields[field]}
@@ -250,7 +251,7 @@ type timeCandidate struct {
 	model.TimeValue
 }
 
-func timeCandidates(present []model.SourceRecord, get func(model.SourceRecord) model.TimeValue) []timeCandidate {
+func timeCandidates(present []source.SourceRecord, get func(source.SourceRecord) model.TimeValue) []timeCandidate {
 	out := make([]timeCandidate, len(present))
 	for i, s := range present {
 		out[i] = timeCandidate{Source: s.Meta.Source, TimeValue: get(s)}
@@ -370,7 +371,7 @@ func normalizeNS(ns string) string {
 // the renderers key showing the row on len(Value) rather than Present(),
 // specifically to keep this case from making the row (not just its badge)
 // disappear.
-func (m *mergeState) nameservers(present []model.SourceRecord) model.Field[[]string] {
+func (m *mergeState) nameservers(present []source.SourceRecord) model.Field[[]string] {
 	unionSeen := map[string]bool{}
 	var order []string
 	var sourceOrder []model.SourceID
@@ -468,7 +469,7 @@ func sortedKeys(m map[string]bool) []string {
 // of the same status is also present, since it names the same restriction
 // with strictly less information. A bare status with no prefixed variant
 // anywhere is kept — it's the only information available.
-func (m *mergeState) status(present []model.SourceRecord) model.Field[[]string] {
+func (m *mergeState) status(present []source.SourceRecord) model.Field[[]string] {
 	seen := map[string]bool{}
 	var order []string
 	var contributors []model.SourceID
@@ -522,8 +523,8 @@ func dropRedundantBareStatuses(order []string, seen map[string]bool) []string {
 // dnssec picks the first present source that expressed an opinion
 // (DNSSEC != nil), by precedence. Present-and-differing sources are
 // treated as a Conflict, same as any other scalar.
-func (m *mergeState) dnssec(present []model.SourceRecord) model.Field[bool] {
-	var winner *model.SourceRecord
+func (m *mergeState) dnssec(present []source.SourceRecord) model.Field[bool] {
+	var winner *source.SourceRecord
 	for i := range present {
 		if present[i].DNSSEC != nil {
 			winner = &present[i]

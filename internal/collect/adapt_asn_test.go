@@ -6,6 +6,7 @@ import (
 	"github.com/patramsey/plat/internal/merge"
 	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
+	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/internal/whois/parse"
 )
@@ -183,7 +184,7 @@ func TestFromASNRDAP_RedactedOrgName_ProducesRedactionNoticeEndToEnd(t *testing.
 		ASNFields: &parse.ASNFields{CommonFields: parse.CommonFields{Handle: "AS64512", OrgName: "Example Holdings LLC"}},
 	})
 
-	rec := merge.MergeASN([]model.ASNSourceRecord{rdapSR, whoisSR})
+	rec := merge.MergeASN([]source.ASNSourceRecord{rdapSR, whoisSR})
 
 	if rec.Org.Name.Value != "Example Holdings LLC" {
 		t.Errorf("Org.Name = %q, want the WHOIS source's value (registry-rdap's was redacted)", rec.Org.Name.Value)
@@ -202,7 +203,7 @@ func TestFromASNRDAP_RedactedOrgName_ProducesRedactionNoticeEndToEnd(t *testing.
 // TestFromASNRDAP_RIRStatusPassesThroughVerbatim is fromASNHop's RDAP-side
 // sibling, mirroring the identical regression pinned for IP networks:
 // RIR status vocabulary ("ALLOCATED NON-PORTABLE" and friends) must not be
-// run through model.NormalizeEPPStatus, which is designed for EPP's
+// run through source.NormalizeEPPStatus, which is designed for EPP's
 // single-word/camelCase vocabulary and mangles multi-word RIR values into
 // meaningless tokens.
 func TestFromASNRDAP_RIRStatusPassesThroughVerbatim(t *testing.T) {
@@ -400,7 +401,7 @@ func TestFromASNHop_Unsupported(t *testing.T) {
 // TestFromASNHop_RIRStatusPassesThroughVerbatim is a regression guard
 // mirroring TestFromIPHop_RIRStatusPassesThroughVerbatim: RIR status
 // vocabulary is not EPP (RFC 8056), so it must not be run through
-// model.NormalizeEPPStatus.
+// source.NormalizeEPPStatus.
 func TestFromASNHop_RIRStatusPassesThroughVerbatim(t *testing.T) {
 	hop := whois.Hop{
 		ASNFields: &parse.ASNFields{
