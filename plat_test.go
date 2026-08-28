@@ -114,12 +114,19 @@ func TestNewRejectsUnknownSource(t *testing.T) {
 func TestNewAcceptsEveryValidSource(t *testing.T) {
 	for _, s := range model.Precedence {
 		t.Run(string(s), func(t *testing.T) {
-			if _, err := New(context.Background(), Options{DisableCache: true, Sources: []SourceID{s}}); err != nil {
+			if _, err := New(context.Background(), Options{
+				DisableCache: true,
+				Sources:      []SourceID{s},
+				Resolver:     NewResolver(ResolverConfig{Domains: map[string]string{}}),
+			}); err != nil {
 				t.Errorf("New rejected the valid source %q: %v", s, err)
 			}
 		})
 	}
-	if _, err := New(context.Background(), Options{DisableCache: true}); err != nil {
+	if _, err := New(context.Background(), Options{
+		DisableCache: true,
+		Resolver:     NewResolver(ResolverConfig{Domains: map[string]string{}}),
+	}); err != nil {
 		t.Errorf("New rejected nil Sources (meaning: all): %v", err)
 	}
 }
