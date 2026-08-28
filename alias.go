@@ -21,8 +21,8 @@ import (
 // is additive and safe, same as anywhere else. TestPublicAPISurface does
 // NOT catch any of this: it parses only this package's own declarations,
 // so it is blind to everything inside model. model has its own api-surface
-// golden and its own TestPublicAPISurface subtest; both goldens must be
-// updated in the same commit as any change to either surface. Review
+// golden and its own TestPublicAPISurface subtest; each golden must be
+// updated in the same commit as a change to its own surface. Review
 // changes to those types with that in mind.
 
 // Record is a merged, provenance-annotated domain lookup result.
