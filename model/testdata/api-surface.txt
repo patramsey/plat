@@ -9,6 +9,7 @@ func PresentSources
 func PresentSourcesASN
 func PresentSourcesIP
 func Rank
+method Field.Present
 type ASNRecord
 type Conflict
 type Field

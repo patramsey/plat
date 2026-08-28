@@ -102,13 +102,27 @@ func exportedNames(t *testing.T, dir string) []string {
 }
 
 func recvName(fl *ast.FieldList) string {
-	switch t := fl.List[0].Type.(type) {
+	return recvBaseName(fl.List[0].Type)
+}
+
+// recvBaseName unwraps a receiver type expression down to its base
+// identifier. A plain or pointer receiver on a non-generic type is just
+// *ast.Ident or *ast.StarExpr around one, but a receiver on a generic
+// type -- e.g. Field[T] or, if a future type parameterizes on more than
+// one type, Field[K, V] -- parses as *ast.IndexExpr or *ast.IndexListExpr
+// wrapping the base identifier instead. Recursing through all of these
+// (and StarExpr around a generic receiver) keeps a method on a generic
+// type from being silently dropped from the API surface.
+func recvBaseName(e ast.Expr) string {
+	switch t := e.(type) {
 	case *ast.StarExpr:
-		if id, ok := t.X.(*ast.Ident); ok {
-			return id.Name
-		}
+		return recvBaseName(t.X)
 	case *ast.Ident:
 		return t.Name
+	case *ast.IndexExpr:
+		return recvBaseName(t.X)
+	case *ast.IndexListExpr:
+		return recvBaseName(t.X)
 	}
 	return ""
 }
