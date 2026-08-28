@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
+	"github.com/patramsey/plat/model"
 )
 
 func loadRDAPFixture(t *testing.T, name string) *rdap.DomainResponse {

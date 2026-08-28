@@ -1,9 +1,27 @@
+// Package model defines plat's data model: Record, IPRecord, and
+// ASNRecord, the provenance-carrying Field[T] that composes them, and
+// the supporting types -- Conflict, RedactionNotice, SourceResult,
+// LifecycleInfo -- that describe how a merged value came to be what it
+// is. Per-field provenance (which source(s) supplied each value) is
+// plat's central idea, not an afterthought bolted onto these types.
+//
+// model is a separate package from plat, the top-level CLI/library
+// package, so this data model can be documented on its own pkg.go.dev
+// page rather than buried under Client and Lookup. plat aliases every
+// exported name here (see plat's alias.go), so a caller using only
+// plat.New and Client.Lookup rarely needs to import model directly --
+// but the shapes, and their documentation, live in this package.
 package model
 
 import "time"
 
 // Field-name constants used as Conflict.Field / RedactionNotice.Field
 // values, so callers never hand-type a field name string more than once.
+// Several of these share a value with an IP- or ASN-record constant
+// (e.g. FieldHandle == FieldIPHandle == "handle") -- harmless in
+// practice since Record, IPRecord, and ASNRecord are disjoint, but worth
+// knowing before writing one switch over Conflict.Field that spans more
+// than one record kind, where it produces a duplicate-case compile error.
 const (
 	FieldDomain              = "domain"
 	FieldHandle              = "handle"
@@ -59,8 +77,9 @@ type Field[T any] struct {
 // Present reports whether any source contributed to this field.
 func (f Field[T]) Present() bool { return len(f.Sources) > 0 }
 
-// TimeValue parallels rdap.RDAPTime and parse.Date so adapters can map
-// either into it 1:1 without losing the raw string when parsing failed.
+// TimeValue is a timestamp together with the raw string a source
+// reported it as. When parsing failed, Time is the zero value but Raw
+// still holds what the source sent -- check Parsed before trusting Time.
 type TimeValue struct {
 	Time   time.Time
 	Raw    string
@@ -108,60 +127,40 @@ type SourceResult struct {
 	Raw      []byte
 }
 
-// Record is the unified, provenance-annotated domain lookup result — the
-// output of merge.Merge.
+// Record is a domain lookup's unified, provenance-annotated result:
+// registry and registrar RDAP and WHOIS merged into one set of fields,
+// each recording which source(s) supplied it.
 type Record struct {
-	Domain      Field[string]
-	Handle      Field[string]
-	Registrar   RegistrarInfo
-	Status      Field[[]string]
-	Created     Field[TimeValue]
-	Updated     Field[TimeValue]
-	Expires     Field[TimeValue]
+	// Domain is the normalized (lowercase, punycode) domain name.
+	Domain Field[string]
+	// Handle is the registry's unique identifier for the domain (RDAP's
+	// "handle" / WHOIS's "Registry Domain ID").
+	Handle    Field[string]
+	Registrar RegistrarInfo
+	// Status holds EPP status codes (RFC 8056), already normalized from
+	// both RDAP's and WHOIS's differing vocabularies -- e.g. WHOIS's
+	// "clientTransferProhibited" and RDAP's "client transfer prohibited"
+	// both arrive here as "clientTransferProhibited".
+	Status Field[[]string]
+	// Created, Updated, and Expires are UTC. When a source's timestamp
+	// could not be parsed, TimeValue.Time is the zero value but
+	// TimeValue.Raw still carries the source's original string --
+	// check TimeValue.Parsed before trusting Time.
+	Created Field[TimeValue]
+	Updated Field[TimeValue]
+	Expires Field[TimeValue]
+	// Nameservers are lowercased with any trailing dot stripped, then
+	// unioned across sources; genuinely differing sets (not just casing
+	// or a trailing dot) surface as a Conflict instead of being merged.
 	Nameservers Field[[]string]
-	DNSSEC      Field[bool]
-	Lifecycle   *LifecycleInfo
-	Redacted    []RedactionNotice
-	Sources     []SourceResult
-	Conflicts   []Conflict
+	// DNSSEC reports whether the domain is signed. A zero Field (check
+	// Present, not just the bool) means no source expressed an opinion
+	// either way -- it does not mean DNSSEC is known to be off.
+	DNSSEC Field[bool]
+	// Lifecycle is non-nil only for a gTLD domain whose Status places it
+	// in ICANN's Expired Registration Recovery Policy timeline.
+	Lifecycle *LifecycleInfo
+	Redacted  []RedactionNotice
+	Sources   []SourceResult
+	Conflicts []Conflict
 }
-
-// RegistrarFields is the plain-string registrar identity an adapter
-// extracts from one source, before merge.Merge turns it into
-// Record.Registrar's Field[string]s with provenance.
-type RegistrarFields struct {
-	Name       string
-	IANAID     string
-	URL        string
-	AbuseEmail string
-	AbusePhone string
-}
-
-// SourceRecord is merge.Merge's input shape — one per source that was
-// attempted, produced by internal/collect's adapters from rdap.Result /
-// whois.Hop.
-type SourceRecord struct {
-	Meta           SourceResult
-	Present        bool
-	Domain         string
-	Handle         string
-	Registrar      RegistrarFields
-	Status         []string // already EPP-normalized by the adapter
-	Created        TimeValue
-	Updated        TimeValue
-	Expires        TimeValue
-	Nameservers    []string // raw, as reported by the source — merge.Merge normalizes (lowercase, no trailing dot)
-	DNSSEC         *bool    // nil = source said nothing about DNSSEC
-	RedactedFields map[string]bool
-	Redactions     []RedactionNotice
-}
-
-// IsPresent and SourceID expose the two fields every source-record type
-// shares, so merge's generic helpers can reach them. Go generics cannot
-// read struct fields through a type parameter, only methods.
-//
-// Named IsPresent rather than Present because Present is already a field
-// on this struct; a method may not share a name with a field of the same
-// type.
-func (r SourceRecord) IsPresent() bool    { return r.Present }
-func (r SourceRecord) SourceID() SourceID { return r.Meta.Source }

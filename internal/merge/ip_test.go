@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/source"
+	"github.com/patramsey/plat/model"
 )
 
-func ipsr(source model.SourceID, present bool) model.IPSourceRecord {
-	return model.IPSourceRecord{
-		Meta:           model.SourceResult{Source: source, OK: present},
+func ipsr(src model.SourceID, present bool) source.IPSourceRecord {
+	return source.IPSourceRecord{
+		Meta:           model.SourceResult{Source: src, OK: present},
 		Present:        present,
 		RedactedFields: map[string]bool{},
 	}
@@ -30,7 +31,7 @@ func TestMergeIP_CombinesRDAPAndWHOIS(t *testing.T) {
 	whoisSrc.OrgName = "Google LLC" // richer than RDAP's "GOGL"
 	whoisSrc.Country = "US"
 
-	rec := MergeIP([]model.IPSourceRecord{rdapSrc, whoisSrc})
+	rec := MergeIP([]source.IPSourceRecord{rdapSrc, whoisSrc})
 
 	if rec.Handle.Value != "NET-8-8-8-0-2" {
 		t.Errorf("Handle = %q, want NET-8-8-8-0-2", rec.Handle.Value)
@@ -55,7 +56,7 @@ func TestMergeIP_RDAPWinsOnConflict(t *testing.T) {
 	b := ipsr(model.SourceRegistryWHOIS, true)
 	b.Name = "SOMETHING-ELSE"
 
-	rec := MergeIP([]model.IPSourceRecord{b, a}) // deliberately out of order
+	rec := MergeIP([]source.IPSourceRecord{b, a}) // deliberately out of order
 
 	if rec.Name.Value != "GOGL" {
 		t.Errorf("Name = %q, want the registry-rdap value (higher precedence)", rec.Name.Value)
@@ -89,7 +90,7 @@ func TestMergeIP_StatusIsSortedRegardlessOfInputOrder(t *testing.T) {
 		b := ipsr(model.SourceRegistryWHOIS, true)
 		b.Status = st
 
-		rec := MergeIP([]model.IPSourceRecord{a, b})
+		rec := MergeIP([]source.IPSourceRecord{a, b})
 
 		if !slices.Equal(rec.Status.Value, want) {
 			t.Errorf("ordering %d: Status.Value = %v, want sorted %v", i, rec.Status.Value, want)

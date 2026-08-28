@@ -7,7 +7,7 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 // Decode reads a single machine-output document -- the JSON one -o json

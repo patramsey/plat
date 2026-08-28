@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/source"
+	"github.com/patramsey/plat/model"
 )
 
-func sr(source model.SourceID, present bool) model.SourceRecord {
-	return model.SourceRecord{
-		Meta:           model.SourceResult{Source: source, OK: present},
+func sr(src model.SourceID, present bool) source.SourceRecord {
+	return source.SourceRecord{
+		Meta:           model.SourceResult{Source: src, OK: present},
 		Present:        present,
 		RedactedFields: map[string]bool{},
 	}
@@ -24,7 +25,7 @@ func TestMerge_ScalarComparisonIsCaseAndWhitespaceInsensitive(t *testing.T) {
 	registryRDAP.Domain = "GOOGLE.COM"
 	registryRDAP.Registrar.Name = "MarkMonitor Inc."
 
-	rec := Merge([]model.SourceRecord{registryRDAP, registrarRDAP})
+	rec := Merge([]source.SourceRecord{registryRDAP, registrarRDAP})
 
 	if len(rec.Conflicts) != 0 {
 		t.Errorf("Conflicts = %+v, want none (casing/whitespace-only differences should not be reported as disagreements)", rec.Conflicts)
@@ -49,7 +50,7 @@ func TestMerge_ScalarComparisonIgnoresTrailingPeriod(t *testing.T) {
 	registryRDAP := sr(model.SourceRegistryRDAP, true)
 	registryRDAP.Registrar.Name = "Name.com, Inc."
 
-	rec := Merge([]model.SourceRecord{registryRDAP, registrarRDAP})
+	rec := Merge([]source.SourceRecord{registryRDAP, registrarRDAP})
 
 	if len(rec.Conflicts) != 0 {
 		t.Errorf("Conflicts = %+v, want none (a trailing period is formatting noise, not a genuine disagreement)", rec.Conflicts)
@@ -73,7 +74,7 @@ func TestMerge_ScalarComparisonIgnoresCommaBeforeCorporateSuffix(t *testing.T) {
 	registrarWHOIS := sr(model.SourceRegistrarWHOIS, true)
 	registrarWHOIS.Registrar.Name = "NameCheap, Inc."
 
-	rec := Merge([]model.SourceRecord{registrarRDAP, registrarWHOIS})
+	rec := Merge([]source.SourceRecord{registrarRDAP, registrarWHOIS})
 
 	if len(rec.Conflicts) != 0 {
 		t.Errorf("Conflicts = %+v, want none (a comma before a corporate suffix is formatting noise, not a genuine disagreement)", rec.Conflicts)
@@ -92,7 +93,7 @@ func TestMerge_ScalarComparisonStillCatchesGenuineDifferences(t *testing.T) {
 	registryRDAP := sr(model.SourceRegistryRDAP, true)
 	registryRDAP.Registrar.Name = "Example Registrar B"
 
-	rec := Merge([]model.SourceRecord{registryRDAP, registrarRDAP})
+	rec := Merge([]source.SourceRecord{registryRDAP, registrarRDAP})
 
 	if len(rec.Conflicts) != 1 {
 		t.Fatalf("Conflicts = %+v, want exactly one conflict (a genuine value difference, not just casing/whitespace, must still be caught)", rec.Conflicts)
@@ -105,7 +106,7 @@ func TestMerge_ScalarPrecedence(t *testing.T) {
 	registry := sr(model.SourceRegistryRDAP, true)
 	registry.Registrar.Name = "Registry Says Corp"
 
-	rec := Merge([]model.SourceRecord{registry, registrar})
+	rec := Merge([]source.SourceRecord{registry, registrar})
 
 	if rec.Registrar.Name.Value != "Registrar Says Corp" {
 		t.Errorf("Registrar.Name = %q, want %q (registrar-rdap should win over registry-rdap)", rec.Registrar.Name.Value, "Registrar Says Corp")
@@ -123,7 +124,7 @@ func TestMerge_RedactionOverride(t *testing.T) {
 	registryWHOIS := sr(model.SourceRegistryWHOIS, true)
 	registryWHOIS.Registrar.Name = "Real Registrar Name"
 
-	rec := Merge([]model.SourceRecord{registrarRDAP, registryWHOIS})
+	rec := Merge([]source.SourceRecord{registrarRDAP, registryWHOIS})
 
 	if rec.Registrar.Name.Value != "Real Registrar Name" {
 		t.Errorf("Registrar.Name = %q, want %q (populated value should win over a redacted higher-precedence source)", rec.Registrar.Name.Value, "Real Registrar Name")
@@ -139,7 +140,7 @@ func TestMerge_ScalarAgreement(t *testing.T) {
 	b := sr(model.SourceRegistryWHOIS, true)
 	b.Registrar.Name = "Same Corp"
 
-	rec := Merge([]model.SourceRecord{a, b})
+	rec := Merge([]source.SourceRecord{a, b})
 
 	if rec.Registrar.Name.Value != "Same Corp" {
 		t.Errorf("Registrar.Name = %q, want %q", rec.Registrar.Name.Value, "Same Corp")
@@ -161,7 +162,7 @@ func TestMerge_TimestampWithinTolerance(t *testing.T) {
 	whois := sr(model.SourceRegistryWHOIS, true)
 	whois.Expires = model.TimeValue{Time: whoisTime, Raw: "2026-08-13", Parsed: true}
 
-	rec := Merge([]model.SourceRecord{registry, whois})
+	rec := Merge([]source.SourceRecord{registry, whois})
 
 	if rec.Expires.Value.Raw != "2026-08-13T04:00:00Z" {
 		t.Errorf("Expires.Value.Raw = %q, want the higher-precedence registry-rdap value", rec.Expires.Value.Raw)
@@ -185,7 +186,7 @@ func TestMerge_ExpiresConflictPicksEarliestDate(t *testing.T) {
 	whois := sr(model.SourceRegistryWHOIS, true)
 	whois.Expires = model.TimeValue{Time: whoisTime, Raw: "2026-08-10", Parsed: true}
 
-	rec := Merge([]model.SourceRecord{registry, whois})
+	rec := Merge([]source.SourceRecord{registry, whois})
 
 	if rec.Expires.Value.Raw != "2026-08-10" {
 		t.Errorf("Expires.Value.Raw = %q, want the earlier date (2026-08-10) despite registry-rdap outranking registry-whois", rec.Expires.Value.Raw)
@@ -217,7 +218,7 @@ func TestMerge_UpdatedConflictKeepsPrecedenceWinnerNotEarliest(t *testing.T) {
 	registryRDAP := sr(model.SourceRegistryRDAP, true)
 	registryRDAP.Updated = model.TimeValue{Time: earlierTime, Raw: "2020-01-01T00:00:00Z", Parsed: true}
 
-	rec := Merge([]model.SourceRecord{registrarRDAP, registryRDAP})
+	rec := Merge([]source.SourceRecord{registrarRDAP, registryRDAP})
 
 	if rec.Updated.Value.Raw != "2026-01-01T00:00:00Z" {
 		t.Errorf("Updated.Value.Raw = %q, want the higher-precedence (later) value kept despite the conflict", rec.Updated.Value.Raw)
@@ -235,7 +236,7 @@ func TestMerge_UnparsedDateNeverConflicts(t *testing.T) {
 	whois := sr(model.SourceRegistryWHOIS, true)
 	whois.Expires = model.TimeValue{Raw: "garbage-unparseable-date", Parsed: false}
 
-	rec := Merge([]model.SourceRecord{registry, whois})
+	rec := Merge([]source.SourceRecord{registry, whois})
 
 	if rec.Expires.Value.Raw != "2026-08-13T04:00:00Z" {
 		t.Errorf("Expires.Value.Raw = %q, want the parsed, higher-precedence value", rec.Expires.Value.Raw)
@@ -251,7 +252,7 @@ func TestMerge_NameserverUnionNoConflict(t *testing.T) {
 	b := sr(model.SourceRegistryWHOIS, true)
 	b.Nameservers = []string{"a.iana-servers.net", "B.IANA-SERVERS.NET"}
 
-	rec := Merge([]model.SourceRecord{a, b})
+	rec := Merge([]source.SourceRecord{a, b})
 
 	if len(rec.Nameservers.Value) != 2 {
 		t.Errorf("Nameservers.Value = %v, want 2 entries (case/trailing-dot differences should normalize to the same set)", rec.Nameservers.Value)
@@ -272,7 +273,7 @@ func TestMerge_NameserverGenuineConflict(t *testing.T) {
 	b := sr(model.SourceRegistryWHOIS, true)
 	b.Nameservers = []string{"ns1.example.com", "ns3.example.com"}
 
-	rec := Merge([]model.SourceRecord{a, b})
+	rec := Merge([]source.SourceRecord{a, b})
 
 	if len(rec.Nameservers.Value) != 3 {
 		t.Errorf("Nameservers.Value = %v, want the 3-entry union", rec.Nameservers.Value)
@@ -306,7 +307,7 @@ func TestMerge_NameserverStragglerExcludedFromSources(t *testing.T) {
 	full2 := sr(model.SourceRegistrarWHOIS, true)
 	full2.Nameservers = []string{"ns-1411.awsdns-48.org", "ns-1914.awsdns-47.co.uk", "ns-225.awsdns-28.com", "ns-556.awsdns-05.net"}
 
-	rec := Merge([]model.SourceRecord{stale, full1, full2})
+	rec := Merge([]source.SourceRecord{stale, full1, full2})
 
 	if len(rec.Nameservers.Value) != 4 {
 		t.Errorf("Nameservers.Value = %v, want the 4-entry union", rec.Nameservers.Value)
@@ -359,7 +360,7 @@ func TestMerge_NameserversAreSortedRegardlessOfInputOrder(t *testing.T) {
 		registrarWHOIS := sr(model.SourceRegistrarWHOIS, true)
 		registrarWHOIS.Nameservers = ns
 
-		rec := Merge([]model.SourceRecord{registrarRDAP, registryRDAP, registrarWHOIS})
+		rec := Merge([]source.SourceRecord{registrarRDAP, registryRDAP, registrarWHOIS})
 
 		if !slices.Equal(rec.Nameservers.Value, want) {
 			t.Errorf("ordering %d: Nameservers.Value = %v, want sorted %v", i, rec.Nameservers.Value, want)
@@ -373,7 +374,7 @@ func TestMerge_StatusUnionNoConflict(t *testing.T) {
 	b := sr(model.SourceRegistryWHOIS, true)
 	b.Status = []string{"clientTransferProhibited", "clientUpdateProhibited"}
 
-	rec := Merge([]model.SourceRecord{a, b})
+	rec := Merge([]source.SourceRecord{a, b})
 
 	if len(rec.Status.Value) != 2 {
 		t.Errorf("Status.Value = %v, want the 2-entry union", rec.Status.Value)
@@ -394,7 +395,7 @@ func TestMerge_StatusDropsBareFormWhenPrefixedVariantPresent(t *testing.T) {
 	registryRDAP := sr(model.SourceRegistryRDAP, true)
 	registryRDAP.Status = []string{"clientDeleteProhibited", "clientRenewProhibited", "clientTransferProhibited", "clientUpdateProhibited", "serverDeleteProhibited", "serverTransferProhibited", "serverUpdateProhibited"}
 
-	rec := Merge([]model.SourceRecord{registrarRDAP, registryRDAP})
+	rec := Merge([]source.SourceRecord{registrarRDAP, registryRDAP})
 
 	if len(rec.Status.Value) != 7 {
 		t.Fatalf("Status.Value = %v, want only the 7 client/server-prefixed entries (bare duplicates dropped)", rec.Status.Value)
@@ -412,7 +413,7 @@ func TestMerge_StatusKeepsBareFormWhenNoPrefixedVariantExists(t *testing.T) {
 	a := sr(model.SourceRegistrarRDAP, true)
 	a.Status = []string{"ok"}
 
-	rec := Merge([]model.SourceRecord{a})
+	rec := Merge([]source.SourceRecord{a})
 
 	if len(rec.Status.Value) != 1 || rec.Status.Value[0] != "ok" {
 		t.Errorf(`Status.Value = %v, want ["ok"] preserved (no client/server-prefixed variant exists to make it redundant)`, rec.Status.Value)
@@ -439,7 +440,7 @@ func TestMerge_StatusIsSortedRegardlessOfInputOrder(t *testing.T) {
 		b := sr(model.SourceRegistryWHOIS, true)
 		b.Status = st
 
-		rec := Merge([]model.SourceRecord{a, b})
+		rec := Merge([]source.SourceRecord{a, b})
 
 		if !slices.Equal(rec.Status.Value, want) {
 			t.Errorf("ordering %d: Status.Value = %v, want sorted %v", i, rec.Status.Value, want)
@@ -459,7 +460,7 @@ func TestMerge_AllRedactedFieldStaysEmpty(t *testing.T) {
 	a.Registrar.Name = "REDACTED"
 	a.RedactedFields[model.FieldRegistrarName] = true
 
-	rec := Merge([]model.SourceRecord{a})
+	rec := Merge([]source.SourceRecord{a})
 
 	if rec.Registrar.Name.Present() {
 		t.Errorf("Registrar.Name = %+v, want absent (every source was redacted)", rec.Registrar.Name)
@@ -471,9 +472,9 @@ func TestMerge_AllRedactedFieldStaysEmpty(t *testing.T) {
 
 func TestMerge_RecordSourcesIncludesEveryAttempt(t *testing.T) {
 	ok := sr(model.SourceRegistryRDAP, true)
-	failed := model.SourceRecord{Meta: model.SourceResult{Source: model.SourceRegistrarRDAP, OK: false, Err: "connection refused"}, Present: false}
+	failed := source.SourceRecord{Meta: model.SourceResult{Source: model.SourceRegistrarRDAP, OK: false, Err: "connection refused"}, Present: false}
 
-	rec := Merge([]model.SourceRecord{ok, failed})
+	rec := Merge([]source.SourceRecord{ok, failed})
 
 	if len(rec.Sources) != 2 {
 		t.Fatalf("Sources = %+v, want both attempts recorded regardless of success", rec.Sources)
@@ -489,7 +490,7 @@ func TestMerge_DNSSECConflict(t *testing.T) {
 	registryRDAP := sr(model.SourceRegistryRDAP, true)
 	registryRDAP.DNSSEC = &signedFalse
 
-	rec := Merge([]model.SourceRecord{registryRDAP, registrarRDAP})
+	rec := Merge([]source.SourceRecord{registryRDAP, registrarRDAP})
 
 	if !rec.DNSSEC.Value {
 		t.Errorf("DNSSEC.Value = %v, want true (registrar-rdap should win over registry-rdap)", rec.DNSSEC.Value)
@@ -509,7 +510,7 @@ func TestMerge_DNSSECAgreementNoConflict(t *testing.T) {
 	b := sr(model.SourceRegistryRDAP, true)
 	b.DNSSEC = &signed
 
-	rec := Merge([]model.SourceRecord{a, b})
+	rec := Merge([]source.SourceRecord{a, b})
 
 	if !rec.DNSSEC.Value {
 		t.Errorf("DNSSEC.Value = %v, want true", rec.DNSSEC.Value)
@@ -530,7 +531,7 @@ func TestMerge_ThreeWayScalarConflict(t *testing.T) {
 	registrarWHOIS := sr(model.SourceRegistrarWHOIS, true)
 	registrarWHOIS.Registrar.Name = "Registrar WHOIS Corp"
 
-	rec := Merge([]model.SourceRecord{registryRDAP, registrarWHOIS, registrarRDAP})
+	rec := Merge([]source.SourceRecord{registryRDAP, registrarWHOIS, registrarRDAP})
 
 	if rec.Registrar.Name.Value != "Registrar RDAP Corp" {
 		t.Errorf("Registrar.Name = %q, want %q (highest precedence wins among 3 disagreeing sources)", rec.Registrar.Name.Value, "Registrar RDAP Corp")
@@ -554,7 +555,7 @@ func TestMerge_RedactionWithConflictAmongRemainingSources(t *testing.T) {
 	registrarWHOIS := sr(model.SourceRegistrarWHOIS, true)
 	registrarWHOIS.Registrar.Name = "Registrar WHOIS Corp"
 
-	rec := Merge([]model.SourceRecord{registrarRDAP, registryWHOIS, registrarWHOIS})
+	rec := Merge([]source.SourceRecord{registrarRDAP, registryWHOIS, registrarWHOIS})
 
 	if rec.Registrar.Name.Value != "Registrar WHOIS Corp" {
 		t.Errorf("Registrar.Name = %q, want %q (highest-precedence NON-redacted source should win)", rec.Registrar.Name.Value, "Registrar WHOIS Corp")
@@ -582,7 +583,7 @@ func TestMerge_PartialParseTimestampStillChecksClockSkew(t *testing.T) {
 	t2 := time.Date(2026, 9, 20, 4, 0, 0, 0, time.UTC) // >24h beyond t1
 	registryWHOIS.Expires = model.TimeValue{Time: t2, Raw: "2026-09-20T04:00:00Z", Parsed: true}
 
-	rec := Merge([]model.SourceRecord{registrarRDAP, registryRDAP, registryWHOIS})
+	rec := Merge([]source.SourceRecord{registrarRDAP, registryRDAP, registryWHOIS})
 
 	if rec.Expires.Value.Raw != "2026-08-13T04:00:00Z" {
 		t.Errorf("Expires.Value.Raw = %q, want %q (the earliest PARSED candidate -- an unparsed value can never win the conservative override, even though it's the highest-precedence present candidate)", rec.Expires.Value.Raw, "2026-08-13T04:00:00Z")
@@ -616,7 +617,7 @@ func TestMerge_LifecycleStageEstimates(t *testing.T) {
 			a.Status = []string{tt.status}
 			a.Updated = model.TimeValue{Time: updated, Raw: "2026-08-01T00:00:00Z", Parsed: true}
 
-			rec := Merge([]model.SourceRecord{a})
+			rec := Merge([]source.SourceRecord{a})
 
 			if rec.Lifecycle == nil {
 				t.Fatal("Lifecycle = nil, want populated")
@@ -660,7 +661,7 @@ func TestMerge_LifecycleAutoRenewGraceAnchoredToRegistrarExpires(t *testing.T) {
 	// anchor. This mirrors a real observed registry/registrar WHOIS pair.
 	registryWHOIS.Expires = model.TimeValue{Time: registryExpires, Raw: "2027-08-03T02:51:21Z", Parsed: true}
 
-	rec := Merge([]model.SourceRecord{registrarWHOIS, registryWHOIS})
+	rec := Merge([]source.SourceRecord{registrarWHOIS, registryWHOIS})
 
 	if rec.Lifecycle == nil {
 		t.Fatal("Lifecycle = nil, want populated")
@@ -687,7 +688,7 @@ func TestMerge_LifecycleAutoRenewGraceNoEstimateWithoutRegistrarSource(t *testin
 	a.Status = []string{"autoRenewPeriod"}
 	a.Expires = model.TimeValue{Time: expires, Raw: "2027-08-03T00:00:00Z", Parsed: true}
 
-	rec := Merge([]model.SourceRecord{a})
+	rec := Merge([]source.SourceRecord{a})
 
 	if rec.Lifecycle == nil {
 		t.Fatal("Lifecycle = nil, want populated (Stage/Label/Description don't need the anchor)")
@@ -709,7 +710,7 @@ func TestMerge_LifecyclePendingRestoreHasNoEstimate(t *testing.T) {
 	a.Status = []string{"pendingRestore"}
 	a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
 
-	rec := Merge([]model.SourceRecord{a})
+	rec := Merge([]source.SourceRecord{a})
 
 	if rec.Lifecycle == nil {
 		t.Fatal("Lifecycle = nil, want populated for pendingRestore")
@@ -731,7 +732,7 @@ func TestMerge_LifecycleNilForCCTLD(t *testing.T) {
 	a.Status = []string{"redemptionPeriod"}
 	a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
 
-	rec := Merge([]model.SourceRecord{a})
+	rec := Merge([]source.SourceRecord{a})
 
 	if rec.Lifecycle != nil {
 		t.Errorf("Lifecycle = %+v, want nil for a ccTLD regardless of status -- ccTLD registries set independent policies plat doesn't model", rec.Lifecycle)
@@ -743,7 +744,7 @@ func TestMerge_LifecycleNilWhenNoRecognizedStatus(t *testing.T) {
 	a.Domain = "example.com"
 	a.Status = []string{"clientTransferProhibited"}
 
-	rec := Merge([]model.SourceRecord{a})
+	rec := Merge([]source.SourceRecord{a})
 
 	if rec.Lifecycle != nil {
 		t.Errorf("Lifecycle = %+v, want nil when Status carries no lifecycle-relevant EPP code", rec.Lifecycle)
@@ -756,7 +757,7 @@ func TestMerge_LifecycleMissingAnchorLeavesEstimateEmpty(t *testing.T) {
 	a.Status = []string{"redemptionPeriod"}
 	// Updated deliberately left zero-value (Raw "") -- no usable anchor.
 
-	rec := Merge([]model.SourceRecord{a})
+	rec := Merge([]source.SourceRecord{a})
 
 	if rec.Lifecycle == nil {
 		t.Fatal("Lifecycle = nil, want populated (Stage/Label/Description don't need the anchor)")
@@ -778,7 +779,7 @@ func TestMerge_LifecyclePriorityPendingDeleteBeatsRedemptionGrace(t *testing.T) 
 	a.Status = []string{"redemptionPeriod", "pendingDelete"}
 	a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
 
-	rec := Merge([]model.SourceRecord{a})
+	rec := Merge([]source.SourceRecord{a})
 
 	if rec.Lifecycle == nil {
 		t.Fatal("Lifecycle = nil, want populated")
@@ -794,7 +795,7 @@ func TestMerge_LifecyclePriorityPendingRestoreBeatsAutoRenewPeriod(t *testing.T)
 	a.Status = []string{"autoRenewPeriod", "pendingRestore"}
 	a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
 
-	rec := Merge([]model.SourceRecord{a})
+	rec := Merge([]source.SourceRecord{a})
 
 	if rec.Lifecycle == nil {
 		t.Fatal("Lifecycle = nil, want populated")
@@ -823,7 +824,7 @@ func TestMerge_LifecycleNilForIDNCCTLD(t *testing.T) {
 			a.Status = []string{"redemptionPeriod"}
 			a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
 
-			rec := Merge([]model.SourceRecord{a})
+			rec := Merge([]source.SourceRecord{a})
 
 			if rec.Lifecycle != nil {
 				t.Errorf("Lifecycle = %+v, want nil for IDN ccTLD %q (byte length must not be mistaken for character length, and the punycode form must be recognized too)", rec.Lifecycle, tt.domain)
@@ -852,7 +853,7 @@ func TestMerge_LifecycleNilForIDNGTLD(t *testing.T) {
 			a.Status = []string{"redemptionPeriod"}
 			a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
 
-			rec := Merge([]model.SourceRecord{a})
+			rec := Merge([]source.SourceRecord{a})
 
 			if rec.Lifecycle != nil {
 				t.Errorf("Lifecycle = %+v, want nil -- IDN gTLDs are out of scope for lifecycle interpretation alongside IDN ccTLDs (documented limitation, see isGTLD)", rec.Lifecycle)
@@ -873,7 +874,7 @@ func TestPresentSorted_OrdersByRankForEveryObjectType(t *testing.T) {
 	hi := model.SourceResult{Source: model.SourceRegistrarRDAP}
 
 	t.Run("domain", func(t *testing.T) {
-		got := presentSorted([]model.SourceRecord{
+		got := presentSorted([]source.SourceRecord{
 			{Meta: lo, Present: true},
 			{Meta: hi, Present: true},
 			{Meta: hi, Present: false}, // absent: must be dropped
@@ -887,7 +888,7 @@ func TestPresentSorted_OrdersByRankForEveryObjectType(t *testing.T) {
 	})
 
 	t.Run("ip", func(t *testing.T) {
-		got := presentSorted([]model.IPSourceRecord{
+		got := presentSorted([]source.IPSourceRecord{
 			{Meta: lo, Present: true},
 			{Meta: hi, Present: true},
 			{Meta: hi, Present: false},
@@ -901,7 +902,7 @@ func TestPresentSorted_OrdersByRankForEveryObjectType(t *testing.T) {
 	})
 
 	t.Run("asn", func(t *testing.T) {
-		got := presentSorted([]model.ASNSourceRecord{
+		got := presentSorted([]source.ASNSourceRecord{
 			{Meta: lo, Present: true},
 			{Meta: hi, Present: true},
 			{Meta: hi, Present: false},
@@ -931,7 +932,7 @@ func TestMerge_LifecycleNilForMalformedDomain(t *testing.T) {
 			a.Status = []string{"redemptionPeriod"}
 			a.Updated = model.TimeValue{Time: time.Now(), Raw: "irrelevant", Parsed: true}
 
-			rec := Merge([]model.SourceRecord{a})
+			rec := Merge([]source.SourceRecord{a})
 
 			if rec.Lifecycle != nil {
 				t.Errorf("Lifecycle = %+v, want nil for malformed domain %q", rec.Lifecycle, tt.domain)
@@ -959,7 +960,7 @@ func TestStatusAsymmetry_EPPDropIsDomainOnly(t *testing.T) {
 
 	t.Run("domain drops the redundant bare status", func(t *testing.T) {
 		var st mergeState
-		got := st.status([]model.SourceRecord{{Meta: meta, Present: true, Status: epp}})
+		got := st.status([]source.SourceRecord{{Meta: meta, Present: true, Status: epp}})
 		want := []string{"clientTransferProhibited"}
 		if !slices.Equal(got.Value, want) {
 			t.Errorf("domain status = %q, want %q (bare transferProhibited is redundant)", got.Value, want)
@@ -967,7 +968,7 @@ func TestStatusAsymmetry_EPPDropIsDomainOnly(t *testing.T) {
 	})
 
 	t.Run("ip keeps both strings", func(t *testing.T) {
-		got := statusUnion([]model.IPSourceRecord{{Meta: meta, Present: true, Status: epp}})
+		got := statusUnion([]source.IPSourceRecord{{Meta: meta, Present: true, Status: epp}})
 		want := []string{"clientTransferProhibited", "transferProhibited"}
 		if !slices.Equal(got.Value, want) {
 			t.Errorf("ip status = %q, want %q -- the EPP drop rule must not reach RIR data", got.Value, want)
@@ -975,7 +976,7 @@ func TestStatusAsymmetry_EPPDropIsDomainOnly(t *testing.T) {
 	})
 
 	t.Run("asn keeps both strings", func(t *testing.T) {
-		got := statusUnion([]model.ASNSourceRecord{{Meta: meta, Present: true, Status: epp}})
+		got := statusUnion([]source.ASNSourceRecord{{Meta: meta, Present: true, Status: epp}})
 		want := []string{"clientTransferProhibited", "transferProhibited"}
 		if !slices.Equal(got.Value, want) {
 			t.Errorf("asn status = %q, want %q -- the EPP drop rule must not reach RIR data", got.Value, want)
@@ -988,14 +989,14 @@ func TestStatusAsymmetry_EPPDropIsDomainOnly(t *testing.T) {
 // surfacing its own normalisation gap as data, on the exact signal
 // (the conflict marker) that the tool exists to provide.
 func TestMerge_IDNSpellingsAgree(t *testing.T) {
-	src := func(id model.SourceID, domain string) model.SourceRecord {
-		return model.SourceRecord{
+	src := func(id model.SourceID, domain string) source.SourceRecord {
+		return source.SourceRecord{
 			Meta:    model.SourceResult{Source: id, OK: true},
 			Present: true,
 			Domain:  domain,
 		}
 	}
-	rec := Merge([]model.SourceRecord{
+	rec := Merge([]source.SourceRecord{
 		src(model.SourceRegistrarRDAP, "bücher.com"),
 		src(model.SourceRegistryRDAP, "XN--BCHER-KVA.COM"),
 		src(model.SourceRegistrarWHOIS, "xn--bcher-kva.com"),
@@ -1017,14 +1018,14 @@ func TestMerge_IDNSpellingsAgree(t *testing.T) {
 
 // Genuinely different domains must still conflict.
 func TestMerge_DifferentDomainsStillConflict(t *testing.T) {
-	src := func(id model.SourceID, domain string) model.SourceRecord {
-		return model.SourceRecord{
+	src := func(id model.SourceID, domain string) source.SourceRecord {
+		return source.SourceRecord{
 			Meta:    model.SourceResult{Source: id, OK: true},
 			Present: true,
 			Domain:  domain,
 		}
 	}
-	rec := Merge([]model.SourceRecord{
+	rec := Merge([]source.SourceRecord{
 		src(model.SourceRegistryRDAP, "example.com"),
 		src(model.SourceRegistryWHOIS, "different.com"),
 	})

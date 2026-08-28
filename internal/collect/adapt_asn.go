@@ -4,30 +4,31 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
+	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/internal/whois/parse"
+	"github.com/patramsey/plat/model"
 )
 
-// fromASNRDAP adapts an RDAP autnum response into a model.ASNSourceRecord
+// fromASNRDAP adapts an RDAP autnum response into a source.ASNSourceRecord
 // tagged as src. Mirrors fromIPRDAP's shape, but for rdap.ASNResponse: org
 // identity comes from the "registrant" entity's vCard full name, abuse
 // contact from the "abuse" entity's vCard email/tel -- see
 // RegistrantEntity/AbuseEntity on ASNResponse (internal/rdap/types.go).
 //
 // StartAutnum/EndAutnum are uint32 on rdap.ASNResponse but string on
-// model.ASNSourceRecord -- see the doc comment on model.ASNRecord for why
+// source.ASNSourceRecord -- see the doc comment on model.ASNRecord for why
 // (mergeState.scalar, shared with the domain and IP merge paths, is
 // Field[string]-specific). Converted here at the adapter boundary via
 // strconv.FormatUint.
-func fromASNRDAP(meta model.SourceResult, resp *rdap.ASNResponse) model.ASNSourceRecord {
+func fromASNRDAP(meta model.SourceResult, resp *rdap.ASNResponse) source.ASNSourceRecord {
 	if resp == nil {
 		meta.OK = false
-		return model.ASNSourceRecord{Meta: meta}
+		return source.ASNSourceRecord{Meta: meta}
 	}
 
-	sr := model.ASNSourceRecord{
+	sr := source.ASNSourceRecord{
 		Meta:           meta,
 		Handle:         normalizeASNHandle(resp.Handle),
 		Name:           resp.Name,
@@ -45,7 +46,7 @@ func fromASNRDAP(meta model.SourceResult, resp *rdap.ASNResponse) model.ASNSourc
 
 	// Like an IP network's status (RIR-specific vocabulary, not RFC 8056
 	// EPP), an autnum's status is RIR-specific too -- running it through
-	// model.NormalizeEPPStatus mangled multi-word values into meaningless
+	// source.NormalizeEPPStatus mangled multi-word values into meaningless
 	// tokens. RIR statuses pass through unchanged, per docs/schema.md's
 	// documented contract (same reasoning as fromIPRDAP).
 	sr.Status = append(sr.Status, resp.Status...)
@@ -58,7 +59,7 @@ func fromASNRDAP(meta model.SourceResult, resp *rdap.ASNResponse) model.ASNSourc
 	}
 
 	if regEntity, ok := resp.RegistrantEntity(); ok {
-		if model.IsRedactedPlaceholder(regEntity.VCardArray.FullName) {
+		if source.IsRedactedPlaceholder(regEntity.VCardArray.FullName) {
 			sr.RedactedFields[model.FieldOrgName] = true
 			// RedactedFields alone is not enough to surface a redaction
 			// notice: mergeState.scalar (internal/merge/merge.go, shared
@@ -129,7 +130,7 @@ func normalizeASNHandle(handle string) string {
 
 // asnRDAPPresent reports whether resp yielded any non-empty field,
 // mirroring ipRDAPPresent's reasoning for autnum responses.
-func asnRDAPPresent(sr model.ASNSourceRecord) bool {
+func asnRDAPPresent(sr source.ASNSourceRecord) bool {
 	return sr.Handle != "" || sr.Name != "" || sr.Type != "" || sr.StartAutnum != "" ||
 		sr.EndAutnum != "" || sr.Country != "" || sr.OrgName != "" || sr.AbuseEmail != "" ||
 		sr.AbusePhone != "" || len(sr.Status) > 0 || sr.Registered.Raw != "" || sr.Updated.Raw != "" ||
@@ -137,17 +138,17 @@ func asnRDAPPresent(sr model.ASNSourceRecord) bool {
 }
 
 // fromASNHop adapts one WHOIS hop's parsed ASN fields into a
-// model.ASNSourceRecord tagged as src. Mirrors fromIPHop's shape, using
+// source.ASNSourceRecord tagged as src. Mirrors fromIPHop's shape, using
 // parse.ParseDate for Registered/Updated -- the same tolerant multi-format
 // date parser the domain and IP WHOIS adapters use.
-func fromASNHop(meta model.SourceResult, hop whois.Hop) model.ASNSourceRecord {
+func fromASNHop(meta model.SourceResult, hop whois.Hop) source.ASNSourceRecord {
 	if hop.Err != nil {
 		meta.OK = false
-		return model.ASNSourceRecord{Meta: meta}
+		return source.ASNSourceRecord{Meta: meta}
 	}
 	if hop.ASNFields == nil {
 		meta.OK = false
-		return model.ASNSourceRecord{Meta: meta}
+		return source.ASNSourceRecord{Meta: meta}
 	}
 	// hop.Fields (not ASNFields) is where parse.Parse's refusal signals
 	// land -- mirrors fromIPHop's identical reasoning: without checking
@@ -157,12 +158,12 @@ func fromASNHop(meta model.SourceResult, hop whois.Hop) model.ASNSourceRecord {
 	if hop.Fields.Unsupported {
 		meta.OK = false
 		meta.Err = "registry does not support WHOIS for this autnum"
-		return model.ASNSourceRecord{Meta: meta}
+		return source.ASNSourceRecord{Meta: meta}
 	}
 	if hop.Fields.RateLimited {
 		meta.OK = false
 		meta.Err = "WHOIS server rate-limited this query"
-		return model.ASNSourceRecord{Meta: meta}
+		return source.ASNSourceRecord{Meta: meta}
 	}
 	meta.OK = true
 	f := hop.ASNFields
@@ -176,7 +177,7 @@ func fromASNHop(meta model.SourceResult, hop whois.Hop) model.ASNSourceRecord {
 	// autnum response whose startAutnum/endAutnum both equal the same
 	// queried ASN (the common case; only a block-level RDAP query would
 	// ever report a genuinely differing pair).
-	sr := model.ASNSourceRecord{
+	sr := source.ASNSourceRecord{
 		Meta:           meta,
 		Handle:         f.Handle,
 		Name:           f.Name,
@@ -190,7 +191,7 @@ func fromASNHop(meta model.SourceResult, hop whois.Hop) model.ASNSourceRecord {
 		RedactedFields: map[string]bool{},
 	}
 
-	if model.IsRedactedPlaceholder(f.OrgName) {
+	if source.IsRedactedPlaceholder(f.OrgName) {
 		sr.RedactedFields[model.FieldOrgName] = true
 		// See fromASNRDAP's identical reasoning: mergeState.scalar never
 		// surfaces a RedactedFields-only signal when the value is left
@@ -207,7 +208,7 @@ func fromASNHop(meta model.SourceResult, hop whois.Hop) model.ASNSourceRecord {
 
 	// See fromASNRDAP's identical reasoning: RIR status vocabulary isn't
 	// EPP, so it passes through unchanged rather than being mangled by
-	// model.NormalizeEPPStatus.
+	// source.NormalizeEPPStatus.
 	sr.Status = append(sr.Status, f.Statuses...)
 
 	if registered := parse.ParseDate(f.Registered); registered.Raw != "" {
@@ -223,7 +224,7 @@ func fromASNHop(meta model.SourceResult, hop whois.Hop) model.ASNSourceRecord {
 
 // asnHopPresent reports whether hop yielded any non-empty field, mirroring
 // ipHopPresent's reasoning for the WHOIS side.
-func asnHopPresent(sr model.ASNSourceRecord) bool {
+func asnHopPresent(sr source.ASNSourceRecord) bool {
 	return sr.Handle != "" || sr.Name != "" || sr.Type != "" || sr.StartAutnum != "" ||
 		sr.EndAutnum != "" || sr.Country != "" || sr.OrgName != "" || sr.OrgID != "" ||
 		sr.AbuseEmail != "" || sr.AbusePhone != "" || len(sr.Status) > 0 ||

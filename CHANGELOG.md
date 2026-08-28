@@ -4,6 +4,27 @@ All notable changes to `plat` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- The data model is now a public package, `github.com/patramsey/plat/model`.
+  `plat.Record` and its siblings remain aliases, so existing code compiles
+  unchanged, but their fields -- previously hidden in `internal/` -- are now
+  documented and visible via `go doc github.com/patramsey/plat/model.Record`.
+
+### Changed
+- **Breaking:** A cancelled or expired context now returns the context's own
+  error from `Lookup`, not `ErrLookupFailed`. `errors.Is(err,
+  context.Canceled)` and `errors.Is(err, context.DeadlineExceeded)` now
+  report true, and `errors.Is(err, ErrLookupFailed)` is correspondingly
+  false for these cases. Code retrying on `ErrLookupFailed` no longer
+  retries a cancellation.
+- **Breaking:** `New` now returns an error for an unknown `SourceID` in
+  `Options.Sources`, naming the offending value. It previously accepted any
+  string, then `Lookup` consulted zero sources and reported a generic
+  lookup failure -- a typo in the caller's config surfaced as an
+  infrastructure error instead of a config error.
+
 ## [0.7.0] - 2026-08-25
 
 ### Added

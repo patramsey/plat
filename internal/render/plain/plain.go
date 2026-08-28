@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 // Options controls Render's verbosity.
@@ -413,7 +413,7 @@ func sourcesCol(sources []model.SourceID, conflicted bool) string {
 // registry-whois" repeated on every field row of a well-agreed-upon
 // record was the dominant contributor to line length. writeSourceLegend
 // prints the one-line key these codes decode against; an unrecognized
-// SourceID (shouldn't happen given the closed set in internal/model)
+// SourceID (shouldn't happen given the closed set in model)
 // falls back to the raw string rather than a blank code.
 func sourceCode(s model.SourceID) string {
 	switch s {
@@ -440,7 +440,7 @@ func formatSources(sources []model.SourceID) string {
 
 // legendEntry decodes one source into its "XX source-id" legend entry. An
 // unrecognized SourceID (which shouldn't happen given the closed set in
-// internal/model) has no two-letter code -- sourceCode falls back to the
+// model) has no two-letter code -- sourceCode falls back to the
 // raw string -- so it prints once rather than as "foo foo".
 func legendEntry(s model.SourceID) string {
 	code := sourceCode(s)

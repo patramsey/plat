@@ -5,7 +5,7 @@ import (
 	"io"
 	"text/tabwriter"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 // RenderIP writes an unstyled, aligned key/value view of a merged IP

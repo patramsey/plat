@@ -10,8 +10,8 @@ import (
 	"github.com/patramsey/plat/internal/collect"
 	"github.com/patramsey/plat/internal/domain"
 	"github.com/patramsey/plat/internal/merge"
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/whois"
+	"github.com/patramsey/plat/model"
 )
 
 // defaultTimeout matches the CLI's default --timeout.
@@ -24,7 +24,9 @@ type Options struct {
 	// Deliberate idling -- waiting a turn behind another name's paced
 	// WHOIS query -- is not charged against it. Zero means 5s.
 	Timeout time.Duration
-	// Sources restricts which sources are consulted. nil means all.
+	// Sources restricts which sources are consulted. nil means all. An
+	// unrecognized SourceID is rejected by New, not silently ignored --
+	// see New's doc comment.
 	Sources []SourceID
 	// NoFollow skips the second hop to the registrar's RDAP server.
 	// Domain lookups only; IPs and ASNs have no registrar.
@@ -90,11 +92,24 @@ type Client struct {
 
 // New builds a Client, loading the IANA RDAP bootstrap data once.
 //
-// It rarely fails: a failed fetch falls back to a cached copy and then to
-// a snapshot embedded in the binary, so a caller with no network still
-// gets a usable Client. The error return exists so that a future failure
-// mode is not a breaking signature change.
+// New returns an error in two cases: Options.Sources names a SourceID
+// New does not recognize, or the bootstrap load fails outright. The
+// second is rare in practice -- a failed fetch falls back to a cached
+// copy and then to a snapshot embedded in the binary, so a caller with
+// no network still gets a usable Client -- but the first is a validation
+// check on every call, not a corner case.
 func New(ctx context.Context, opts Options) (*Client, error) {
+	// An unknown SourceID is a bug in the caller's code, not a runtime
+	// condition: unvalidated, it silently filters every source out and the
+	// lookup reports a generic failure, which is close to undiagnosable
+	// from the outside. Caught here, at construction, where the offending
+	// value can be named.
+	for _, s := range opts.Sources {
+		if model.Rank(s) == len(model.Precedence) {
+			return nil, fmt.Errorf("plat: unknown source %q: valid sources are %v", s, model.Precedence)
+		}
+	}
+
 	if opts.Timeout <= 0 {
 		opts.Timeout = defaultTimeout
 	}
@@ -183,7 +198,10 @@ type Result struct {
 // returned data, Lookup returns a Result with nil error, and the
 // per-source detail is in the record's Sources field. Lookup returns
 // ErrInvalidInput, ErrNotFound, or ErrLookupFailed for the three cases
-// where there is no usable answer at all.
+// where there is no usable answer at all. A cancelled or expired ctx is
+// none of those: Lookup returns ctx's own error unwrapped, so errors.Is
+// matches context.Canceled or context.DeadlineExceeded and deliberately
+// does not match ErrLookupFailed.
 func (c *Client) Lookup(ctx context.Context, input string) (Result, error) {
 	q, err := domain.Normalize(input)
 	if err != nil {
@@ -228,6 +246,15 @@ func (c *Client) Lookup(ctx context.Context, input string) (Result, error) {
 		})
 		rec := merge.MergeASN(records)
 		res.Kind, res.ASN, sources = KindASN, &rec, rec.Sources
+	}
+
+	// A cancelled or expired context is not a lookup failure, and must not
+	// be reported as one: a caller retrying on ErrLookupFailed would retry
+	// the cancellation. Returned bare rather than wrapped for that reason.
+	// The partial Result still goes back, so whatever merged before the
+	// context ended stays inspectable.
+	if err := ctx.Err(); err != nil {
+		return res, err
 	}
 
 	switch model.Classify(sources) {

@@ -422,6 +422,12 @@ only useful if kept around. Every field on the result types is a
 same as the CLI's output; a source failing is normal, not an error, as
 long as at least one source returns data.
 
+`Record`, `IPRecord`, `ASNRecord`, `Field[T]`, and the other data types
+are defined in [`github.com/patramsey/plat/model`](https://pkg.go.dev/github.com/patramsey/plat/model)
+and aliased into `plat`, so `plat.Record` and `model.Record` are the same
+type — import `model` directly only if you want its documentation
+without also pulling in `Client` and `Lookup`.
+
 `EncodeJSON` writes a `Result` as plat's `schemaVersion: 1` JSON —
 byte-identical to what `-o json` prints for the same lookup:
 

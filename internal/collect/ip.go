@@ -7,9 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
+	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
+	"github.com/patramsey/plat/model"
 )
 
 // CollectIP fans out to the RIR's RDAP service and the WHOIS chain
@@ -22,8 +23,8 @@ import (
 // Like Collect, records come back in a fixed order (registry-rdap,
 // registry-whois) regardless of which goroutine finished first, so
 // callers see a stable order across runs.
-func CollectIP(ctx context.Context, addr netip.Addr, baseURL, whoisIANAServer string, opts Options) []model.IPSourceRecord {
-	var rdapOut, whoisOut []model.IPSourceRecord
+func CollectIP(ctx context.Context, addr netip.Addr, baseURL, whoisIANAServer string, opts Options) []source.IPSourceRecord {
+	var rdapOut, whoisOut []source.IPSourceRecord
 
 	needRDAP := baseURL != "" && opts.allows(model.SourceRegistryRDAP)
 	needWHOIS := opts.allows(model.SourceRegistryWHOIS)
@@ -41,13 +42,13 @@ func CollectIP(ctx context.Context, addr netip.Addr, baseURL, whoisIANAServer st
 	}
 	wg.Wait()
 
-	out := make([]model.IPSourceRecord, 0, len(rdapOut)+len(whoisOut))
+	out := make([]source.IPSourceRecord, 0, len(rdapOut)+len(whoisOut))
 	out = append(out, rdapOut...)
 	out = append(out, whoisOut...)
 	return out
 }
 
-func collectIPRDAP(ctx context.Context, addr netip.Addr, baseURL string, opts Options) []model.IPSourceRecord {
+func collectIPRDAP(ctx context.Context, addr netip.Addr, baseURL string, opts Options) []source.IPSourceRecord {
 	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient}
 	start := time.Now()
 	result, err := rdapClient.IP(ctx, baseURL, addr)
@@ -60,7 +61,7 @@ func collectIPRDAP(ctx context.Context, addr netip.Addr, baseURL string, opts Op
 		meta.OK = false
 		meta.Err = err.Error()
 		meta.NotFound = errors.Is(err, rdap.ErrDomainNotFound)
-		return []model.IPSourceRecord{fromIPRDAP(meta, nil)}
+		return []source.IPSourceRecord{fromIPRDAP(meta, nil)}
 	}
 	meta.OK = true
 
@@ -68,10 +69,10 @@ func collectIPRDAP(ctx context.Context, addr netip.Addr, baseURL string, opts Op
 	if result != nil {
 		resp = result.IPNetwork
 	}
-	return []model.IPSourceRecord{fromIPRDAP(meta, resp)}
+	return []source.IPSourceRecord{fromIPRDAP(meta, resp)}
 }
 
-func collectIPWHOIS(ctx context.Context, addr netip.Addr, whoisIANAServer string, opts Options) []model.IPSourceRecord {
+func collectIPWHOIS(ctx context.Context, addr netip.Addr, whoisIANAServer string, opts Options) []source.IPSourceRecord {
 	timeout := opts.Timeout
 	if timeout <= 0 {
 		timeout = 5 * time.Second // matches whois.Client.timeout()'s own default
@@ -86,7 +87,7 @@ func collectIPWHOIS(ctx context.Context, addr netip.Addr, whoisIANAServer string
 }
 
 // fromIPWHOIS adapts a LookupIP result's hop chain into a single
-// SourceRegistryWHOIS model.IPSourceRecord, mirroring FromWHOIS's
+// SourceRegistryWHOIS source.IPSourceRecord, mirroring FromWHOIS's
 // domain-side hop-selection logic. LookupIP's chain has at most two hops
 // (IANA, then the RIR) -- there is no third, registrar hop for IP
 // lookups, unlike the domain chain FromWHOIS handles. Hops[0] (IANA) is
@@ -105,12 +106,12 @@ func collectIPWHOIS(ctx context.Context, addr netip.Addr, whoisIANAServer string
 // after the fromIPHop call to correct Meta.OK/NotFound/Present for a
 // "no match"-style response, the same outcome fromHop reaches directly
 // for domains.
-func fromIPWHOIS(result *whois.Result) []model.IPSourceRecord {
+func fromIPWHOIS(result *whois.Result) []source.IPSourceRecord {
 	if result == nil || len(result.Hops) == 0 {
 		return nil
 	}
 	if ianaHop := result.Hops[0]; ianaHop.Err != nil {
-		return []model.IPSourceRecord{{Meta: model.SourceResult{
+		return []source.IPSourceRecord{{Meta: model.SourceResult{
 			Source:  model.SourceRegistryWHOIS,
 			Latency: ianaHop.Latency,
 			OK:      false,
@@ -129,5 +130,5 @@ func fromIPWHOIS(result *whois.Result) []model.IPSourceRecord {
 		sr.Meta.NotFound = true
 		sr.Present = false
 	}
-	return []model.IPSourceRecord{sr}
+	return []source.IPSourceRecord{sr}
 }

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/patramsey/plat/internal/whois"
+	"github.com/patramsey/plat/model"
 )
 
 // selfReferringWHOIS starts a fake WHOIS server that answers a whole
@@ -85,6 +86,49 @@ func TestNew_DefaultsAreApplied(t *testing.T) {
 	}
 	if c.resolver == nil {
 		t.Error("resolver is nil")
+	}
+}
+
+// TestNewRejectsUnknownSource is the regression test for the defect
+// verified on shipped v0.7.0: a typo'd SourceID was accepted silently,
+// then Lookup consulted zero sources and reported a generic "lookup
+// failed" -- indistinguishable from an infrastructure problem.
+func TestNewRejectsUnknownSource(t *testing.T) {
+	_, err := New(context.Background(), Options{
+		DisableCache: true,
+		Sources:      []SourceID{"registry-rdapp"},
+		Resolver:     NewResolver(ResolverConfig{Domains: map[string]string{}}),
+	})
+	if err == nil {
+		t.Fatal("New accepted an unknown SourceID; it silently consults zero sources and reports a generic lookup failure")
+	}
+	// The message must name the offending value -- the whole problem is
+	// that this was previously undiagnosable.
+	if !strings.Contains(err.Error(), "registry-rdapp") {
+		t.Errorf("error %q does not name the offending value", err)
+	}
+}
+
+// TestNewAcceptsEveryValidSource guards against over-correcting: every
+// source model.Precedence lists, plus nil (meaning "all"), must still be
+// accepted.
+func TestNewAcceptsEveryValidSource(t *testing.T) {
+	for _, s := range model.Precedence {
+		t.Run(string(s), func(t *testing.T) {
+			if _, err := New(context.Background(), Options{
+				DisableCache: true,
+				Sources:      []SourceID{s},
+				Resolver:     NewResolver(ResolverConfig{Domains: map[string]string{}}),
+			}); err != nil {
+				t.Errorf("New rejected the valid source %q: %v", s, err)
+			}
+		})
+	}
+	if _, err := New(context.Background(), Options{
+		DisableCache: true,
+		Resolver:     NewResolver(ResolverConfig{Domains: map[string]string{}}),
+	}); err != nil {
+		t.Errorf("New rejected nil Sources (meaning: all): %v", err)
 	}
 }
 
@@ -583,5 +627,45 @@ func TestResolverConfig_CoversEveryCombination(t *testing.T) {
 				t.Errorf("ASNBaseURL coverage = %v, want %v", ok, tt.wantAS)
 			}
 		})
+	}
+}
+
+// A cancelled context is not a lookup failure. A caller retrying on
+// ErrLookupFailed must not retry a cancellation, so the context error is
+// returned bare rather than wrapped.
+func TestLookupReturnsContextErrorOnCancel(t *testing.T) {
+	// Resolver is supplied explicitly (as every other test in this file
+	// does) so New does not fall through to bootstrap.Load's live IANA
+	// fetch -- DisableCache only skips the on-disk cache, not that fetch
+	// attempt. Without it this test would reach the real network.
+	c, err := New(context.Background(), Options{DisableCache: true, Resolver: NewResolver(ResolverConfig{Domains: map[string]string{}})})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, lookupErr := c.Lookup(ctx, "example.com")
+	if !errors.Is(lookupErr, context.Canceled) {
+		t.Errorf("err = %v, want it to match context.Canceled", lookupErr)
+	}
+	if errors.Is(lookupErr, ErrLookupFailed) {
+		t.Errorf("err = %v, must NOT match ErrLookupFailed -- a retry loop keyed on it would retry a cancellation", lookupErr)
+	}
+}
+
+func TestLookupReturnsContextErrorOnDeadline(t *testing.T) {
+	// See TestLookupReturnsContextErrorOnCancel: Resolver is supplied so
+	// New doesn't reach the live IANA bootstrap over the network.
+	c, err := New(context.Background(), Options{DisableCache: true, Resolver: NewResolver(ResolverConfig{Domains: map[string]string{}})})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+	defer cancel()
+
+	_, lookupErr := c.Lookup(ctx, "example.com")
+	if !errors.Is(lookupErr, context.DeadlineExceeded) {
+		t.Errorf("err = %v, want it to match context.DeadlineExceeded", lookupErr)
 	}
 }

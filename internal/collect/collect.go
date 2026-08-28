@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/patramsey/plat/internal/domain"
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
+	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
+	"github.com/patramsey/plat/model"
 )
 
 // Options controls Collect's behavior.
@@ -76,7 +77,7 @@ func (o Options) allows(id model.SourceID) bool {
 // the registrar RDAP hop within the RDAP branch, and the registry ->
 // registrar chasing within the WHOIS branch, are genuinely sequential
 // (each depends on its predecessor's response to find the next hop).
-// Collect returns one model.SourceRecord per source actually attempted AND
+// Collect returns one source.SourceRecord per source actually attempted AND
 // allowed by opts.Sources, always in a fixed registry-rdap,
 // registrar-rdap, registry-whois, registrar-whois order regardless of
 // which goroutine finished first, so callers (e.g. the CLI's -v output)
@@ -102,8 +103,8 @@ func (o Options) allows(id model.SourceID) bool {
 // A single source failing is normal, not fatal — Collect never returns an
 // error; callers pass the (possibly partial) result straight to
 // merge.Merge.
-func Collect(ctx context.Context, name domain.Name, registryBaseURL string, whoisIANAServer string, opts Options) []model.SourceRecord {
-	var rdapOut, whoisOut []model.SourceRecord
+func Collect(ctx context.Context, name domain.Name, registryBaseURL string, whoisIANAServer string, opts Options) []source.SourceRecord {
+	var rdapOut, whoisOut []source.SourceRecord
 	var registrarPort43 string
 
 	needRDAP := registryBaseURL != "" &&
@@ -133,13 +134,13 @@ func Collect(ctx context.Context, name domain.Name, registryBaseURL string, whoi
 		whoisOut = append(whoisOut, fromHop(model.SourceRegistrarWHOIS, hop))
 	}
 
-	out := make([]model.SourceRecord, 0, len(rdapOut)+len(whoisOut))
+	out := make([]source.SourceRecord, 0, len(rdapOut)+len(whoisOut))
 	out = append(out, rdapOut...)
 	out = append(out, whoisOut...)
 	return out
 }
 
-func hasSource(records []model.SourceRecord, id model.SourceID) bool {
+func hasSource(records []source.SourceRecord, id model.SourceID) bool {
 	for _, r := range records {
 		if r.Meta.Source == id {
 			return true
@@ -150,10 +151,10 @@ func hasSource(records []model.SourceRecord, id model.SourceID) bool {
 
 // collectRDAP returns the RDAP source records plus, separately, the
 // registrar-RDAP hop's port43 value (if any) — kept out-of-band from
-// []model.SourceRecord since it isn't itself a per-field provenance
+// []source.SourceRecord since it isn't itself a per-field provenance
 // value, just a hint Collect may use for the registrar-WHOIS fallback.
-func collectRDAP(ctx context.Context, name domain.Name, registryBaseURL string, opts Options) ([]model.SourceRecord, string) {
-	var out []model.SourceRecord
+func collectRDAP(ctx context.Context, name domain.Name, registryBaseURL string, opts Options) ([]source.SourceRecord, string) {
+	var out []source.SourceRecord
 	var registrarPort43 string
 
 	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient}
@@ -177,8 +178,8 @@ func collectRDAP(ctx context.Context, name domain.Name, registryBaseURL string, 
 	return out, registrarPort43
 }
 
-func collectWHOIS(ctx context.Context, name domain.Name, whoisIANAServer string, opts Options) []model.SourceRecord {
-	var out []model.SourceRecord
+func collectWHOIS(ctx context.Context, name domain.Name, whoisIANAServer string, opts Options) []source.SourceRecord {
+	var out []source.SourceRecord
 
 	timeout := opts.Timeout
 	if timeout <= 0 {

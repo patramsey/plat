@@ -7,7 +7,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 // RenderASN writes a styled, colorized view of r to w: a "plat · <handle

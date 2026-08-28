@@ -1,7 +1,8 @@
 package merge
 
 import (
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/source"
+	"github.com/patramsey/plat/model"
 )
 
 // MergeIP combines per-source IP records into one unified,
@@ -9,7 +10,7 @@ import (
 // errors, and treats a source contributing nothing as normal. Precedence
 // collapses to registry-rdap -> registry-whois: an IP allocation has no
 // registrar, so the two registrar SourceIDs never occur.
-func MergeIP(sources []model.IPSourceRecord) model.IPRecord {
+func MergeIP(sources []source.IPSourceRecord) model.IPRecord {
 	var rec model.IPRecord
 	for _, s := range sources {
 		rec.Sources = append(rec.Sources, s.Meta)
@@ -18,7 +19,7 @@ func MergeIP(sources []model.IPSourceRecord) model.IPRecord {
 	present := presentSorted(sources)
 	st := &mergeState{}
 
-	str := func(field string, get func(model.IPSourceRecord) string) model.Field[string] {
+	str := func(field string, get func(source.IPSourceRecord) string) model.Field[string] {
 		cands := make([]scalarCandidate, len(present))
 		for i, s := range present {
 			cands[i] = scalarCandidate{Source: s.Meta.Source, Value: get(s), Redacted: s.RedactedFields[field]}
@@ -26,19 +27,19 @@ func MergeIP(sources []model.IPSourceRecord) model.IPRecord {
 		return st.scalar(field, cands)
 	}
 
-	rec.Handle = str(model.FieldIPHandle, func(s model.IPSourceRecord) string { return s.Handle })
-	rec.Name = str(model.FieldIPName, func(s model.IPSourceRecord) string { return s.Name })
-	rec.Type = str(model.FieldIPType, func(s model.IPSourceRecord) string { return s.Type })
-	rec.StartAddress = str(model.FieldIPStartAddress, func(s model.IPSourceRecord) string { return s.StartAddress })
-	rec.EndAddress = str(model.FieldIPEndAddress, func(s model.IPSourceRecord) string { return s.EndAddress })
-	rec.CIDR = str(model.FieldIPCIDR, func(s model.IPSourceRecord) string { return s.CIDR })
-	rec.IPVersion = str(model.FieldIPVersion, func(s model.IPSourceRecord) string { return s.IPVersion })
-	rec.ParentHandle = str(model.FieldIPParent, func(s model.IPSourceRecord) string { return s.ParentHandle })
-	rec.Country = str(model.FieldIPCountry, func(s model.IPSourceRecord) string { return s.Country })
-	rec.Org.Name = str(model.FieldOrgName, func(s model.IPSourceRecord) string { return s.OrgName })
-	rec.Org.ID = str(model.FieldOrgID, func(s model.IPSourceRecord) string { return s.OrgID })
-	rec.Org.AbuseEmail = str(model.FieldOrgAbuseEmail, func(s model.IPSourceRecord) string { return s.AbuseEmail })
-	rec.Org.AbusePhone = str(model.FieldOrgAbusePhone, func(s model.IPSourceRecord) string { return s.AbusePhone })
+	rec.Handle = str(model.FieldIPHandle, func(s source.IPSourceRecord) string { return s.Handle })
+	rec.Name = str(model.FieldIPName, func(s source.IPSourceRecord) string { return s.Name })
+	rec.Type = str(model.FieldIPType, func(s source.IPSourceRecord) string { return s.Type })
+	rec.StartAddress = str(model.FieldIPStartAddress, func(s source.IPSourceRecord) string { return s.StartAddress })
+	rec.EndAddress = str(model.FieldIPEndAddress, func(s source.IPSourceRecord) string { return s.EndAddress })
+	rec.CIDR = str(model.FieldIPCIDR, func(s source.IPSourceRecord) string { return s.CIDR })
+	rec.IPVersion = str(model.FieldIPVersion, func(s source.IPSourceRecord) string { return s.IPVersion })
+	rec.ParentHandle = str(model.FieldIPParent, func(s source.IPSourceRecord) string { return s.ParentHandle })
+	rec.Country = str(model.FieldIPCountry, func(s source.IPSourceRecord) string { return s.Country })
+	rec.Org.Name = str(model.FieldOrgName, func(s source.IPSourceRecord) string { return s.OrgName })
+	rec.Org.ID = str(model.FieldOrgID, func(s source.IPSourceRecord) string { return s.OrgID })
+	rec.Org.AbuseEmail = str(model.FieldOrgAbuseEmail, func(s source.IPSourceRecord) string { return s.AbuseEmail })
+	rec.Org.AbusePhone = str(model.FieldOrgAbusePhone, func(s source.IPSourceRecord) string { return s.AbusePhone })
 
 	regCands := make([]timeCandidate, len(present))
 	updCands := make([]timeCandidate, len(present))

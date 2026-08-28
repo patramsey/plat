@@ -14,8 +14,9 @@ import (
 	"time"
 
 	"github.com/patramsey/plat/internal/domain"
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
+	"github.com/patramsey/plat/model"
 )
 
 func startWHOISListener(t *testing.T, respond func(query string) string) string {
@@ -598,7 +599,7 @@ func TestCollect_Port43FallbackWhenRegistryWHOISGivesNoReferral(t *testing.T) {
 
 	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
 
-	var registrarWHOIS *model.SourceRecord
+	var registrarWHOIS *source.SourceRecord
 	for i, s := range sources {
 		if s.Meta.Source == model.SourceRegistrarWHOIS {
 			registrarWHOIS = &sources[i]
@@ -818,7 +819,7 @@ func TestCollect_BulkSharedLimiterAndIANACacheAllRetainRegistryWHOIS(t *testing.
 		IANACache: whois.NewIANACache(),
 	}
 
-	results := make([][]model.SourceRecord, len(names))
+	results := make([][]source.SourceRecord, len(names))
 	var wg sync.WaitGroup
 	for i, n := range names {
 		wg.Add(1)
@@ -913,7 +914,7 @@ func TestCollect_BulkPacingIsNotChargedAgainstTheChainDeadline(t *testing.T) {
 		IANACache: whois.NewIANACache(),
 	}
 
-	results := make([][]model.SourceRecord, len(names))
+	results := make([][]source.SourceRecord, len(names))
 	var wg sync.WaitGroup
 	for i, n := range names {
 		wg.Add(1)

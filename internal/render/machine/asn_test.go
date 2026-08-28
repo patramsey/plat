@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 // fullASNRecord populates every ASNRecord field, including Type,

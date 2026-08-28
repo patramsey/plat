@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/internal/whois/parse"
+	"github.com/patramsey/plat/model"
 )
 
 var errDeadline = context.DeadlineExceeded

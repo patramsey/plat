@@ -9,8 +9,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/render/plain"
+	"github.com/patramsey/plat/model"
 )
 
 func fullRecord() model.Record {

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 func fullIPRecord() model.IPRecord {

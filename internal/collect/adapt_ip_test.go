@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/internal/whois/parse"
+	"github.com/patramsey/plat/model"
 )
 
 // rdapTime builds an rdap.RDAPTime by round-tripping through the type's own
@@ -200,7 +200,7 @@ func TestFromIPRDAP_RedactedOrgName(t *testing.T) {
 
 // TestFromIPRDAP_RIRStatusPassesThroughVerbatim is fromIPHop's RDAP-side
 // sibling: APNIC's real RDAP responses report "ALLOCATED NON-PORTABLE",
-// which model.NormalizeEPPStatus (designed for EPP's single-word/
+// which source.NormalizeEPPStatus (designed for EPP's single-word/
 // camelCase vocabulary) mangled into "allocatedNon-portable" -- a token
 // that exists in no vocabulary. RIR status strings must survive
 // unchanged.
@@ -369,7 +369,7 @@ func TestFromIPHop_Unsupported(t *testing.T) {
 // TestFromIPHop_RIRStatusPassesThroughVerbatim is a regression test for a
 // real defect caught during live verification: RIPE's "ASSIGNED PA" and
 // APNIC's "ALLOCATED NON-PORTABLE" are RIR-specific status vocabulary,
-// not EPP (RFC 8056) -- running them through model.NormalizeEPPStatus
+// not EPP (RFC 8056) -- running them through source.NormalizeEPPStatus
 // mangled them into meaningless tokens ("assignedPa",
 // "allocatedNon-portable") that exist in no vocabulary and can't be
 // searched for.

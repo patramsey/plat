@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/internal/source"
+	"github.com/patramsey/plat/model"
 )
 
-func asnsr(source model.SourceID, present bool) model.ASNSourceRecord {
-	return model.ASNSourceRecord{
-		Meta:           model.SourceResult{Source: source, OK: present},
+func asnsr(src model.SourceID, present bool) source.ASNSourceRecord {
+	return source.ASNSourceRecord{
+		Meta:           model.SourceResult{Source: src, OK: present},
 		Present:        present,
 		RedactedFields: map[string]bool{},
 	}
@@ -31,7 +32,7 @@ func TestMergeASN_CombinesRDAPAndWHOIS(t *testing.T) {
 	whoisSrc.OrgName = "Google LLC" // richer than RDAP's "GOOGLE"
 	whoisSrc.Country = "US"
 
-	rec := MergeASN([]model.ASNSourceRecord{rdapSrc, whoisSrc})
+	rec := MergeASN([]source.ASNSourceRecord{rdapSrc, whoisSrc})
 
 	if rec.Handle.Value != "AS15169" {
 		t.Errorf("Handle = %q, want AS15169", rec.Handle.Value)
@@ -56,7 +57,7 @@ func TestMergeASN_RDAPWinsOnConflict(t *testing.T) {
 	b := asnsr(model.SourceRegistryWHOIS, true)
 	b.Name = "SOMETHING-ELSE"
 
-	rec := MergeASN([]model.ASNSourceRecord{b, a}) // deliberately out of order
+	rec := MergeASN([]source.ASNSourceRecord{b, a}) // deliberately out of order
 
 	if rec.Name.Value != "GOOGLE" {
 		t.Errorf("Name = %q, want the registry-rdap value (higher precedence)", rec.Name.Value)
@@ -90,7 +91,7 @@ func TestMergeASN_StatusIsSortedRegardlessOfInputOrder(t *testing.T) {
 		b := asnsr(model.SourceRegistryWHOIS, true)
 		b.Status = st
 
-		rec := MergeASN([]model.ASNSourceRecord{a, b})
+		rec := MergeASN([]source.ASNSourceRecord{a, b})
 
 		if !slices.Equal(rec.Status.Value, want) {
 			t.Errorf("ordering %d: Status.Value = %v, want sorted %v", i, rec.Status.Value, want)

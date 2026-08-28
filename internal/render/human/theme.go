@@ -6,7 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 // Theme holds every style the human renderer uses, resolved once at
@@ -101,7 +101,7 @@ var statusWarn = map[string]bool{
 	"transferPeriod":  true,
 }
 
-// statusStyle classifies an EPP status code (see internal/model.
+// statusStyle classifies an EPP status code (see internal/source.
 // NormalizeEPPStatus) into a color: green for a protective/locked-down
 // status, red for one meaning something is actively wrong, yellow for a
 // transitional/grace-period state, and the default value style for
@@ -146,7 +146,7 @@ func expiryStyle(th Theme, tv model.TimeValue) lipgloss.Style {
 // record was the dominant source of line width (and the main reason
 // rows needed wrapping at all). sourceLegend prints the one-line key
 // these codes decode against; an unrecognized SourceID (shouldn't happen
-// given the closed set in internal/model) falls back to the raw string
+// given the closed set in model) falls back to the raw string
 // rather than a blank code.
 func sourceCode(s model.SourceID) string {
 	switch s {

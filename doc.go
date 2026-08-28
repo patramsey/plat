@@ -11,8 +11,10 @@
 //
 //	c, err := plat.New(ctx, plat.Options{})
 //	if err != nil {
-//		// New rarely fails: a failed bootstrap fetch falls back to a
-//		// cached copy and then to a snapshot embedded in the binary.
+//		// New fails if Options.Sources names an unrecognized SourceID,
+//		// or -- rare, since a failed bootstrap fetch falls back to a
+//		// cached copy and then to a snapshot embedded in the binary --
+//		// the bootstrap load itself fails outright.
 //	}
 //	res, err := c.Lookup(ctx, "example.com")
 //
@@ -59,12 +61,26 @@
 // a populated Result too, so a caller diagnosing either case still has
 // that detail to inspect.
 //
-// # Internal types, public aliases
+// A cancelled or expired context is handled the same way but is not
+// treated as a lookup failure: Lookup returns ctx's own error --
+// context.Canceled or context.DeadlineExceeded, matched with errors.Is
+// -- rather than ErrLookupFailed, alongside a Result holding whatever
+// had already merged before the context ended.
 //
-// Record, IPRecord, ASNRecord, and their component types are aliases to
-// types defined in an internal package: the same type, so no conversion
-// happens at the boundary, but the implementation underneath stays free
-// to change without breaking anything built against this package.
+// # plat for behavior, model for data
+//
+// The data types -- Record, IPRecord, ASNRecord, Field[T], and the rest
+// -- are defined in the public package model, and aliased here so that a
+// caller who only wants to call New and Lookup rarely needs a second
+// import. Following an alias (e.g. Record) leads straight to model's own
+// documentation, and because an alias is the same type, not a copy,
+// there is no conversion at the boundary: a model.Record returned by
+// some other package is a plat.Record and vice versa.
+//
+// That directness cuts both ways: these shapes are public API. Adding a
+// field is additive and safe; renaming or removing an exported field, or
+// changing an aliased method's signature, is a breaking change for every
+// consumer, exactly as if it were declared in this package directly.
 //
 // # Producing plat's JSON output
 //

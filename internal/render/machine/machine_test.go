@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 var update = flag.Bool("update", false, "update golden files in testdata/schema/")
