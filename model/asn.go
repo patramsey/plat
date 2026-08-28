@@ -4,7 +4,10 @@ package model
 // RedactionNotice.Field values. Org-related fields (FieldOrgName,
 // FieldOrgID, FieldOrgAbuseEmail, FieldOrgAbusePhone) are reused verbatim
 // from ip.go rather than duplicated here, since ASNRecord.Org is the same
-// OrgInfo type as IPRecord.Org.
+// OrgInfo type as IPRecord.Org. Several of these also share a value with
+// a Record or IPRecord constant (e.g. FieldASNHandle == FieldHandle ==
+// "handle"); see the comment on Record's own field-name constants for
+// why that's harmless.
 const (
 	FieldASNHandle      = "handle"
 	FieldASNName        = "name"
@@ -42,33 +45,44 @@ var ASNFieldOrder = []FieldSpec{
 	{"Updated", FieldASNUpdated},
 }
 
-// ASNRecord is the unified, provenance-annotated autonomous-system lookup
-// result -- the output of merge.MergeASN. It is a sibling of IPRecord, not
-// a variant of it: an ASN has a start/end autnum range instead of an
-// address range or CIDR, and has no IP version or parent handle.
+// ASNRecord is an autonomous system lookup's unified, provenance-annotated
+// result: the responsible RIR's RDAP and WHOIS merged into one set of
+// fields, each recording which source(s) supplied it. It is a sibling of
+// IPRecord, not a variant of it: an ASN has a start/end autnum range
+// instead of an address range or CIDR, and has no IP version or parent
+// handle.
 //
-// StartAutnum/EndAutnum are Field[string], not Field[uint32], even though
-// an autnum is numeric. This mirrors IPRecord.StartAddress/EndAddress
-// (also Field[string] despite being numeric-ish): mergeState.scalar --
-// shared with the domain and IP merge paths, and not to be modified for
-// this feature -- takes []scalarCandidate whose Value is a string and
-// returns Field[string]. Keeping StartAutnum/EndAutnum as strings lets
-// merge.MergeASN reuse scalar() with no carve-out and avoids adding a
-// numeric field-view to the machine renderer. The adapter boundary
-// (internal/collect/adapt_asn.go) converts the RDAP response's uint32
-// startAutnum/endAutnum to string via strconv.FormatUint.
+// StartAutnum and EndAutnum are Field[string], not Field[uint32], even
+// though an autnum is numeric -- parse them yourself if you need to
+// compare ranges numerically. This mirrors IPRecord.StartAddress and
+// EndAddress, which are Field[string] for the same reason: it lets both
+// record types share the same merge machinery internally, and it avoids
+// committing this package to a numeric field-view a consumer might not
+// want anyway (a CIDR or address range isn't naturally a single number).
 type ASNRecord struct {
-	Handle      Field[string]
-	Name        Field[string]
-	Type        Field[string]
+	// Handle is the RIR's unique identifier for this AS registration.
+	Handle Field[string]
+	Name   Field[string]
+	// Type is the RIR's registration type (e.g. "DIRECT ALLOCATION").
+	Type Field[string]
+	// StartAutnum and EndAutnum bound the AS number range (a single ASN
+	// has StartAutnum == EndAutnum). Both are decimal strings -- see the
+	// type's own doc comment for why they aren't uint32.
 	StartAutnum Field[string]
 	EndAutnum   Field[string]
 	Country     Field[string]
 	Org         OrgInfo
-	Status      Field[[]string]
-	Registered  Field[TimeValue]
-	Updated     Field[TimeValue]
-	Redacted    []RedactionNotice
-	Sources     []SourceResult
-	Conflicts   []Conflict
+	// Status is passed through as each RIR reports it; there is no
+	// EPP-equivalent shared vocabulary across RIRs, so unlike Record's
+	// domain Status, no normalization is applied here.
+	Status Field[[]string]
+	// Registered and Updated are UTC. When a source's timestamp could not
+	// be parsed, TimeValue.Time is the zero value but TimeValue.Raw still
+	// carries the source's original string -- check TimeValue.Parsed
+	// before trusting Time.
+	Registered Field[TimeValue]
+	Updated    Field[TimeValue]
+	Redacted   []RedactionNotice
+	Sources    []SourceResult
+	Conflicts  []Conflict
 }
