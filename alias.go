@@ -8,14 +8,13 @@ import (
 )
 
 // The record types are aliases rather than defined types: an alias is the
-// same type, so no conversion happens at the boundary and the
-// implementation stays in internal/, free to change without breaking
-// consumers of anything not named here.
+// same type, so no conversion happens at the boundary, and following the
+// alias leads a reader straight to model's own documentation rather than
+// a copy of it.
 //
-// "Free to change" is narrower than it sounds for the aliased types
-// themselves, though: because the alias is the same type, not a copy,
-// their shapes are now part of this package's public API too. Renaming
-// or removing an exported field on model.Record, model.IPRecord,
+// That direct link cuts both ways, though: because the alias is the same
+// type, not a copy, their shapes are now part of this package's public API
+// too. Renaming or removing an exported field on model.Record, model.IPRecord,
 // model.ASNRecord (or the other aliased types below), or changing an
 // aliased method's signature, is a breaking change for every consumer --
 // exactly as if the field or method lived here directly. Adding a field
@@ -23,11 +22,6 @@ import (
 // NOT catch any of this: it parses only this package's own declarations,
 // so it is blind to everything inside model. Review changes to
 // those types with that in mind.
-//
-// As of the model package's promotion out of internal/, that blindness is
-// covered from the other side: model has its own api-surface golden and its
-// own TestPublicAPISurface. Both goldens must be updated in the same commit
-// as any change to either surface.
 
 // Record is a merged, provenance-annotated domain lookup result.
 type Record = model.Record
