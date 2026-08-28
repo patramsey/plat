@@ -24,7 +24,9 @@ type Options struct {
 	// Deliberate idling -- waiting a turn behind another name's paced
 	// WHOIS query -- is not charged against it. Zero means 5s.
 	Timeout time.Duration
-	// Sources restricts which sources are consulted. nil means all.
+	// Sources restricts which sources are consulted. nil means all. An
+	// unrecognized SourceID is rejected by New, not silently ignored --
+	// see New's doc comment.
 	Sources []SourceID
 	// NoFollow skips the second hop to the registrar's RDAP server.
 	// Domain lookups only; IPs and ASNs have no registrar.
@@ -90,10 +92,12 @@ type Client struct {
 
 // New builds a Client, loading the IANA RDAP bootstrap data once.
 //
-// It rarely fails: a failed fetch falls back to a cached copy and then to
-// a snapshot embedded in the binary, so a caller with no network still
-// gets a usable Client. The error return exists so that a future failure
-// mode is not a breaking signature change.
+// New returns an error in two cases: Options.Sources names a SourceID
+// New does not recognize, or the bootstrap load fails outright. The
+// second is rare in practice -- a failed fetch falls back to a cached
+// copy and then to a snapshot embedded in the binary, so a caller with
+// no network still gets a usable Client -- but the first is a validation
+// check on every call, not a corner case.
 func New(ctx context.Context, opts Options) (*Client, error) {
 	// An unknown SourceID is a bug in the caller's code, not a runtime
 	// condition: unvalidated, it silently filters every source out and the

@@ -97,6 +97,7 @@ func TestNewRejectsUnknownSource(t *testing.T) {
 	_, err := New(context.Background(), Options{
 		DisableCache: true,
 		Sources:      []SourceID{"registry-rdapp"},
+		Resolver:     NewResolver(ResolverConfig{Domains: map[string]string{}}),
 	})
 	if err == nil {
 		t.Fatal("New accepted an unknown SourceID; it silently consults zero sources and reports a generic lookup failure")
