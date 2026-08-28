@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
+	"github.com/patramsey/plat/model"
 )
 
 // CollectIP fans out to the RIR's RDAP service and the WHOIS chain

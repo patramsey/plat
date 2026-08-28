@@ -10,8 +10,8 @@ import (
 	"github.com/patramsey/plat/internal/collect"
 	"github.com/patramsey/plat/internal/domain"
 	"github.com/patramsey/plat/internal/merge"
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/whois"
+	"github.com/patramsey/plat/model"
 )
 
 // defaultTimeout matches the CLI's default --timeout.

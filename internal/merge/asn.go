@@ -1,8 +1,8 @@
 package merge
 
 import (
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/source"
+	"github.com/patramsey/plat/model"
 )
 
 // MergeASN combines per-source ASN records into one unified,

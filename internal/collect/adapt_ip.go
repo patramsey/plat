@@ -4,11 +4,11 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/internal/whois/parse"
+	"github.com/patramsey/plat/model"
 )
 
 // fromIPRDAP adapts an RDAP IP-network response into a source.IPSourceRecord

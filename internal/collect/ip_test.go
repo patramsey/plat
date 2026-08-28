@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/patramsey/plat/internal/merge"
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 const arinIPBody = `{

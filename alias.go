@@ -4,7 +4,7 @@ import (
 	"net/netip"
 
 	"github.com/patramsey/plat/internal/bootstrap"
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 // The record types are aliases rather than defined types: an alias is the
@@ -21,8 +21,13 @@ import (
 // exactly as if the field or method lived here directly. Adding a field
 // is additive and safe, same as anywhere else. TestPublicAPISurface does
 // NOT catch any of this: it parses only this package's own declarations,
-// so it is blind to everything inside internal/model. Review changes to
+// so it is blind to everything inside model. Review changes to
 // those types with that in mind.
+//
+// As of the model package's promotion out of internal/, that blindness is
+// covered from the other side: model has its own api-surface golden and its
+// own TestPublicAPISurface. Both goldens must be updated in the same commit
+// as any change to either surface.
 
 // Record is a merged, provenance-annotated domain lookup result.
 type Record = model.Record

@@ -26,13 +26,13 @@ import (
 	"github.com/patramsey/plat"
 	"github.com/patramsey/plat/internal/diff"
 	"github.com/patramsey/plat/internal/domain"
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/render"
 	"github.com/patramsey/plat/internal/render/human"
 	"github.com/patramsey/plat/internal/render/machine"
 	"github.com/patramsey/plat/internal/render/plain"
 	"github.com/patramsey/plat/internal/spinner"
+	"github.com/patramsey/plat/model"
 )
 
 // version, commit, date, and builtBy are overwritten via -ldflags at

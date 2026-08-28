@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 // TestDecode_IPFields_EmptyRecord decodes a wholly empty IPRecord and

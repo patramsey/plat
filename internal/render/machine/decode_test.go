@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 // decodeFixtureRecord is a domain record with one field of each kind:

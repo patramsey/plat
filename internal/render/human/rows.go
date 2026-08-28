@@ -8,7 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 func writeStringField(b *strings.Builder, th Theme, width int, label string, f model.Field[string], style lipgloss.Style, conflicted bool) {
@@ -269,7 +269,7 @@ func wrapItems(items []string, sep string, width int) []string {
 
 // legendEntry decodes one source into its "XX source-id" legend entry. An
 // unrecognized SourceID (which shouldn't happen given the closed set in
-// internal/model) has no two-letter code -- sourceCode falls back to the
+// model) has no two-letter code -- sourceCode falls back to the
 // raw string -- so it prints once rather than as "foo foo".
 func legendEntry(s model.SourceID) string {
 	code := sourceCode(s)

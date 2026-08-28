@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/patramsey/plat/internal/domain"
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
+	"github.com/patramsey/plat/model"
 )
 
 // Options controls Collect's behavior.

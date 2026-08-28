@@ -7,7 +7,7 @@
 // only because of how the merge happens to be staged today.
 package source
 
-import "github.com/patramsey/plat/internal/model"
+import "github.com/patramsey/plat/model"
 
 // RegistrarFields is the plain-string registrar identity an adapter
 // extracts from one source, before merge.Merge turns it into

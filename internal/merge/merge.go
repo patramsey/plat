@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/net/idna"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/source"
+	"github.com/patramsey/plat/model"
 )
 
 const clockSkew = 24 * time.Hour

@@ -3,7 +3,7 @@ package human
 import (
 	"strings"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 // writeLifecycle renders r.Lifecycle -- plat's own interpretation of

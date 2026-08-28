@@ -4,11 +4,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/internal/whois/parse"
+	"github.com/patramsey/plat/model"
 )
 
 // fromASNRDAP adapts an RDAP autnum response into a source.ASNSourceRecord

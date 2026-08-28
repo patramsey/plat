@@ -3,9 +3,9 @@ package collect
 import (
 	"strings"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
+	"github.com/patramsey/plat/model"
 )
 
 // FromWHOIS adapts a WHOIS lookup's hop chain into per-hop

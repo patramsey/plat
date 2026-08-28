@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/source"
+	"github.com/patramsey/plat/model"
 )
 
 func ipsr(src model.SourceID, present bool) source.IPSourceRecord {

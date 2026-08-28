@@ -4,9 +4,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/source"
+	"github.com/patramsey/plat/model"
 )
 
 // FromRDAP adapts an RDAP client result into a source.SourceRecord tagged

@@ -22,12 +22,12 @@ import (
 	"github.com/patramsey/plat"
 	"github.com/patramsey/plat/internal/bootstrap"
 	"github.com/patramsey/plat/internal/domain"
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/render"
 	"github.com/patramsey/plat/internal/render/human"
 	"github.com/patramsey/plat/internal/render/machine"
 	"github.com/patramsey/plat/internal/whois"
+	"github.com/patramsey/plat/model"
 )
 
 func TestExitCode(t *testing.T) {

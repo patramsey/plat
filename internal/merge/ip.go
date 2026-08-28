@@ -1,8 +1,8 @@
 package merge
 
 import (
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/source"
+	"github.com/patramsey/plat/model"
 )
 
 // MergeIP combines per-source IP records into one unified,

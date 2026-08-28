@@ -11,7 +11,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/patramsey/plat/internal/model"
+	"github.com/patramsey/plat/model"
 )
 
 // SchemaVersion is the current machine-output schema version.

@@ -11,9 +11,9 @@ import (
 	"testing"
 
 	"github.com/patramsey/plat/internal/domain"
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/render"
 	"github.com/patramsey/plat/internal/render/machine"
+	"github.com/patramsey/plat/model"
 )
 
 // TestArticle tables over article's four object-type inputs -- a pure

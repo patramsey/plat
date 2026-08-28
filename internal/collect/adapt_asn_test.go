@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	"github.com/patramsey/plat/internal/merge"
-	"github.com/patramsey/plat/internal/model"
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/internal/whois/parse"
+	"github.com/patramsey/plat/model"
 )
 
 // arinLikeASN returns an *rdap.ASNResponse shaped like ARIN's real response
