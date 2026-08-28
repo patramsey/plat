@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/patramsey/plat/internal/whois"
+	"github.com/patramsey/plat/model"
 )
 
 // selfReferringWHOIS starts a fake WHOIS server that answers a whole
@@ -85,6 +86,41 @@ func TestNew_DefaultsAreApplied(t *testing.T) {
 	}
 	if c.resolver == nil {
 		t.Error("resolver is nil")
+	}
+}
+
+// TestNewRejectsUnknownSource is the regression test for the defect
+// verified on shipped v0.7.0: a typo'd SourceID was accepted silently,
+// then Lookup consulted zero sources and reported a generic "lookup
+// failed" -- indistinguishable from an infrastructure problem.
+func TestNewRejectsUnknownSource(t *testing.T) {
+	_, err := New(context.Background(), Options{
+		DisableCache: true,
+		Sources:      []SourceID{"registry-rdapp"},
+	})
+	if err == nil {
+		t.Fatal("New accepted an unknown SourceID; it silently consults zero sources and reports a generic lookup failure")
+	}
+	// The message must name the offending value -- the whole problem is
+	// that this was previously undiagnosable.
+	if !strings.Contains(err.Error(), "registry-rdapp") {
+		t.Errorf("error %q does not name the offending value", err)
+	}
+}
+
+// TestNewAcceptsEveryValidSource guards against over-correcting: every
+// source model.Precedence lists, plus nil (meaning "all"), must still be
+// accepted.
+func TestNewAcceptsEveryValidSource(t *testing.T) {
+	for _, s := range model.Precedence {
+		t.Run(string(s), func(t *testing.T) {
+			if _, err := New(context.Background(), Options{DisableCache: true, Sources: []SourceID{s}}); err != nil {
+				t.Errorf("New rejected the valid source %q: %v", s, err)
+			}
+		})
+	}
+	if _, err := New(context.Background(), Options{DisableCache: true}); err != nil {
+		t.Errorf("New rejected nil Sources (meaning: all): %v", err)
 	}
 }
 

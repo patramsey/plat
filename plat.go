@@ -95,6 +95,17 @@ type Client struct {
 // gets a usable Client. The error return exists so that a future failure
 // mode is not a breaking signature change.
 func New(ctx context.Context, opts Options) (*Client, error) {
+	// An unknown SourceID is a bug in the caller's code, not a runtime
+	// condition: unvalidated, it silently filters every source out and the
+	// lookup reports a generic failure, which is close to undiagnosable
+	// from the outside. Caught here, at construction, where the offending
+	// value can be named.
+	for _, s := range opts.Sources {
+		if model.Rank(s) == len(model.Precedence) {
+			return nil, fmt.Errorf("plat: unknown source %q: valid sources are %v", s, model.Precedence)
+		}
+	}
+
 	if opts.Timeout <= 0 {
 		opts.Timeout = defaultTimeout
 	}
