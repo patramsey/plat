@@ -183,7 +183,10 @@ type Result struct {
 // returned data, Lookup returns a Result with nil error, and the
 // per-source detail is in the record's Sources field. Lookup returns
 // ErrInvalidInput, ErrNotFound, or ErrLookupFailed for the three cases
-// where there is no usable answer at all.
+// where there is no usable answer at all. A cancelled or expired ctx is
+// none of those: Lookup returns ctx's own error unwrapped, so errors.Is
+// matches context.Canceled or context.DeadlineExceeded and deliberately
+// does not match ErrLookupFailed.
 func (c *Client) Lookup(ctx context.Context, input string) (Result, error) {
 	q, err := domain.Normalize(input)
 	if err != nil {

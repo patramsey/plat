@@ -59,6 +59,12 @@
 // a populated Result too, so a caller diagnosing either case still has
 // that detail to inspect.
 //
+// A cancelled or expired context is handled the same way but is not
+// treated as a lookup failure: Lookup returns ctx's own error --
+// context.Canceled or context.DeadlineExceeded, matched with errors.Is
+// -- rather than ErrLookupFailed, alongside a Result holding whatever
+// had already merged before the context ended.
+//
 // # Internal types, public aliases
 //
 // Record, IPRecord, ASNRecord, and their component types are aliases to
