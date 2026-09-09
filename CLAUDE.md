@@ -4,7 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Shipped and released — latest tag `v0.4.0`. The module is scaffolded, 14 packages under `cmd/` and `internal/`, released via goreleaser (binaries, checksums, Homebrew tap).
+Shipped and released — latest tag `v0.8.0`. 17 packages, released via
+goreleaser (binaries, checksums, Homebrew tap).
+
+plat is both a CLI and a **published Go library**. Two packages are public
+API and cannot be changed without breaking consumers: the root package
+`github.com/patramsey/plat` (client, options, errors, and aliases) and
+`github.com/patramsey/plat/model` (the record types and their provenance).
+Both have pinned api-surface goldens under `testdata/` — see the Public API
+section below before exporting anything.
 
 Working today: domain lookups, IP-address lookups, and ASN lookups — each merged from RDAP and WHOIS with per-field provenance, rendered human/plain/JSON/NDJSON.
 
@@ -30,6 +38,13 @@ Live/integration tests are opt-in via build tag: `go test -tags=live ./...` — 
 ## Architecture
 
 ```
+plat.go, alias.go,       # PUBLIC: the library. Client/Options/Result/errors,
+  errors.go, encode.go,  #   plus type aliases re-exporting model's types so a
+  doc.go                 #   caller rarely needs the second import.
+model/                   # PUBLIC: unified Record/IPRecord/ASNRecord, Field[T]
+                         #   provenance, field-key constants, FieldOrder,
+                         #   Precedence/Rank, Classify. Promoted out of
+                         #   internal/ in v0.8.0 so pkg.go.dev can document it.
 cmd/plat/                # main.go, cobra root command, gendocs (man/completions)
 internal/
   domain/                # input normalization: lowercase, IDN -> punycode, validation
@@ -38,7 +53,11 @@ internal/
   whois/                 # WHOIS client: port-43 dialer + referral chasing
     parse/               # heuristic key/value parser + per-registry quirks
   collect/               # concurrent fan-out: registry/registrar RDAP + WHOIS -> SourceRecords
-  model/                 # unified Record types, provenance types
+  source/                # pre-merge shapes collect produces and merge consumes
+                         #   (SourceRecord & friends) + the two normalisation
+                         #   helpers collect needs. Inputs to the merge, not
+                         #   results of it -- which is why they stayed internal
+                         #   when model/ went public.
   merge/                 # merge engine: source records -> unified Record
   render/
     human/                # lipgloss-styled TTY output
@@ -46,6 +65,7 @@ internal/
     machine/              # JSON / NDJSON encoders
   spinner/               # animated progress indicator for long-running lookups
 testdata/                # golden files: recorded RDAP JSON + WHOIS blobs
+                         #   plus api-surface.txt, the root package's pinned surface
 ```
 
 Each RDAP/WHOIS client (`internal/rdap`, `internal/whois`) carries its own
@@ -123,10 +143,61 @@ The tape covers a domain, an IP, and an ASN (all Google, deliberately, so it rea
 
 **Two traps when re-recording.** First, check `which -a plat`: a Homebrew-installed plat shadows a freshly built one on a default macOS `$PATH`, and the v0.4.0 Homebrew build rendered human output with no colour at all, so recording against it publishes a monochrome GIF of a bug. Build to a temp dir and put it first: `go build -o /tmp/platdemo/plat ./cmd/plat && PATH=/tmp/platdemo:$PATH vhs docs/demo.tape`. Second, vhs's `Type` cannot contain a double quote, escaped or not — a `jq` filter written with string literals will not parse, which is why the tape's filter uses bare object keys.
 
+## Public API
+
+Two packages are public and permanent. Un-exporting or renaming anything in
+either breaks consumers.
+
+- **`github.com/patramsey/plat`** — `Client`, `Options`, `Result`, the error
+  sentinels, and type aliases re-exporting `model`'s types.
+- **`github.com/patramsey/plat/model`** — the record types and everything
+  needed to walk them.
+
+Each has a golden listing every exported identifier: `testdata/api-surface.txt`
+and `model/testdata/api-surface.txt`. `TestPublicAPISurface` is table-driven
+over both and **fails on an addition as loudly as on a removal**, so growth is
+deliberate: update the matching golden in the same commit and the diff shows a
+reviewer exactly what was committed to. Each golden tracks its own surface;
+they are not coupled.
+
+Three hazards, each learned the hard way:
+
+- **The aliases make `model`'s shapes part of `plat`'s API.** An alias is the
+  same type, not a copy, so renaming or removing an exported field on
+  `model.Record` is a breaking change for every consumer — and
+  `TestPublicAPISurface` cannot see it, because it parses only each package's
+  own declarations. `alias.go`'s comment block says this at the point of the
+  declarations; read it before touching those types.
+- **The scanner only guards what it can parse.** It handled pointer and plain
+  identifier receivers but not `Field[T]`, which parses as `*ast.IndexExpr` —
+  so `model.Field[T].Present` was silently unpinned and adding an exported
+  method on a generic type passed CI. Fixed in v0.8.0; the lesson is that a
+  green golden proves only that the scanner saw no change.
+- **`internal/source` exists to keep the merge's inputs out of the API.**
+  `SourceRecord` and friends have the shape they do because of how the merge
+  is staged today; publishing them would freeze that. If something needs to
+  move between `model/` and `internal/source`, the question is whether a
+  consumer receives it or feeds it.
+
 ## Non-goals
 
 **IP and ASN lookups were once listed here and have since shipped** (v0.2.0 and v0.3.0) — don't re-add them.
 
 Still out of scope: availability monitoring, watch mode, historical WHOIS archiving, acting as a WHOIS/RDAP server. Design internals to not preclude these, but don't build them.
 
-Deferred rather than rejected, each tracked as an open issue: `--diff` between runs (#33), bulk mode (#34), interactive Bubble Tea mode (#35). Extracting `internal/` as a public library (#36) shipped in v0.4.0 and is no longer deferred. #50 tracks the remaining duplication across the three object types — the parser vocabulary half is done; the fetch trio, `presentSorted`×3, `status`×3, and the two adapters are deliberately left alone, since none has ever caused a bug.
+Deferred rather than rejected: interactive Bubble Tea mode (#35), the only
+one of these still open.
+
+Shipped since this section was last written, so don't re-add them as ideas:
+`--diff` between runs (#33, v0.4.0), bulk mode (#34), extracting `internal/`
+as a public library (#36, v0.4.0), and #50's consolidation of the three
+object-type implementations — the parser vocabulary half landed; the fetch
+trio, `presentSorted`×3, `status`×3, and the two adapters were deliberately
+left alone, since none had ever caused a bug.
+
+One known gap carried forward: `.pl` recovers only the first of its usually
+four nameservers. It has no `templates.yaml` entry, so the generic `kv`
+tokenizer does not follow its multi-line continuation lines. Left unfixed
+deliberately — that tokenizer also serves `.com`, `.org`, `.nl` and `.fr` —
+and pinned by a test that documents the gap rather than asserting it is
+correct.
