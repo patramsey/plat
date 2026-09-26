@@ -808,7 +808,7 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, client *plat
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, q.Name.Punycode, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
+	reportLookupError(stderr, format, q.Name.Punycode, lookupOutcomeError(code, record.Sources, len(ui.NotQueried) > 0), record.Sources, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 	return code
 }
 
@@ -854,7 +854,7 @@ func lookupOneIP(ctx context.Context, stdout, stderr io.Writer, client *plat.Cli
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
+	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources, len(ui.NotQueriedRIR) > 0), record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 	return code
 }
 
@@ -901,7 +901,7 @@ func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, client *plat.Cl
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources), record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
+	reportLookupError(stderr, format, q.Input, lookupOutcomeError(code, record.Sources, len(ui.NotQueriedRIR) > 0), record.Sources, opts.Verbose, ui, ui.NotQueriedRIR, ui.NotQueriedRIRReason)
 	return code
 }
 
@@ -914,8 +914,9 @@ func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, client *plat.Cl
 // that made a confirmed-available result look identical to an actual
 // failure. Exit 3 keeps a distinct, more cautious wording, since it covers
 // both a total connectivity failure and a mixed result where non-existence
-// can't be asserted with confidence.
-func lookupOutcomeError(code int, sources []model.SourceResult) error {
+// can't be asserted with confidence. filtered reports whether a flag such
+// as --source excluded any source before the lookup ran.
+func lookupOutcomeError(code int, sources []model.SourceResult, filtered bool) error {
 	names := make([]string, len(sources))
 	for i, s := range sources {
 		names[i] = string(s.Source)
@@ -925,8 +926,16 @@ func lookupOutcomeError(code int, sources []model.SourceResult) error {
 	if code == 1 {
 		return fmt.Errorf("is not registered (checked: %s)", checked)
 	}
+	// Zero sources means nothing was queried: a source that was tried
+	// and failed is always recorded. So the name has no server listed
+	// (e.g. .gr, which IANA lists with neither an RDAP service nor a
+	// WHOIS server), or --source excluded the only one it has --
+	// never that a server could not be reached.
 	if len(sources) == 0 {
-		return errors.New("lookup failed -- no sources could be reached")
+		if filtered {
+			return errors.New("lookup failed -- none of the selected sources has a server listed for this name, so there was nothing to query")
+		}
+		return errors.New("lookup failed -- no RDAP or WHOIS server is listed for this name, so there was nothing to query")
 	}
 	failed := 0
 	for _, s := range sources {

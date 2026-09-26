@@ -144,6 +144,7 @@ func asnRDAPPresent(sr source.ASNSourceRecord) bool {
 func fromASNHop(meta model.SourceResult, hop whois.Hop) source.ASNSourceRecord {
 	if hop.Err != nil {
 		meta.OK = false
+		meta.Err = hop.Err.Error()
 		return source.ASNSourceRecord{Meta: meta}
 	}
 	if hop.ASNFields == nil {

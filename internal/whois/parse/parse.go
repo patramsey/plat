@@ -269,71 +269,96 @@ func indexTopLevelColon(s string) int {
 	return -1
 }
 
-// tokenizeIndent handles Nominet-style ".uk" WHOIS output: a
-// non-indented "Header:" line introduces a section, followed by one or
-// more indented lines holding that section's content. An indented line
-// containing its own "sub-key: value" pair (e.g. "Registered on:
-// 14-Aug-1995" inside a "Relevant dates:" section) is tokenized using
-// that sub-key directly, since Nominet nests several distinct fields
-// under one section header. An indented line with no colon uses the
-// enclosing section's header as the key, so multiple indented lines
-// under "Name servers:" each become a separate pair sharing that key —
-// exactly like tokenizeKV's repeated "Name Server:" lines do for other
-// registries. A non-indented line that already carries its own value
-// under a short, label-like key (e.g. EURid's ".eu" responses open with
-// flat "Domain: europa.eu" / "Script: LATIN" lines before any indented
-// section) is emitted as its own pair immediately rather than treated as
-// a section header, since it has no indented body of its own. The
-// flatKeyPattern check keeps this narrow: it must not swallow prose that
-// happens to contain a colon, like a trailing "WHOIS lookup made on Sun,
-// 12 Jul 2026 at 09:15:00" timestamp line (digits/commas/many words),
-// which tokenizeIndent must keep dropping the same as before. Blank
-// lines and any other non-indented, non-header, non-label-valued line
-// are ignored, the same way tokenizeKV skips comment lines. Within an
-// indented line, the key/value separator is the first colon *not*
-// nested inside parentheses -- an indented "host (glue)" line like
-// EURid's "ns1.example.eu (2a05:d018:c5f:3701::1)" carries colons inside
-// its IPv6 glue that must not be mistaken for that separator, or the
-// whole line (and its hostname) is lost into Unmapped under a garbage
-// key instead of reaching stripGlue.
+// tokenizeIndent handles Nominet-style ".uk" WHOIS output: a "Header:"
+// line introduces a section, followed by one or more lines indented
+// deeper than that header holding the section's content. Indentation is
+// relative, not absolute: real Nominet responses indent every line --
+// headers by four spaces, bodies by eight -- while EURid's headers sit at
+// column zero, so a header is recognized by its trailing colon and its
+// body by being indented past it. A line indented no deeper than the
+// current header ends that section.
+//
+// A body line containing its own "sub-key: value" pair (e.g. "Registered
+// on: before Aug-1996" inside a "Relevant dates:" section) is tokenized
+// using that sub-key directly, since Nominet nests several distinct
+// fields under one section header. Any other body line uses the enclosing
+// section's header as the key, so multiple lines under "Name servers:"
+// each become a separate pair sharing that key -- exactly like
+// tokenizeKV's repeated "Name Server:" lines do for other registries.
+//
+// A sub-key must pass flatKeyPattern, and its colon must be the first one
+// not nested inside parentheses. Both guard nameserver glue: Nominet's
+// "ddns0.bbc.co.uk   148.163.199.1  2607:f740:e04e::1" and EURid's
+// "ns1.example.eu (2a05:d018:c5f:3701::1)" both carry IPv6 colons that
+// are not separators, and splitting on them loses the hostname into
+// Unmapped under a garbage key instead of letting it reach stripGlue.
+//
+// A line outside any section that already carries its own value under a
+// short, label-like key (e.g. EURid's ".eu" responses open with flat
+// "Domain: europa.eu" / "Script: LATIN" lines before any indented
+// section) is emitted as its own pair rather than treated as a header,
+// since it has no body of its own. flatKeyPattern keeps this narrow too:
+// it must not swallow prose that happens to contain a colon, like
+// Nominet's trailing "WHOIS lookup made at 14:44:39 26-Sep-2026" line.
+// Blank lines and any other line outside a section are ignored, the same
+// way tokenizeKV skips comment lines.
 func tokenizeIndent(raw string) []kvPair {
 	var out []kvPair
 	section := ""
+	sectionIndent := 0
 	for _, line := range strings.Split(raw, "\n") {
 		trimmedRight := strings.TrimRight(line, "\r")
-		if strings.TrimSpace(trimmedRight) == "" {
+		content := strings.TrimSpace(trimmedRight)
+		if content == "" {
 			continue
 		}
-		if !strings.HasPrefix(trimmedRight, " ") && !strings.HasPrefix(trimmedRight, "\t") {
-			trimmed := strings.TrimSpace(trimmedRight)
-			section = ""
-			switch {
-			case strings.HasSuffix(trimmed, ":"):
-				section = strings.ToLower(strings.TrimSuffix(trimmed, ":"))
-			default:
-				if idx := strings.Index(trimmed, ":"); idx >= 0 {
-					key := strings.TrimSpace(trimmed[:idx])
-					val := strings.TrimSpace(trimmed[idx+1:])
-					if val != "" && flatKeyPattern.MatchString(key) {
-						out = append(out, kvPair{strings.ToLower(key), val})
-					}
+		indent := len(trimmedRight) - len(strings.TrimLeft(trimmedRight, " \t"))
+
+		if section != "" && indent > sectionIndent {
+			if idx := indexTopLevelColon(content); idx >= 0 {
+				key := strings.TrimSpace(content[:idx])
+				val := strings.TrimSpace(content[idx+1:])
+				if val != "" && flatKeyPattern.MatchString(key) {
+					out = append(out, kvPair{strings.ToLower(key), val})
+					continue
 				}
 			}
+			out = append(out, kvPair{section, content})
 			continue
 		}
-		if section == "" {
+
+		section = ""
+		if strings.HasSuffix(content, ":") {
+			section = strings.ToLower(strings.TrimSuffix(content, ":"))
+			sectionIndent = indent
 			continue
 		}
-		content := strings.TrimSpace(trimmedRight)
-		if idx := indexTopLevelColon(content); idx >= 0 && strings.TrimSpace(content[idx+1:]) != "" {
-			key := strings.ToLower(strings.TrimSpace(content[:idx]))
+		if idx := strings.Index(content, ":"); idx >= 0 {
+			key := strings.TrimSpace(content[:idx])
 			val := strings.TrimSpace(content[idx+1:])
-			out = append(out, kvPair{key, val})
-			continue
+			if val != "" && flatKeyPattern.MatchString(key) {
+				out = append(out, kvPair{strings.ToLower(key), val})
+			}
 		}
-		out = append(out, kvPair{section, content})
 	}
 	return out
+}
+
+// nominetTag matches the registrar tag Nominet appends to a .uk
+// registrar's name ("British Broadcasting Corporation [Tag = BBC]").
+var nominetTag = regexp.MustCompile(`\s*\[Tag = [^\]]*\]$`)
+
+// registrarName strips what Nominet adds to a registrar line that is not
+// the registrar's name: its trailing "[Tag = X]", which RDAP does not
+// carry and so made every .uk lookup report a registrar conflict, and its
+// "No registrar listed." sentence for a domain registered directly with
+// Nominet, which means there is no registrar rather than naming one.
+// Neither shape appears in any other registry's output.
+func registrarName(val string) string {
+	if strings.HasPrefix(val, "No registrar listed.") {
+		return ""
+	}
+	return nominetTag.ReplaceAllString(val, "")
 }
 
 // Parse extracts normalized Fields from a raw WHOIS response for tld,
@@ -396,7 +421,7 @@ func Parse(raw, tld string) Fields {
 		case fDomain:
 			f.Domain = p.val
 		case fRegistrar:
-			f.Registrar = p.val
+			f.Registrar = registrarName(p.val)
 		case fRegistrarWHOISServer:
 			f.RegistrarWHOISServer = p.val
 		case fRefer:
