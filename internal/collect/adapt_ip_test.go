@@ -326,6 +326,11 @@ func TestFromIPHop_HopError(t *testing.T) {
 	if sr.Meta.OK {
 		t.Error("Meta.OK = true, want false when hop.Err is set")
 	}
+	// The error text is what -v and -o json show as the reason the
+	// source failed; dropping it left a timeout reading as "no data".
+	if sr.Meta.Err != errDeadline.Error() {
+		t.Errorf("Meta.Err = %q, want %q", sr.Meta.Err, errDeadline.Error())
+	}
 }
 
 func TestFromIPHop_RateLimited(t *testing.T) {

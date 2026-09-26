@@ -108,6 +108,7 @@ func ipRDAPPresent(sr source.IPSourceRecord) bool {
 func fromIPHop(meta model.SourceResult, hop whois.Hop) source.IPSourceRecord {
 	if hop.Err != nil {
 		meta.OK = false
+		meta.Err = hop.Err.Error()
 		return source.IPSourceRecord{Meta: meta}
 	}
 	if hop.IPFields == nil {
