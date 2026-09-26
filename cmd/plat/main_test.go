@@ -2127,3 +2127,43 @@ func TestApplyNoColor_LeavesColourAloneWithoutTheFlag(t *testing.T) {
 		t.Errorf("applyNoColor(false) = %+v, want the input unchanged", ui)
 	}
 }
+
+// The bulk separator was written after every name but the last, whether
+// or not that name printed anything, so a failed name (whose error goes
+// to stderr) left a stray blank line on stdout: two before the record
+// here, or a trailing one when the failure came last.
+func TestRunLookupPool_FailedNamesLeaveNoBlankLines(t *testing.T) {
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write(fixture)
+	}))
+	defer rdapSrv.Close()
+
+	opts := lookupOptions{NoFollow: true, Concurrency: 1}
+	client := newTestClient(t, bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL}), opts, []model.SourceID{model.SourceRegistryRDAP})
+
+	for _, names := range [][]string{
+		{"bad..com", "nosuch.local", "example.com"},
+		{"example.com", "bad..com"},
+		{"example.com", "bad..com", "example.com"},
+	} {
+		t.Run(strings.Join(names, ","), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			_ = runLookupPool(context.Background(), &stdout, &stderr, names, opts, render.FormatPlain, uiConfig{}, client)
+			out := stdout.String()
+			if strings.HasPrefix(out, "\n") {
+				t.Errorf("stdout starts with a blank line:\n%q", out)
+			}
+			if strings.HasSuffix(out, "\n\n") {
+				t.Errorf("stdout ends with a blank line:\n%q", out)
+			}
+			if strings.Contains(out, "\n\n\n") {
+				t.Errorf("stdout has a doubled blank line:\n%q", out)
+			}
+		})
+	}
+}

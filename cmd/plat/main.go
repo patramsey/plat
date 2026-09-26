@@ -565,19 +565,27 @@ func runLookupPool(ctx context.Context, stdout, stderr io.Writer, domains []stri
 	}
 
 	worst := 0
+	wrote := false
 	for i := range domains {
-		if _, err := stdout.Write(bufs[i].Bytes()); err != nil {
-			return err
-		}
 		if codes[i] > worst {
 			worst = codes[i]
+		}
+		// A failed name renders nothing to stdout (its error goes to
+		// stderr), so it gets no separator either: the blank line goes
+		// only between two records that were actually written.
+		if bufs[i].Len() == 0 {
+			continue
 		}
 		// A quiet record is a single line; a blank line between two of
 		// them double-spaces the whole run for no gain. The separator
 		// exists to keep multi-line records apart.
-		if !render.IsMachine(format) && !opts.Quiet && i < len(domains)-1 {
+		if wrote && !render.IsMachine(format) && !opts.Quiet {
 			_, _ = fmt.Fprintln(stdout)
 		}
+		if _, err := stdout.Write(bufs[i].Bytes()); err != nil {
+			return err
+		}
+		wrote = true
 	}
 	if worst != 0 {
 		return exitSignal{worst}

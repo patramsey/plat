@@ -232,6 +232,10 @@ attempted source agrees it doesn't exist) reads as "is not registered"; a
 genuine lookup failure (sources errored, so non-existence can't be
 confirmed) reads as "lookup inconclusive" or "lookup failed" instead.
 
+Errors about the invocation itself rather than any one name — an unknown
+flag, `--concurrency 0`, an empty `--file` — have no `domain` to report.
+They print as plain `plat: …` text on stderr and exit `2`.
+
 stdout only ever contains successfully-rendered records in machine mode —
 scripts consuming stdout never need to distinguish a partial/error object
 from a real record.

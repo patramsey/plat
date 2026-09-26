@@ -118,7 +118,7 @@ This is a render-and-exit tool for v1 — **not** an interactive Bubble Tea app 
 
 ## Machine output contract
 
-`-o json` emits the unified `Record` (camelCase, `"schemaVersion": 1`, provenance per field, RFC 3339 timestamps) — treat this schema as a public API; breaking changes bump `schemaVersion`. `--raw` adds embedded raw source payloads. `-o ndjson` for multi-domain invocations. Errors in machine mode still go to stderr as JSON; stdout stays schema-clean.
+`-o json` emits the unified `Record` (camelCase, `"schemaVersion": 1`, provenance per field, RFC 3339 timestamps) — treat this schema as a public API; breaking changes bump `schemaVersion`. `--raw` adds embedded raw source payloads. `-o ndjson` for multi-domain invocations. A name that can't be looked up in machine mode reports its error to stderr as JSON (`{error, domain}`); errors about the invocation itself (bad flags, an empty `--file`) name no domain and stay plain text. stdout stays schema-clean.
 
 ## Testing approach
 
