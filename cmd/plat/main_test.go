@@ -122,6 +122,17 @@ func TestDeriveOutcome(t *testing.T) {
 	}
 }
 
+// With --source excluding the one source a name has, nothing was queried
+// either, but "no RDAP or WHOIS server is listed" would be false: the
+// excluded one exists. The message must point at the filter instead.
+func TestLookupOutcomeError_ZeroSourcesAfterFilter(t *testing.T) {
+	got := lookupOutcomeError(3, nil, true).Error()
+	want := "lookup failed -- none of the selected sources has a server listed for this name, so there was nothing to query"
+	if got != want {
+		t.Errorf("lookupOutcomeError(3, nil, true) = %q, want %q", got, want)
+	}
+}
+
 func TestLookupOutcomeError(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -146,10 +157,14 @@ func TestLookupOutcomeError(t *testing.T) {
 			"is not registered (checked: registrar-rdap, registry-rdap, registrar-whois)",
 		},
 		{
+			// Zero sources means nothing was queried at all -- a source
+			// that was tried and failed is always recorded -- so "could
+			// not be reached" blamed connectivity for a TLD such as .gr,
+			// which lists neither an RDAP service nor a WHOIS server.
 			"total failure, zero sources",
 			3,
 			nil,
-			"lookup failed -- no sources could be reached",
+			"lookup failed -- no RDAP or WHOIS server is listed for this name, so there was nothing to query",
 		},
 		{
 			"total failure, all sources errored",
@@ -166,7 +181,7 @@ func TestLookupOutcomeError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := lookupOutcomeError(tt.code, tt.sources).Error()
+			got := lookupOutcomeError(tt.code, tt.sources, false).Error()
 			if got != tt.want {
 				t.Errorf("lookupOutcomeError(%d, %+v) = %q, want %q", tt.code, tt.sources, got, tt.want)
 			}
@@ -660,7 +675,7 @@ func TestReportLookupError_NotRegisteredUsesOKStyleInHumanFormat(t *testing.T) {
 	th := human.NewTheme(false)
 
 	var notRegistered bytes.Buffer
-	reportLookupError(&notRegistered, render.FormatHuman, "example.com", lookupOutcomeError(1, sources), sources, false, uiConfig{}, nil, "")
+	reportLookupError(&notRegistered, render.FormatHuman, "example.com", lookupOutcomeError(1, sources, false), sources, false, uiConfig{}, nil, "")
 	wantOK := th.OK.Render("plat: example.com: is not registered (checked: registry-rdap)") + "\n"
 	if notRegistered.String() != wantOK {
 		t.Errorf("not-registered output = %q, want th.OK-styled %q", notRegistered.String(), wantOK)
@@ -668,7 +683,7 @@ func TestReportLookupError_NotRegisteredUsesOKStyleInHumanFormat(t *testing.T) {
 
 	failedSources := []model.SourceResult{{Source: model.SourceRegistryRDAP, Err: "timeout"}}
 	var failed bytes.Buffer
-	reportLookupError(&failed, render.FormatHuman, "example.com", lookupOutcomeError(3, failedSources), failedSources, false, uiConfig{}, nil, "")
+	reportLookupError(&failed, render.FormatHuman, "example.com", lookupOutcomeError(3, failedSources, false), failedSources, false, uiConfig{}, nil, "")
 	wantErr := th.Err.Render("plat: example.com: lookup inconclusive -- 1 of 1 sources failed, so non-existence can't be confirmed (checked: registry-rdap)") + "\n"
 	if failed.String() != wantErr {
 		t.Errorf("total-failure output = %q, want th.Err-styled %q", failed.String(), wantErr)
