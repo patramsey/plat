@@ -1,0 +1,14 @@
+state:            active
+domain:           iis.se
+holder:           stifte6931-00001
+created:          2000-05-04
+modified:         2023-03-08
+expires:          2031-03-09
+transferred:      2019-01-25
+nserver:          nsa.dnsnode.net
+nserver:          nsp.dnsnode.net
+nserver:          nsu.dnsnode.net
+dnssec:           signed delegation
+registry-lock:    unlocked
+status:           ok
+registrar:        Internetstift

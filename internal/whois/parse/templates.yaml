@@ -4,11 +4,6 @@ de:
     changed: updated
 jp:
   format: brackets
-  synonyms:
-    # JPRS's third-level records (.ad.jp, .co.jp) give status as
-    # "[State]". Scoped here: as a global synonym it turned every contact
-    # "State:" line -- .mx's "State: Nuevo Leon" -- into a domain status.
-    state: status
 uk:
   format: indent
 eu:
@@ -41,3 +36,7 @@ mx:
   synonyms:
     # NIC Mexico lists nameservers as "DNS:" lines under "Name Servers:".
     dns: nameservers
+    # "state" is a status synonym globally (.jp, .ru and .se give domain
+    # status that way), but NIC Mexico's "State:" lines are contacts'
+    # Mexican states. Mapping to "" keeps them out of status.
+    state: ""

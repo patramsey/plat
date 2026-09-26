@@ -1,0 +1,16 @@
+
+domain:        YANDEX.RU
+nserver:       ns1.yandex.ru. 213.180.193.1, 2a02:6b8::1
+nserver:       ns2.yandex.ru. 93.158.134.1, 2a02:6b8:0:1::1
+state:         REGISTERED, DELEGATED, VERIFIED
+org:           
+taxpayer-id:   
+registrar:     RU-CENTER-RU
+admin-contact: https://www.nic.ru/whois
+created:       1997-09-23T09:45:07Z
+paid-till:     2026-09-30T21:00:00Z
+free-date:     2026-11-01
+source:        TCI
+
+Last updated on 2026-09-26T16:18:01Z
+

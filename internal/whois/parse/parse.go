@@ -68,6 +68,7 @@ var defaultSynonyms = map[string]string{
 	"domain nameservers":                     fNameservers,
 	"nserver":                                fNameservers,
 	"nameservers":                            fNameservers,
+	"state":                                  fStatus,      // .jp third-level records, .ru, .se
 	"nameserver":                             fNameservers, // .lt uses the singular; without this synonym its nameservers were dropped entirely
 	"creation date":                          fCreated,
 	"created":                                fCreated,
@@ -411,8 +412,10 @@ func Parse(raw, tld string) Fields {
 	}
 
 	for _, p := range pairs {
+		// A template can map a key to "" to say it is not a synonym for
+		// that TLD, keeping it in Unmapped (see mx in templates.yaml).
 		canon, ok := synonyms[p.key]
-		if !ok {
+		if !ok || canon == "" {
 			f.Unmapped[p.key] = append(f.Unmapped[p.key], p.val)
 			continue
 		}

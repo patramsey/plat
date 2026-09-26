@@ -733,3 +733,23 @@ func TestParse_MXContactStateIsNotAStatus(t *testing.T) {
 		t.Errorf("Nameservers = %v, want %v", f.Nameservers, wantNS)
 	}
 }
+
+// TCI (.ru) and IIS (.se) publish the domain's status as "state:". This
+// pins the global "state" synonym: scoping it to .jp alone (to stop .mx
+// contact states reading as statuses) emptied yandex.ru's status.
+func TestParse_StateIsDomainStatusForRUAndSE(t *testing.T) {
+	for _, tt := range []struct {
+		fixture, tld string
+		want         []string
+	}{
+		{"tcinet-ru-yandex-recorded.txt", "ru", []string{"REGISTERED, DELEGATED, VERIFIED"}},
+		{"iis-se-recorded.txt", "se", []string{"active", "ok"}},
+	} {
+		t.Run(tt.tld, func(t *testing.T) {
+			f := Parse(loadFixture(t, tt.fixture), tt.tld)
+			if !slices.Equal(f.Statuses, tt.want) {
+				t.Errorf("Statuses = %q, want %q", f.Statuses, tt.want)
+			}
+		})
+	}
+}
