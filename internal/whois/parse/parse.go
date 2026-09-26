@@ -156,6 +156,10 @@ var notFoundMarkers = []string{
 var unsupportedMarkers = []string{
 	"not supported",
 	"unsupported tld",
+	// SWITCH (.ch, .li) refuses port-43 queries and points to its web
+	// form. Matched as the whole sentence: "not permitted" alone appears
+	// in the terms of use of countless real answers.
+	"requests of this client are not permitted",
 }
 
 // tokenizeKV handles the default "Key: value" dialect used by most

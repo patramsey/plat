@@ -753,3 +753,25 @@ func TestParse_StateIsDomainStatusForRUAndSE(t *testing.T) {
 		})
 	}
 }
+
+// SWITCH (.ch, .li) refuses port-43 queries outright. Nothing matched
+// the refusal, so fromHop counted it as a successful response with no
+// fields and `plat nic.ch` exited 0 with an empty record.
+func TestParse_SWITCHRefusalIsUnsupported(t *testing.T) {
+	f := Parse(loadFixture(t, "switch-ch-refused-recorded.txt"), "ch")
+	if !f.Unsupported {
+		t.Error("Unsupported = false, want true for SWITCH's refusal")
+	}
+	if f.NotFound {
+		t.Error("NotFound = true; a refusal says nothing about whether the domain exists")
+	}
+}
+
+// The refusal marker must be SWITCH's sentence, not "not permitted":
+// terms-of-use text on real answers says that constantly.
+func TestParse_TermsOfUseNotPermittedIsNotARefusal(t *testing.T) {
+	f := Parse("Domain Name: example.com\nUse of this data for marketing is not permitted.\n", "com")
+	if f.Unsupported {
+		t.Error("Unsupported = true for a real answer whose terms say \"not permitted\"")
+	}
+}
