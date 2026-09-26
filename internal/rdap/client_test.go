@@ -848,3 +848,44 @@ func TestClient_ASN_AbuseTelPrefersVoiceOverFax(t *testing.T) {
 		t.Errorf("AbuseEntity().Tel = %q, want the voice number +31 20 535 4444", abuse.VCardArray.Tel)
 	}
 }
+
+// A 429 whose Retry-After outlasts the remaining budget used to sleep
+// until the context expired and return a bare "context deadline
+// exceeded" -- the rate limit and its body lost, so -v showed a generic
+// timeout. It now returns the 429 at once.
+func TestClientDomain_429WithRetryAfterPastDeadlineReturnsTheRateLimit(t *testing.T) {
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.Header().Set("Retry-After", "3600")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+
+	start := time.Now()
+	result, err := (&Client{Timeout: 300 * time.Millisecond}).Domain(context.Background(), srv.URL, "EXAMPLE.COM")
+	elapsed := time.Since(start)
+
+	if elapsed > 200*time.Millisecond {
+		t.Errorf("elapsed = %v, want an immediate return -- the wait cannot fit the budget", elapsed)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("err = %v, want the 429, not a timeout", err)
+	}
+	if result == nil || result.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("result = %+v, want StatusCode 429", result)
+	}
+	if hits != 1 {
+		t.Errorf("hits = %d, want 1 (no retry)", hits)
+	}
+}
+
+// time.Duration(secs) * time.Second overflowed for a huge Retry-After and
+// went negative, which would retry immediately.
+func TestRetryAfter_HugeValueDoesNotOverflow(t *testing.T) {
+	h := http.Header{}
+	h.Set("Retry-After", "9223372037")
+	if d := retryAfter(h); d <= 0 {
+		t.Errorf("retryAfter(9223372037) = %v, want a positive duration", d)
+	}
+}

@@ -130,6 +130,11 @@ func (c *Client) do(ctx context.Context, reqURL string) (*rawResponse, error) {
 	return &rawResponse{StatusCode: resp.StatusCode, Header: resp.Header, Body: body}, nil
 }
 
+// maxRetryAfterSecs caps a numeric Retry-After. Any wait this long is
+// past every lookup's deadline, so the cap only has to keep the
+// multiplication in range.
+const maxRetryAfterSecs = 24 * 60 * 60
+
 func retryAfter(h http.Header) time.Duration {
 	v := h.Get("Retry-After")
 	if v == "" {
@@ -143,6 +148,11 @@ func retryAfter(h http.Header) time.Duration {
 		// no meaningful non-zero duration to return.
 		if secs < 0 {
 			return time.Second
+		}
+		// Capped before multiplying: a value past ~292 years overflows
+		// time.Duration and goes negative, which would retry at once.
+		if secs > maxRetryAfterSecs {
+			secs = maxRetryAfterSecs
 		}
 		return time.Duration(secs) * time.Second
 	}
@@ -227,15 +237,23 @@ func fetchAt[T rdapObject](
 		return nil, err
 	}
 
+	// One polite retry -- but only if the wait fits the remaining budget.
+	// Sleeping into the deadline returned a bare context error and lost
+	// the 429, so -v reported a timeout instead of the rate limit. When
+	// the wait cannot fit, the 429 falls through to the error handling
+	// below and is reported as what it is.
 	if resp.StatusCode == http.StatusTooManyRequests {
-		select {
-		case <-time.After(retryAfter(resp.Header)):
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-		resp, err = c.do(ctx, reqURL)
-		if err != nil {
-			return nil, err
+		wait := retryAfter(resp.Header)
+		if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > wait {
+			select {
+			case <-time.After(wait):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+			resp, err = c.do(ctx, reqURL)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
