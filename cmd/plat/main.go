@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/net/idna"
 	"io"
 	"net/netip"
 	"os"
@@ -19,6 +18,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
+	"golang.org/x/net/idna"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/term"
 
