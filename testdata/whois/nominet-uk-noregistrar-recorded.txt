@@ -1,0 +1,53 @@
+
+    Domain name:
+        nominet.uk
+
+    Registrant:
+        Nominet UK
+
+    Registrant type:
+        UK Limited Company, (Company number: 3203859)
+
+    Registrant's address:
+        Minerva House
+        Edmund Halley Road
+        Oxford Science Park
+        Oxford
+        Oxon
+        OX4 4DQ
+        United Kingdom
+
+    Data validation:
+        Nominet was able to match the registrant's name and address against a 3rd party data source on 26-Oct-2018
+
+    Registrar:
+        No registrar listed.  This domain is registered directly with Nominet.
+
+    Relevant dates:
+        Registered on: 10-Jun-2014
+        Last updated:  15-May-2026
+
+    Registration status:
+        No registration status listed.
+
+    Name servers:
+        dns1.nominetdns.uk        213.248.219.254  2a01:618:403::254
+        dns2.nominetdns.uk        103.49.83.254  2401:fd80:403::254
+        dns3.nominetdns.uk        213.248.223.254  2a01:618:407::254
+        dns4.nominetdns.uk        43.230.51.254  2401:fd80:407::254
+        dnsa.nominetdns.uk        156.154.100.3  2001:502:ad09::3
+        dnsb.nominetdns.uk        156.154.101.3  2001:502:2eda::3
+        dnsc.nominetdns.uk        156.154.102.3  2610:a1:1009::3
+        dnsd.nominetdns.uk        156.154.103.3  2610:a1:1010::3
+
+    DNSSEC:
+        Signed
+
+    WHOIS lookup made at 14:47:23 26-Sep-2026
+
+    ********************************************************************************
+    * WHOIS service for .UK will cease on 9th of February 2027                     *
+    * For more information on the replacement RDAP services please see:            *
+    * https://theukdomain.uk/rdap                                                  *
+    ********************************************************************************
+

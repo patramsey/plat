@@ -19,7 +19,7 @@ var templateManifest = []struct {
 }{
 	{tld: "de", fixture: "denic-de-recorded.txt", wantDomain: "denic.de", wantNSCount: 4},
 	{tld: "jp", fixture: "jprs-jp-example.txt", wantDomain: "EXAMPLE.JP", wantNSCount: 2},
-	{tld: "uk", fixture: "nominet-uk-example.txt", wantDomain: "example.uk", wantNSCount: 2},
+	{tld: "uk", fixture: "nominet-uk-recorded.txt", wantDomain: "bbc.co.uk", wantNSCount: 8},
 	{tld: "eu", fixture: "eurid-eu-recorded.txt", wantDomain: "europa.eu", wantNSCount: 12},
 	{tld: "fr", fixture: "afnic-fr-example.txt", wantDomain: "example.fr", wantNSCount: 2},
 	{tld: "nl", fixture: "sidn-nl-example.txt", wantDomain: "example.nl", wantNSCount: 2},

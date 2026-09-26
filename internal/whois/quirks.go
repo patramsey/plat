@@ -41,3 +41,17 @@ func BuildQuery(server, domain string) string {
 	}
 	return domain
 }
+
+// registryFallback names a TLD's registry WHOIS server for when IANA's
+// record lists none but the registry still runs one. It fills a gap in
+// IANA's data and never overrides it: Lookup consults this only after the
+// IANA hop answered without a server, so a registry that moves its server
+// and updates IANA is followed there.
+//
+// .uk: IANA's record has carried an empty "whois:" line since
+// 2026-08-04, while whois.nic.uk continues to answer. Without this entry
+// a .uk lookup had RDAP as its only source, so one slow RDAP response
+// failed the whole lookup.
+var registryFallback = map[string]string{
+	"uk": "whois.nic.uk",
+}

@@ -99,8 +99,13 @@ func (c *Client) Lookup(ctx context.Context, name domain.Name) (*Result, error) 
 	ianaHop := c.ianaHop(ctx, name.TLD)
 	result.Hops = append(result.Hops, ianaHop)
 
-	if ianaHop.Err == nil && ianaHop.Fields.Refer != "" {
-		registryHop := c.hop(ctx, ianaHop.Fields.Refer, name.Punycode, name.TLD)
+	registry := ianaHop.Fields.Refer
+	if ianaHop.Err == nil && registry == "" {
+		registry = registryFallback[name.TLD]
+	}
+
+	if ianaHop.Err == nil && registry != "" {
+		registryHop := c.hop(ctx, registry, name.Punycode, name.TLD)
 		result.Hops = append(result.Hops, registryHop)
 
 		if registryHop.Err == nil && registryHop.Fields.RegistrarWHOISServer != "" {

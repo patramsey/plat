@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/patramsey/plat/internal/domain"
 )
 
 // startGatedListener is startListener's sibling (see client_test.go):
@@ -108,5 +110,72 @@ func TestClient_IANAHopCreditsBlockedWaitToInheritingCallersBudget(t *testing.T)
 			"the time this caller spent blocked on the winner's fetch must be credited back to its chain budget "+
 			"(referral.go's creditChain(ctx, blocked) call in ianaHop), or a busy shared limiter can silently "+
 			"starve this name's later hops of the budget they were promised", after, before)
+	}
+}
+
+// withRegistryFallback points tld's fallback registry server at addr for
+// the duration of the test, so the fallback path can be exercised against
+// a local listener instead of the real registry.
+func withRegistryFallback(t *testing.T, tld, addr string) {
+	t.Helper()
+	orig := registryFallback
+	registryFallback = map[string]string{tld: addr}
+	t.Cleanup(func() { registryFallback = orig })
+}
+
+// IANA's record for .uk has carried an empty "whois:" line since
+// 2026-08-04, though whois.nic.uk still answers. Without a fallback the
+// chain stopped at IANA and a .uk lookup had RDAP as its only source.
+func TestClient_LookupFallsBackWhenIANAListsNoServer(t *testing.T) {
+	registryAddr := startListener(t, func(query string) string {
+		return "\n    Domain name:\n        bbc.co.uk\n"
+	})
+	ianaAddr := startListener(t, func(query string) string {
+		return "domain:       UK\nwhois:        \nstatus:       ACTIVE\n"
+	})
+	withRegistryFallback(t, "uk", registryAddr)
+
+	q, err := domain.Normalize("bbc.co.uk")
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
+	result, err := c.Lookup(context.Background(), q.Name)
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if len(result.Hops) != 2 {
+		t.Fatalf("got %d hops, want 2 (IANA, then the fallback registry server)", len(result.Hops))
+	}
+	if got := result.Hops[1].Server; got != registryAddr {
+		t.Errorf("registry hop server = %q, want fallback %q", got, registryAddr)
+	}
+	if got := result.Hops[1].Fields.Domain; got != "bbc.co.uk" {
+		t.Errorf("registry hop Domain = %q, want bbc.co.uk", got)
+	}
+}
+
+// The fallback table only fills a gap; it must never override a server
+// IANA does name, or a stale entry would outlive a registry's move.
+func TestClient_LookupPrefersIANAReferralOverFallback(t *testing.T) {
+	registryAddr := startListener(t, func(query string) string {
+		return "Domain Name: example.uk\n"
+	})
+	ianaAddr := startListener(t, func(query string) string {
+		return "refer: " + registryAddr + "\n"
+	})
+	withRegistryFallback(t, "uk", "127.0.0.1:1")
+
+	q, err := domain.Normalize("example.uk")
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
+	result, err := c.Lookup(context.Background(), q.Name)
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if len(result.Hops) != 2 || result.Hops[1].Server != registryAddr {
+		t.Fatalf("hops = %+v, want registry hop to IANA's referral %q", result.Hops, registryAddr)
 	}
 }

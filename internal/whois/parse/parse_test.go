@@ -128,20 +128,30 @@ func TestParse_FoundDomainNotFlaggedUnsupported(t *testing.T) {
 }
 
 func TestTokenizeIndent_UKFixture(t *testing.T) {
-	raw := loadFixture(t, "nominet-uk-example.txt")
+	raw := loadFixture(t, "nominet-uk-recorded.txt")
 	pairs := tokenizeIndent(raw)
 
+	// Every line of a real Nominet response is indented: section headers
+	// by four spaces, their bodies by eight. Nameserver lines carry glue
+	// addresses, IPv6 ones included, whose colons are not key separators.
 	want := map[string][]string{
-		"domain name":         {"example.uk"},
-		"registrant":          {"Example Organisation Ltd"},
-		"registrant type":     {"UK Limited Company (Company number 12345678)"},
-		"registrar":           {"Example Registrar Ltd t/a Example Registrar [Tag = EXAMPLE]"},
-		"url":                 {"http://www.example-registrar.co.uk"},
-		"registered on":       {"14-Aug-1995"},
-		"expiry date":         {"13-Aug-2026"},
-		"last updated":        {"14-Jan-2025"},
+		"domain name":         {"bbc.co.uk"},
+		"registrar":           {"British Broadcasting Corporation [Tag = BBC]"},
+		"url":                 {"https://www.bbc.co.uk"},
+		"registered on":       {"before Aug-1996"},
+		"expiry date":         {"13-Dec-2034"},
+		"last updated":        {"29-Oct-2025"},
 		"registration status": {"Registered until expiry date."},
-		"name servers":        {"ns1.example.uk", "ns2.example.uk"},
+		"name servers": {
+			"ddns0.bbc.co.uk           148.163.199.1  2607:f740:e04e::1",
+			"ddns0.bbc.com",
+			"ddns1.bbc.co.uk           148.163.199.65  2607:f740:e04e:4::1",
+			"ddns1.bbc.com",
+			"dns0.bbc.co.uk            198.51.44.9  2620:4d:4000:6259:7:9:0:1",
+			"dns0.bbc.com",
+			"dns1.bbc.co.uk            198.51.45.9  2a00:edc0:6259:7:9::2",
+			"dns1.bbc.com",
+		},
 	}
 	got := map[string][]string{}
 	for _, p := range pairs {
@@ -238,27 +248,45 @@ func TestParse_IndentIPv6OnlyGlueNameserver(t *testing.T) {
 }
 
 func TestParse_UKTemplateEndToEnd(t *testing.T) {
-	raw := loadFixture(t, "nominet-uk-example.txt")
+	raw := loadFixture(t, "nominet-uk-recorded.txt")
 	f := Parse(raw, "uk")
 
-	if f.Domain != "example.uk" {
-		t.Errorf("Domain = %q, want example.uk", f.Domain)
+	if f.Domain != "bbc.co.uk" {
+		t.Errorf("Domain = %q, want bbc.co.uk", f.Domain)
 	}
-	if f.Registrar != "Example Registrar Ltd t/a Example Registrar [Tag = EXAMPLE]" {
+	if f.Registrar != "British Broadcasting Corporation" {
 		t.Errorf("Registrar = %q", f.Registrar)
 	}
-	wantNS := []string{"ns1.example.uk", "ns2.example.uk"}
-	if len(f.Nameservers) != len(wantNS) || f.Nameservers[0] != wantNS[0] || f.Nameservers[1] != wantNS[1] {
+	wantNS := []string{
+		"ddns0.bbc.co.uk", "ddns0.bbc.com", "ddns1.bbc.co.uk", "ddns1.bbc.com",
+		"dns0.bbc.co.uk", "dns0.bbc.com", "dns1.bbc.co.uk", "dns1.bbc.com",
+	}
+	if !slices.Equal(f.Nameservers, wantNS) {
 		t.Errorf("Nameservers = %v, want %v", f.Nameservers, wantNS)
 	}
-	if !f.Created.Parsed || f.Created.Raw != "14-Aug-1995" {
-		t.Errorf("Created = %+v, want Parsed with Raw 14-Aug-1995", f.Created)
+	// Nominet reports registrations predating its records as "before
+	// Aug-1996" -- not a date, so it must not parse as one.
+	if f.Created.Parsed || f.Created.Raw != "before Aug-1996" {
+		t.Errorf("Created = %+v, want unparsed with Raw %q", f.Created, "before Aug-1996")
 	}
-	if !f.Expires.Parsed || f.Expires.Raw != "13-Aug-2026" {
-		t.Errorf("Expires = %+v, want Parsed with Raw 13-Aug-2026", f.Expires)
+	if !f.Expires.Parsed || f.Expires.Raw != "13-Dec-2034" {
+		t.Errorf("Expires = %+v, want Parsed with Raw 13-Dec-2034", f.Expires)
 	}
-	if !f.Updated.Parsed || f.Updated.Raw != "14-Jan-2025" {
-		t.Errorf("Updated = %+v, want Parsed with Raw 14-Jan-2025", f.Updated)
+	if !f.Updated.Parsed || f.Updated.Raw != "29-Oct-2025" {
+		t.Errorf("Updated = %+v, want Parsed with Raw 29-Oct-2025", f.Updated)
+	}
+	if f.NotFound {
+		t.Error("NotFound = true for a registered domain")
+	}
+}
+
+func TestParse_UKNotFound(t *testing.T) {
+	f := Parse(loadFixture(t, "nominet-uk-notfound-recorded.txt"), "uk")
+	if !f.NotFound {
+		t.Error("NotFound = false, want true for Nominet's \"No match for\" response")
+	}
+	if f.Domain != "" {
+		t.Errorf("Domain = %q, want empty for a not-found response", f.Domain)
 	}
 }
 
@@ -611,5 +639,30 @@ func TestTokenizeBrackets_AcceptsOrdinalPrefix(t *testing.T) {
 	want := []kvPair{{"domain name", "NIC.AD.JP"}, {"state", "Connected"}}
 	if !slices.Equal(got, want) {
 		t.Errorf("pairs = %+v, want %+v", got, want)
+	}
+}
+
+// Nominet appends its own registrar tag to the name ("[Tag = BBC]"),
+// which RDAP does not carry, so leaving it on made every .uk lookup
+// report a registrar conflict between two sources naming the same one.
+func TestParse_UKRegistrarDropsNominetTag(t *testing.T) {
+	f := Parse(loadFixture(t, "nominet-uk-recorded.txt"), "uk")
+	if f.Registrar != "British Broadcasting Corporation" {
+		t.Errorf("Registrar = %q, want %q", f.Registrar, "British Broadcasting Corporation")
+	}
+}
+
+// A domain registered directly with Nominet has no registrar, and
+// Nominet says so in prose. That sentence is not a registrar's name.
+func TestParse_UKNoRegistrarListedIsAbsent(t *testing.T) {
+	f := Parse(loadFixture(t, "nominet-uk-noregistrar-recorded.txt"), "uk")
+	if f.Registrar != "" {
+		t.Errorf("Registrar = %q, want empty", f.Registrar)
+	}
+	if f.Domain != "nominet.uk" {
+		t.Errorf("Domain = %q, want nominet.uk", f.Domain)
+	}
+	if len(f.Nameservers) != 8 {
+		t.Errorf("Nameservers = %v, want 8 entries", f.Nameservers)
 	}
 }
