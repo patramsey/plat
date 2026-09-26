@@ -1,0 +1,62 @@
+
+domain:       seznam.cz
+registrant:   SEZNAM-CZ-AS
+admin-c:      SEZNAM-CZ-AS-TECH
+nsset:        SEZNAM-NAMESERVERS
+keyset:       AUTO-1F6H8UIVQ6PNRFJQ3L1YU16R9
+registrar:    REG-SEZNAM
+status:       Sponsoring registrar change forbidden
+registered:   07.10.1996 02:00:00
+changed:      05.09.2022 14:21:11
+expire:       29.10.2027
+
+contact:      SEZNAM-CZ-AS
+org:          Seznam.cz, a.s.
+name:         Pavel Zima
+address:      Radlická 3294/10
+address:      Praha 5
+address:      150 00
+address:      CZ
+e-mail:       domeny-owner@firma.seznam.cz
+registrar:    REG-MOJEID
+created:      21.01.2021 07:38:06
+changed:      05.10.2022 09:56:15
+
+contact:      SEZNAM-CZ-AS-TECH
+org:          Seznam.cz, a.s.
+name:         Vlastimil Pečínka
+address:      Radlická 3294/10
+address:      Praha 5
+address:      150 00
+address:      CZ
+e-mail:       domeny@firma.seznam.cz
+registrar:    REG-MOJEID
+created:      27.02.2017 13:51:01
+changed:      06.05.2026 12:49:06
+
+nsset:        SEZNAM-NAMESERVERS
+nserver:      ans.seznam.cz (77.75.74.80, 2a02:598:3333::3)
+nserver:      ams.seznam.cz (77.75.75.230, 2a02:598:4444::4)
+tech-c:       SEZNAM-CZ-AS-TECH
+registrar:    REG-SEZNAM
+created:      18.10.2007 18:01:01
+changed:      11.12.2024 13:50:21
+
+keyset:       AUTO-1F6H8UIVQ6PNRFJQ3L1YU16R9
+dnskey:       257 3 13 4RjTqRW4rtz/sJ8Doo44NqGOoB8RirxCI4Qo9sAvZFOt71Am6E0d9YSFKfDcIHQSNyMonv8gD/3L/Q8xVM51mQ==
+tech-c:       CZNIC-AKM
+registrar:    REG-CZNIC
+created:      10.11.2021 14:55:10
+changed:      14.11.2025 22:34:15
+
+contact:      CZNIC-AKM
+org:          CZ.NIC, z.s.p.o.
+name:         CZ.NIC, z.s.p.o.
+address:      Milesovska 1136/5
+address:      Praha 3
+address:      13000
+address:      CZ
+registrar:    REG-CZNIC
+created:      12.08.2024 15:02:38
+
+

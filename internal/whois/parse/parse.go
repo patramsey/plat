@@ -417,15 +417,29 @@ func Parse(raw, tld string) Fields {
 			f.Unmapped[p.key] = append(f.Unmapped[p.key], p.val)
 			continue
 		}
+		// Single-valued fields keep their first occurrence. A response
+		// describes the domain first and then its contact, nsset and
+		// keyset objects, which reuse the same keys (CZ.NIC's contacts
+		// carry their own "registrar:" and "created:", .it's their own
+		// "Created:" and "Last Update:"), so assigning on every match
+		// let the last contact's values replace the domain's own.
 		switch canon {
 		case fDomain:
-			f.Domain = p.val
+			if f.Domain == "" {
+				f.Domain = p.val
+			}
 		case fRegistrar:
-			f.Registrar = registrarName(p.val)
+			if f.Registrar == "" {
+				f.Registrar = registrarName(p.val)
+			}
 		case fRegistrarWHOISServer:
-			f.RegistrarWHOISServer = p.val
+			if f.RegistrarWHOISServer == "" {
+				f.RegistrarWHOISServer = p.val
+			}
 		case fRefer:
-			f.Refer = p.val
+			if f.Refer == "" {
+				f.Refer = p.val
+			}
 		case fStatus:
 			// ICANN's gTLD convention is "<eppCode> <url>", so the code is the
 			// first token. A registry that puts an English phrase here (CZ.NIC:
@@ -452,11 +466,17 @@ func Parse(raw, tld string) Fields {
 				f.Nameservers = append(f.Nameservers, ns)
 			}
 		case fCreated:
-			f.Created = ParseDate(p.val)
+			if f.Created.Raw == "" {
+				f.Created = ParseDate(p.val)
+			}
 		case fUpdated:
-			f.Updated = ParseDate(p.val)
+			if f.Updated.Raw == "" {
+				f.Updated = ParseDate(p.val)
+			}
 		case fExpires:
-			f.Expires = ParseDate(p.val)
+			if f.Expires.Raw == "" {
+				f.Expires = ParseDate(p.val)
+			}
 		}
 	}
 	return f
