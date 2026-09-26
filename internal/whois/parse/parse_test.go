@@ -719,3 +719,17 @@ func TestParse_MultiObjectResponseKeepsTheDomainsOwnValues(t *testing.T) {
 		})
 	}
 }
+
+// .mx contact blocks carry "State: Nuevo Leon" -- the Mexican state. A
+// global "state" synonym, there for .jp third-level records, turned it
+// into four copies of a domain status rendered as "nuevoLeon".
+func TestParse_MXContactStateIsNotAStatus(t *testing.T) {
+	f := Parse(loadFixture(t, "nicmx-mx-recorded.txt"), "mx")
+	if len(f.Statuses) != 0 {
+		t.Errorf("Statuses = %v, want none (.mx publishes no domain status)", f.Statuses)
+	}
+	wantNS := []string{"a.nic.mx", "b.nic.mx", "c.nic.mx"}
+	if !slices.Equal(f.Nameservers, wantNS) {
+		t.Errorf("Nameservers = %v, want %v", f.Nameservers, wantNS)
+	}
+}

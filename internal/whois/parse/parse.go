@@ -63,7 +63,6 @@ var defaultSynonyms = map[string]string{
 	"whois":                                  fRefer,
 	"domain status":                          fStatus,
 	"status":                                 fStatus,
-	"state":                                  fStatus, // .jp third-level records
 	"name server":                            fNameservers,
 	"name servers":                           fNameservers,
 	"domain nameservers":                     fNameservers,

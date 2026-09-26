@@ -1,0 +1,53 @@
+
+Domain Name:       nic.mx
+
+Created On:        1997-01-15
+Expiration Date:   2027-01-14
+Last Updated On:   2025-12-16
+Registrar:         Registry .MX
+URL:               http://www.registry.mx
+
+Registrant:
+   Name:           Network Information Center, S.A. de C.V.
+   City:           Monterrey
+   State:          Nuevo Leon
+   Country:        Mexico
+
+Administrative Contact:
+   Name:           Network Information Center, S.A. de C.V.
+   City:           Monterrey
+   State:          Nuevo Leon
+   Country:        Mexico
+
+Technical Contact:
+   Name:           Network Information Center, S.A. de C.V.
+   City:           Monterrey
+   State:          Nuevo Leon
+   Country:        Mexico
+
+Billing Contact:
+   Name:           Network Information Center, S.A. de C.V.
+   City:           Monterrey
+   State:          Nuevo Leon
+   Country:        Mexico
+
+Name Servers:
+   DNS:            a.nic.mx       2001:1250:a000:0:0:0:0:1, 207.248.65.1
+   DNS:            b.nic.mx       2001:1250:b000:0:0:0:0:1, 201.131.250.1
+   DNS:            c.nic.mx       2001:1250:c000:0:0:0:0:1, 201.131.248.1
+
+DNSSEC DS Records:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
