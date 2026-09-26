@@ -1,0 +1,110 @@
+
+
+
+
+
+NetRange:       12.0.0.0 - 12.255.255.255
+CIDR:           12.0.0.0/8
+NetName:        ATT
+NetHandle:      NET-12-0-0-0-1
+Parent:         NET12 (NET-12-0-0-0-0)
+NetType:        Direct Allocation
+OriginAS:       
+Organization:   AT&T Enterprises, LLC (AEL-360)
+RegDate:        1983-08-23
+Updated:        2025-12-02
+Comment:        IP assignments within this IP Block range are STATIC, not dynamic.
+Ref:            https://rdap.arin.net/registry/ip/12.0.0.0
+
+
+
+OrgName:        AT&T Enterprises, LLC
+OrgId:          AEL-360
+Address:        208 S. Akard St.
+City:           Dallas
+StateProv:      TX
+PostalCode:     75202
+Country:        US
+RegDate:        2024-11-22
+Updated:        2026-06-05
+Ref:            https://rdap.arin.net/registry/entity/AEL-360
+
+
+OrgAbuseHandle: ABUSE7-ARIN
+OrgAbuseName:   abuse
+OrgAbusePhone:  +1-919-319-8167 
+OrgAbuseEmail:  abuse@att.net
+OrgAbuseRef:    https://rdap.arin.net/registry/entity/ABUSE7-ARIN
+
+OrgTechHandle: ICC-ARIN
+OrgTechName:   IP Team
+OrgTechPhone:  +1-888-876-2382 
+OrgTechEmail:  rm-ipspecialist@att.com
+OrgTechRef:    https://rdap.arin.net/registry/entity/ICC-ARIN
+
+OrgRoutingHandle: ROUTI59-ARIN
+OrgRoutingName:   Routing POC
+OrgRoutingPhone:  +1-999-999-9999 
+OrgRoutingEmail:  routing_poc@att.com
+OrgRoutingRef:    https://rdap.arin.net/registry/entity/ROUTI59-ARIN
+
+OrgTechHandle: ZS44-ARIN
+OrgTechName:   IPAdmin-ATT Internet Services
+OrgTechPhone:  +1-888-510-5545 
+OrgTechEmail:  ipadmin@semail.att.com
+OrgTechRef:    https://rdap.arin.net/registry/entity/ZS44-ARIN
+
+
+
+
+NetRange:       12.0.0.0 - 12.0.3.255
+CIDR:           12.0.0.0/22
+NetName:        ATT-NET-12-0-0-0-22
+NetHandle:      NET-12-0-0-0-2
+Parent:         ATT (NET-12-0-0-0-1)
+NetType:        Reassigned
+OriginAS:       
+Customer:       AT&T CBB TIER-3 LAB (C11309735)
+RegDate:        2025-08-07
+Updated:        2025-08-07
+Ref:            https://rdap.arin.net/registry/ip/12.0.0.0
+
+
+CustName:       AT&T CBB TIER-3 LAB
+Address:        200 S Laurel AVE
+City:           MIDDLETOWN
+StateProv:      NJ
+PostalCode:     07748
+Country:        US
+RegDate:        2025-08-07
+Updated:        2025-08-07
+Ref:            https://rdap.arin.net/registry/entity/C11309735
+
+OrgAbuseHandle: ABUSE7-ARIN
+OrgAbuseName:   abuse
+OrgAbusePhone:  +1-919-319-8167 
+OrgAbuseEmail:  abuse@att.net
+OrgAbuseRef:    https://rdap.arin.net/registry/entity/ABUSE7-ARIN
+
+OrgTechHandle: ICC-ARIN
+OrgTechName:   IP Team
+OrgTechPhone:  +1-888-876-2382 
+OrgTechEmail:  rm-ipspecialist@att.com
+OrgTechRef:    https://rdap.arin.net/registry/entity/ICC-ARIN
+
+OrgRoutingHandle: ROUTI59-ARIN
+OrgRoutingName:   Routing POC
+OrgRoutingPhone:  +1-999-999-9999 
+OrgRoutingEmail:  routing_poc@att.com
+OrgRoutingRef:    https://rdap.arin.net/registry/entity/ROUTI59-ARIN
+
+OrgTechHandle: ZS44-ARIN
+OrgTechName:   IPAdmin-ATT Internet Services
+OrgTechPhone:  +1-888-510-5545 
+OrgTechEmail:  ipadmin@semail.att.com
+OrgTechRef:    https://rdap.arin.net/registry/entity/ZS44-ARIN
+
+
+
+
+

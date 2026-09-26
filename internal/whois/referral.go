@@ -13,10 +13,11 @@ import (
 
 func (c *Client) hop(ctx context.Context, server, queryDomain, tld string) Hop {
 	start := time.Now()
-	raw, err := c.query(ctx, server, queryDomain)
+	line := BuildQuery(server, queryDomain)
+	raw, err := c.query(ctx, server, line)
 	h := Hop{
 		Server:  server,
-		Query:   BuildQuery(server, queryDomain),
+		Query:   line,
 		Raw:     raw,
 		Latency: time.Since(start),
 		Err:     err,
@@ -155,10 +156,11 @@ func (c *Client) LookupIP(ctx context.Context, addr netip.Addr) (*Result, error)
 // chain can still read "refer:") and IPFields (the actual payload).
 func (c *Client) ipHop(ctx context.Context, server, query string) Hop {
 	start := time.Now()
-	raw, err := c.query(ctx, server, query)
+	line := BuildIPQuery(server, query)
+	raw, err := c.query(ctx, server, line)
 	h := Hop{
 		Server:  server,
-		Query:   BuildQuery(server, query),
+		Query:   line,
 		Raw:     raw,
 		Latency: time.Since(start),
 		Err:     err,
@@ -203,10 +205,11 @@ func (c *Client) LookupASN(ctx context.Context, asn uint32) (*Result, error) {
 // payload), mirroring ipHop.
 func (c *Client) asnHop(ctx context.Context, server, query string) Hop {
 	start := time.Now()
-	raw, err := c.query(ctx, server, query)
+	line := BuildQuery(server, query)
+	raw, err := c.query(ctx, server, line)
 	h := Hop{
 		Server:  server,
-		Query:   BuildQuery(server, query),
+		Query:   line,
 		Raw:     raw,
 		Latency: time.Since(start),
 		Err:     err,

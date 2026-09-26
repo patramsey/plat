@@ -85,10 +85,11 @@ func (c *Client) hopDeadline(ctx context.Context) time.Time {
 }
 
 // query performs one TCP round-trip: dial server (appending the default
-// port 43 if server doesn't already specify one), send the quirk-adjusted
-// query for domain, and read the response to EOF. Bounded to 1 MiB to
+// port 43 if server doesn't already specify one), send line -- already
+// quirk-adjusted by the caller via BuildQuery or BuildIPQuery -- and read
+// the response to EOF. Bounded to 1 MiB to
 // defend against a runaway or hostile server.
-func (c *Client) query(ctx context.Context, server, domain string) (string, error) {
+func (c *Client) query(ctx context.Context, server, line string) (string, error) {
 	if c.Limiter != nil {
 		// The wait is credited back to the chain budget before the hop
 		// deadline is computed below, so a slot handed out later than
@@ -121,7 +122,7 @@ func (c *Client) query(ctx context.Context, server, domain string) (string, erro
 		_ = conn.SetDeadline(deadline)
 	}
 
-	q := BuildQuery(server, domain) + "\r\n"
+	q := line + "\r\n"
 	if _, err := conn.Write([]byte(q)); err != nil {
 		return "", fmt.Errorf("whois: writing query to %s: %w", addr, err)
 	}

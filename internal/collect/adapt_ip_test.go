@@ -543,3 +543,15 @@ func TestParentHandleFromWHOIS(t *testing.T) {
 		})
 	}
 }
+
+// ARIN's WHOIS says "Reassigned" where its RDAP says "ASSIGNMENT" for the
+// same network (verified on NET-12-0-0-0-2, NET-24-0-0-0-2 and
+// NET-199-0-0-0-2), so every reassigned ARIN block raised a type
+// conflict between two sources that agree.
+func TestFromIPHop_ARINReassignedMatchesRDAPAssignment(t *testing.T) {
+	hop := whois.Hop{IPFields: &parse.IPFields{CommonFields: parse.CommonFields{Handle: "NET-12-0-0-0-2"}, NetType: "Reassigned"}}
+	sr := fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS}, hop)
+	if sr.Type != "ASSIGNMENT" {
+		t.Errorf("Type = %q, want ASSIGNMENT (ARIN RDAP's name for the same type)", sr.Type)
+	}
+}

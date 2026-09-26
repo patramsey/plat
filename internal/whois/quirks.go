@@ -24,12 +24,31 @@ var quirks = []Quirk{
 // to send to server for domain, applying any matching quirk. server may
 // be a bare hostname or a host:port pair (quirk matching strips the port).
 func BuildQuery(server, domain string) string {
+	return applyQuirks(quirks, server, domain)
+}
+
+// ipQuirks applies to IP-address queries only. A bare ARIN query for an
+// address inside nested networks returns a one-line-per-network summary
+// with no key/value record at all; "n + " asks for the full record of
+// every matching network (parse.ParseIP then keeps the most specific).
+// "n" restricts the query to networks, which is why this cannot live in
+// quirks: ARIN's ASN queries must stay bare.
+var ipQuirks = []Quirk{
+	{HostSuffix: "arin.net", Prefix: "n + "},
+}
+
+// BuildIPQuery is BuildQuery for an IP-address query.
+func BuildIPQuery(server, addr string) string {
+	return applyQuirks(ipQuirks, server, addr)
+}
+
+func applyQuirks(table []Quirk, server, domain string) string {
 	host := server
 	if h, _, err := net.SplitHostPort(server); err == nil {
 		host = h
 	}
 	host = strings.ToLower(host)
-	for _, q := range quirks {
+	for _, q := range table {
 		// A label-boundary match, not a raw character-suffix match: a
 		// host merely ending in the same characters as a known registry
 		// host (e.g. "evildenic.de") isn't actually that registry's
