@@ -415,6 +415,7 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 		domains = names
 	}
 
+	ui = applyNoColor(ui, opts.NoColor)
 	format, err := render.Select(opts.Output, render.IsTerminal(os.Stdout), effectiveNoColor(ui, opts.NoColor))
 	if err != nil {
 		return usageError{err}
@@ -1088,7 +1089,7 @@ func reportLookupError(stderr io.Writer, format render.Format, domainName string
 		_ = machine.EncodeError(stderr, domainName, err)
 		return
 	}
-	if format == render.FormatHuman {
+	if format == render.FormatHuman && !ui.NoColor {
 		th := human.NewTheme(ui.Dark)
 		style := th.Err
 		if deriveOutcome(sources) == 1 {
@@ -1242,4 +1243,21 @@ func exitCode(err error, stderr io.Writer) int {
 	default:
 		return 3
 	}
+}
+
+// applyNoColor gives --no-color the effect NO_COLOR has. NO_COLOR is read
+// by colorprofile.Detect in main(), so it already lowers ui.Profile; the
+// flag is only known here, and reached nothing but render.Select -- so an
+// explicit -o human still rendered in colour. It lowers the profile to
+// ASCII (styles without colour, as for NO_COLOR) and sets ui.NoColor,
+// which the stderr error line checks.
+func applyNoColor(ui uiConfig, flag bool) uiConfig {
+	if !flag {
+		return ui
+	}
+	ui.NoColor = true
+	if ui.Profile > colorprofile.Ascii {
+		ui.Profile = colorprofile.Ascii
+	}
+	return ui
 }

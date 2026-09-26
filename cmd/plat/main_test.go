@@ -2086,3 +2086,44 @@ func TestHelpExplainsToolAndProvenance(t *testing.T) {
 		t.Errorf("--help output has no json example; got:\n%s", out)
 	}
 }
+
+// --no-color is documented as having the same effect as NO_COLOR, but
+// only NO_COLOR lowered the detected colour profile (colorprofile.Detect
+// reads the environment). With an explicit -o human, the flag reached
+// the renderer choice and nothing else, so a colour terminal still got
+// ANSI. applyNoColor makes the flag lower the profile the same way.
+func TestRunLookupPool_NoColorFlagStripsANSIOnAColorTerminal(t *testing.T) {
+	t.Setenv("CLICOLOR_FORCE", "")
+
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write(fixture)
+	}))
+	defer rdapSrv.Close()
+
+	opts := lookupOptions{NoFollow: true, Concurrency: 1, NoColor: true}
+	client := newTestClient(t, bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL}), opts, []model.SourceID{model.SourceRegistryRDAP})
+
+	ui := applyNoColor(uiConfig{Profile: colorprofile.TrueColor, Width: 80}, opts.NoColor)
+	var stdout, stderr bytes.Buffer
+	if err := runLookupPool(context.Background(), &stdout, &stderr, []string{"example.com"}, opts, render.FormatHuman, ui, client); err != nil {
+		t.Fatalf("runLookupPool: %v\nstderr:\n%s", err, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "\x1b[") {
+		t.Errorf("ANSI present with --no-color on a colour terminal:\n%s", stdout.String())
+	}
+	if !ui.NoColor {
+		t.Error("ui.NoColor = false after applyNoColor(..., true); the stderr error line checks it")
+	}
+}
+
+func TestApplyNoColor_LeavesColourAloneWithoutTheFlag(t *testing.T) {
+	ui := applyNoColor(uiConfig{Profile: colorprofile.TrueColor}, false)
+	if ui.Profile != colorprofile.TrueColor || ui.NoColor {
+		t.Errorf("applyNoColor(false) = %+v, want the input unchanged", ui)
+	}
+}
