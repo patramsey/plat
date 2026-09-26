@@ -1089,3 +1089,28 @@ func TestMerge_RedactionNoticeForAdapterShapedSource(t *testing.T) {
 		t.Errorf("Redacted = %+v, want %+v", rec.Redacted, want)
 	}
 }
+
+// FromRDAP prefers a nameserver's unicodeName; WHOIS always gives the
+// A-label. normalizeNS only lowercased and stripped the dot, so the same
+// host arrived as two nameservers, neither source was credited, and a
+// nameservers conflict was raised. The domain field already folds to
+// punycode for comparison (normalizeDomain); nameservers now do too,
+// keeping the first-seen spelling for display.
+func TestMerge_NameserverUnicodeAndPunycodeAreOneHost(t *testing.T) {
+	rdapSrc := sr(model.SourceRegistryRDAP, true)
+	rdapSrc.Nameservers = []string{"ns1.bücher.de"}
+	whoisSrc := sr(model.SourceRegistryWHOIS, true)
+	whoisSrc.Nameservers = []string{"NS1.XN--BCHER-KVA.DE."}
+
+	rec := Merge([]source.SourceRecord{rdapSrc, whoisSrc})
+
+	if want := []string{"ns1.bücher.de"}; !slices.Equal(rec.Nameservers.Value, want) {
+		t.Errorf("Nameservers = %v, want %v", rec.Nameservers.Value, want)
+	}
+	if want := []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}; !slices.Equal(rec.Nameservers.Sources, want) {
+		t.Errorf("Nameservers.Sources = %v, want %v", rec.Nameservers.Sources, want)
+	}
+	if len(rec.Conflicts) != 0 {
+		t.Errorf("Conflicts = %+v, want none", rec.Conflicts)
+	}
+}

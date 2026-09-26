@@ -357,6 +357,18 @@ func normalizeNS(ns string) string {
 	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(ns), "."))
 }
 
+// foldNS is normalizeNS plus punycode folding, the nameserver counterpart
+// of normalizeDomain. FromRDAP prefers a nameserver's unicodeName while
+// WHOIS always gives the A-label, so without folding the same host
+// counted as two nameservers and raised a conflict.
+func foldNS(ns string) string {
+	n := normalizeNS(ns)
+	if ascii, err := idna.Lookup.ToASCII(n); err == nil {
+		return ascii
+	}
+	return n
+}
+
 // nameservers computes the union of normalized nameserver names across all
 // present sources. A Conflict is recorded if two present sources' sets
 // (after normalization) are unequal — the merged value stays the union
@@ -377,6 +389,7 @@ func normalizeNS(ns string) string {
 // disappear.
 func (m *mergeState) nameservers(present []source.SourceRecord) model.Field[[]string] {
 	unionSeen := map[string]bool{}
+	display := map[string]string{} // folded name -> first-seen spelling
 	var order []string
 	var sourceOrder []model.SourceID
 	sourceSets := map[model.SourceID]map[string]bool{}
@@ -388,10 +401,11 @@ func (m *mergeState) nameservers(present []source.SourceRecord) model.Field[[]st
 		sourceOrder = append(sourceOrder, s.Meta.Source)
 		set := map[string]bool{}
 		for _, ns := range s.Nameservers {
-			n := normalizeNS(ns)
+			n := foldNS(ns)
 			set[n] = true
 			if !unionSeen[n] {
 				unionSeen[n] = true
+				display[n] = normalizeNS(ns)
 				order = append(order, n)
 			}
 		}
@@ -433,6 +447,9 @@ func (m *mergeState) nameservers(present []source.SourceRecord) model.Field[[]st
 	// Values are already normalized (lowercased, trailing dot stripped)
 	// before comparison, so a lexical sort here is purely a presentation
 	// choice with no semantic meaning lost.
+	for i, n := range order {
+		order[i] = display[n]
+	}
 	sort.Strings(order)
 	return model.Field[[]string]{Value: order, Sources: agreeing}
 }
