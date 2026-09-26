@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/net/idna"
 	"io"
 	"net/netip"
 	"os"
@@ -728,6 +729,13 @@ func diffNameMatches(snap machine.Snapshot, q domain.Query) bool {
 		end, errE := netip.ParseAddr(snap.IPEnd)
 		if errS == nil && errE == nil {
 			return q.IP.Compare(start) >= 0 && q.IP.Compare(end) <= 0
+		}
+	}
+	if q.Kind == domain.KindDomain {
+		// A snapshot's domain name is RDAP's unicodeName when the registry
+		// publishes one; the query is punycode. Compare A-labels.
+		if ascii, err := idna.Lookup.ToASCII(strings.ToLower(snap.Name)); err == nil {
+			return strings.EqualFold(ascii, q.Name.Punycode)
 		}
 	}
 	return strings.EqualFold(snap.Name, diffQueryName(q))
