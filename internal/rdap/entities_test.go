@@ -24,6 +24,21 @@ func TestVCardArrayUnmarshal(t *testing.T) {
 			wantFN: "Abuse Team", wantEmail: "abuse@example.example", wantTel: "+1.5555550100",
 		},
 		{
+			name:    "voice tel wins over an earlier untyped one",
+			json:    `["vcard",[["tel",{},"text","+1 untyped"],["tel",{"type":["work","voice"]},"text","+1 voice"]]]`,
+			wantTel: "+1 voice",
+		},
+		{
+			name:    "fax-only tel is never the phone",
+			json:    `["vcard",[["tel",{"type":"fax"},"text","+1 fax"]]]`,
+			wantTel: "",
+		},
+		{
+			name:    "untyped tel is kept when there is no voice one",
+			json:    `["vcard",[["tel",{"type":"fax"},"text","+1 fax"],["tel",{},"text","+1 untyped"]]]`,
+			wantTel: "+1 untyped",
+		},
+		{
 			name: "missing entirely (zero value)",
 			json: `null`,
 		},

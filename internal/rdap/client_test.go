@@ -797,3 +797,54 @@ func TestIP_WrongObjectClassIsMalformed(t *testing.T) {
 		t.Error("IPNetwork must stay nil when the class check fails")
 	}
 }
+
+// serveGolden serves a recorded RDAP document from testdata/rdap.
+func serveGolden(t *testing.T, name string) string {
+	t.Helper()
+	body, err := os.ReadFile("../../testdata/rdap/" + name)
+	if err != nil {
+		t.Fatalf("reading golden: %v", err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL
+}
+
+// RIPE gives its mnt-by maintainers the "registrant" role alongside the
+// owning organization, and lists entities sorted by handle -- so for
+// 80.128.0.1 the maintainer DTAG-NIC comes before ORG-DTAG1-RIPE. Taking
+// the first registrant reported "DTAG-NIC" as the network's owner.
+func TestClient_IP_RIPERegistrantPrefersOrganization(t *testing.T) {
+	url := serveGolden(t, "ripe-80.128.0.1.json")
+	res, err := (&Client{}).IP(context.Background(), url, netip.MustParseAddr("80.128.0.1"))
+	if err != nil {
+		t.Fatalf("IP: %v", err)
+	}
+	reg, ok := res.IPNetwork.RegistrantEntity()
+	if !ok {
+		t.Fatal("RegistrantEntity() ok = false, want true")
+	}
+	if reg.VCardArray.FullName != "Deutsche Telekom AG" {
+		t.Errorf("RegistrantEntity().FullName = %q, want Deutsche Telekom AG", reg.VCardArray.FullName)
+	}
+}
+
+// RIPE's abuse entity for AS3333 lists a voice number and then a fax
+// number. Keeping the last tel reported the fax as the abuse phone.
+func TestClient_ASN_AbuseTelPrefersVoiceOverFax(t *testing.T) {
+	url := serveGolden(t, "ripe-as3333.json")
+	res, err := (&Client{}).ASN(context.Background(), url, 3333)
+	if err != nil {
+		t.Fatalf("ASN: %v", err)
+	}
+	abuse, ok := res.ASN.AbuseEntity()
+	if !ok {
+		t.Fatal("AbuseEntity() ok = false, want true")
+	}
+	if abuse.VCardArray.Tel != "+31 20 535 4444" {
+		t.Errorf("AbuseEntity().Tel = %q, want the voice number +31 20 535 4444", abuse.VCardArray.Tel)
+	}
+}
