@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -854,9 +855,9 @@ func TestClient_ASN_AbuseTelPrefersVoiceOverFax(t *testing.T) {
 // exceeded" -- the rate limit and its body lost, so -v showed a generic
 // timeout. It now returns the 429 at once.
 func TestClientDomain_429WithRetryAfterPastDeadlineReturnsTheRateLimit(t *testing.T) {
-	var hits int
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits++
+		hits.Add(1)
 		w.Header().Set("Retry-After", "3600")
 		w.WriteHeader(http.StatusTooManyRequests)
 	}))
@@ -875,8 +876,8 @@ func TestClientDomain_429WithRetryAfterPastDeadlineReturnsTheRateLimit(t *testin
 	if result == nil || result.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("result = %+v, want StatusCode 429", result)
 	}
-	if hits != 1 {
-		t.Errorf("hits = %d, want 1 (no retry)", hits)
+	if hits.Load() != 1 {
+		t.Errorf("hits = %d, want 1 (no retry)", hits.Load())
 	}
 }
 
@@ -887,5 +888,61 @@ func TestRetryAfter_HugeValueDoesNotOverflow(t *testing.T) {
 	h.Set("Retry-After", "9223372037")
 	if d := retryAfter(h); d <= 0 {
 		t.Errorf("retryAfter(9223372037) = %v, want a positive duration", d)
+	}
+}
+
+// A caller cancelling while the client waits out a 429's Retry-After gets
+// its own cancellation back, not a 429 and not a retry.
+func TestClientDomain_429WaitAbandonedWhenContextCancelled(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Retry-After", "2")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(50*time.Millisecond, cancel)
+	_, err := (&Client{Timeout: 5 * time.Second}).Domain(ctx, srv.URL, "EXAMPLE.COM")
+
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("err = %v, want context.Canceled", err)
+	}
+	if hits.Load() != 1 {
+		t.Errorf("hits = %d, want 1 (the retry must not be sent)", hits.Load())
+	}
+}
+
+// The one polite retry can itself fail at the transport level; that error
+// is returned rather than a stale 429.
+func TestClientDomain_429RetryTransportErrorIsReturned(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hits.Add(1) == 1 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		conn, _, err := w.(http.Hijacker).Hijack()
+		if err == nil {
+			_ = conn.Close()
+		}
+	}))
+	defer srv.Close()
+
+	result, err := (&Client{Timeout: 5 * time.Second}).Domain(context.Background(), srv.URL, "EXAMPLE.COM")
+
+	if err == nil {
+		t.Fatal("err = nil, want the retry's transport error")
+	}
+	if result != nil {
+		t.Errorf("result = %+v, want nil alongside a transport error", result)
+	}
+	// At least 2, not exactly: net/http's transport itself retries an
+	// idempotent GET once when a reused connection closes before any
+	// response, so the server can see a third request.
+	if hits.Load() < 2 {
+		t.Errorf("hits = %d, want the retry to have been sent", hits.Load())
 	}
 }

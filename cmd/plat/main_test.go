@@ -2167,3 +2167,30 @@ func TestRunLookupPool_FailedNamesLeaveNoBlankLines(t *testing.T) {
 		})
 	}
 }
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("stdout closed") }
+
+// A write to stdout failing mid-run (a closed pipe) is returned, not
+// swallowed into an exit code that claims the lookups succeeded.
+func TestRunLookupPool_StdoutWriteErrorIsReturned(t *testing.T) {
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write(fixture)
+	}))
+	defer rdapSrv.Close()
+
+	opts := lookupOptions{NoFollow: true, Concurrency: 1}
+	client := newTestClient(t, bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL}), opts, []model.SourceID{model.SourceRegistryRDAP})
+
+	var stderr bytes.Buffer
+	err = runLookupPool(context.Background(), failingWriter{}, &stderr, []string{"example.com"}, opts, render.FormatPlain, uiConfig{}, client)
+	if err == nil || !strings.Contains(err.Error(), "stdout closed") {
+		t.Errorf("err = %v, want the stdout write error", err)
+	}
+}
