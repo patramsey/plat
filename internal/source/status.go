@@ -51,6 +51,9 @@ var canonicalEPPStatus = map[string]string{
 	"redemptionperiod":         "redemptionPeriod",
 	"inactive":                 "inactive",
 	"ok":                       "ok",
+	// RFC 8056 section 2: RDAP's "active" is EPP's "ok". Without this an
+	// unlocked domain answered by RDAP and WHOIS listed both.
+	"active": "ok",
 }
 
 // NormalizeEPPStatus canonicalizes a domain status string from either RDAP

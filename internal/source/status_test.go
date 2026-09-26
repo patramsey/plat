@@ -12,8 +12,8 @@ func TestNormalizeEPPStatus(t *testing.T) {
 		{"already camelCase", "clientTransferProhibited", "clientTransferProhibited"},
 		{"space separated all caps", "CLIENT TRANSFER PROHIBITED", "clientTransferProhibited"},
 		{"space separated, different words", "client delete prohibited", "clientDeleteProhibited"},
-		{"single lowercase word", "active", "active"},
-		{"single uppercase word", "ACTIVE", "active"},
+		{"single lowercase word", "published", "published"},
+		{"single uppercase word", "CONNECT", "connect"},
 		{"already camelCase, server prefix", "serverDeleteProhibited", "serverDeleteProhibited"},
 		{"single word, no case ambiguity", "connect", "connect"},
 		{"two-letter lowercase", "ok", "ok"},
@@ -42,13 +42,24 @@ func TestNormalizeEPPStatus_CanonicalisesKnownCodesCaseInsensitively(t *testing.
 		{"pendingdelete", "pendingDelete"},
 		{"autorenewperiod", "autoRenewPeriod"},
 		{"ok", "ok"},
-		{"active", "active"},
+		{"active", "ok"}, // RFC 8056: RDAP "active" is EPP "ok"
 		// Not an EPP code: today's behaviour is preserved untouched.
 		{"connect", "connect"},
 		{"Sponsoring registrar change forbidden", "sponsoringRegistrarChangeForbidden"},
 	} {
 		if got := NormalizeEPPStatus(tt.in); got != tt.want {
 			t.Errorf("NormalizeEPPStatus(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+// RFC 8056 maps RDAP's "active" to EPP's "ok". Without the mapping, an
+// unlocked domain answered by both RDAP and WHOIS showed
+// "Status: active · ok" -- one status, listed twice.
+func TestNormalizeEPPStatus_RDAPActiveIsEPPOk(t *testing.T) {
+	for _, in := range []string{"active", "Active", "ACTIVE"} {
+		if got := NormalizeEPPStatus(in); got != "ok" {
+			t.Errorf("NormalizeEPPStatus(%q) = %q, want ok", in, got)
 		}
 	}
 }
