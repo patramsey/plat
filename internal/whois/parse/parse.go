@@ -66,6 +66,8 @@ var defaultSynonyms = map[string]string{
 	"name server":                            fNameservers,
 	"name servers":                           fNameservers,
 	"domain nameservers":                     fNameservers,
+	"sponsoring registrar":                   fRegistrar, // CNNIC (.cn)
+	"registration time":                      fCreated,   // CNNIC (.cn)
 	"nserver":                                fNameservers,
 	"nameservers":                            fNameservers,
 	"state":                                  fStatus,      // .jp third-level records, .ru, .se
@@ -332,7 +334,11 @@ func tokenizeIndent(raw string) []kvPair {
 		}
 
 		section = ""
-		if strings.HasSuffix(content, ":") {
+		// .it writes its headers with no colon at all ("Registrar",
+		// "Nameservers"). A colon-less line outside a section is taken as
+		// a header too; if nothing indented follows it, the next line
+		// simply ends the empty section.
+		if strings.HasSuffix(content, ":") || !strings.Contains(content, ":") {
 			section = strings.ToLower(strings.TrimSuffix(content, ":"))
 			sectionIndent = indent
 			continue
@@ -484,6 +490,13 @@ func Parse(raw, tld string) Fields {
 				f.Expires = ParseDate(p.val)
 			}
 		}
+	}
+	// DNS Belgium answers an unregistered name with "Status: AVAILABLE"
+	// (and a registered one with "NOT AVAILABLE"). Matched on the exact
+	// status value rather than as a marker in the raw text, where
+	// "available" is a substring of the registered answer.
+	if slices.ContainsFunc(f.Statuses, func(s string) bool { return strings.EqualFold(strings.TrimSpace(s), "available") }) {
+		f.NotFound = true
 	}
 	return f
 }

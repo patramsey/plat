@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -22,10 +23,13 @@ var templateManifest = []struct {
 	{tld: "uk", fixture: "nominet-uk-recorded.txt", wantDomain: "bbc.co.uk", wantNSCount: 8},
 	{tld: "eu", fixture: "eurid-eu-recorded.txt", wantDomain: "europa.eu", wantNSCount: 12},
 	{tld: "fr", fixture: "afnic-fr-example.txt", wantDomain: "example.fr", wantNSCount: 2},
-	{tld: "nl", fixture: "sidn-nl-example.txt", wantDomain: "example.nl", wantNSCount: 2},
+	{tld: "nl", fixture: "sidn-nl-google-recorded.txt", wantDomain: "google.nl", wantNSCount: 4},
 	{tld: "cz", fixture: "cznic-cz-seznam-recorded.txt", wantDomain: "seznam.cz", wantNSCount: 2},
 	{tld: "br", fixture: "registrobr-br-google-recorded.txt", wantDomain: "google.com.br", wantNSCount: 4},
 	{tld: "mx", fixture: "nicmx-mx-recorded.txt", wantDomain: "nic.mx", wantNSCount: 3},
+	{tld: "be", fixture: "dnsbe-be-recorded.txt", wantDomain: "dns.be", wantNSCount: 4},
+	{tld: "it", fixture: "nicit-it-google-recorded.txt", wantDomain: "google.it", wantNSCount: 4},
+	{tld: "at", fixture: "nicat-at-recorded.txt", wantDomain: "nic.at", wantNSCount: 5},
 }
 
 func TestTemplateManifest_EveryRegisteredTemplateHasAFixture(t *testing.T) {
@@ -171,15 +175,24 @@ func TestParse_FRSynonymOverride(t *testing.T) {
 	}
 }
 
-func TestParse_NLIndentedNameserverBlock(t *testing.T) {
-	raw := loadFixture(t, "sidn-nl-example.txt")
-	f := Parse(raw, "nl")
-
-	if f.Domain != "example.nl" {
-		t.Errorf("Domain = %q, want example.nl", f.Domain)
+// Real SIDN output puts the registrar and nameservers on indented lines
+// under "Registrar:" and "Domain nameservers:" headers. The kv tokenizer
+// skipped both, so google.nl had no registrar or nameservers. The
+// fixture this test used before was written with flat
+// "Domain nameservers: x" lines SIDN never sends, which is how that hid.
+func TestParse_NLIndentedSections(t *testing.T) {
+	f := Parse(loadFixture(t, "sidn-nl-google-recorded.txt"), "nl")
+	if f.Domain != "google.nl" {
+		t.Errorf("Domain = %q, want google.nl", f.Domain)
 	}
-	wantNS := []string{"ns1.example.nl", "ns2.example.nl"}
-	if len(f.Nameservers) != len(wantNS) {
+	if f.Registrar != "MarkMonitor Inc." {
+		t.Errorf("Registrar = %q, want MarkMonitor Inc. (the first line under Registrar:, not its address)", f.Registrar)
+	}
+	wantNS := []string{"ns1.google.com", "ns2.google.com", "ns3.google.com", "ns4.google.com"}
+	if !slices.Equal(f.Nameservers, wantNS) {
 		t.Errorf("Nameservers = %v, want %v", f.Nameservers, wantNS)
+	}
+	if f.Created.Raw != "1999-05-27" || f.Updated.Raw != "2025-04-18" {
+		t.Errorf("Created/Updated = %q/%q, want 1999-05-27/2025-04-18", f.Created.Raw, f.Updated.Raw)
 	}
 }
