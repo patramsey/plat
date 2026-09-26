@@ -1114,3 +1114,37 @@ func TestMerge_NameserverUnicodeAndPunycodeAreOneHost(t *testing.T) {
 		t.Errorf("Conflicts = %+v, want none", rec.Conflicts)
 	}
 }
+
+// registro.br's WHOIS gives a local date; its RDAP a UTC timestamp.
+// 1999-05-19T00:06:55Z is 21:06 on 18 May in Brazil, so the two agree,
+// but comparing "19990518" as midnight UTC put them 24h06m apart -- just
+// past the 24h skew -- and raised a conflict on google.com.br.
+func TestMerge_DateOnlyValueAgreesWithTimestampFromTheSameLocalDay(t *testing.T) {
+	rdapSrc := sr(model.SourceRegistryRDAP, true)
+	rdapSrc.Created = model.TimeValue{Time: time.Date(1999, 5, 19, 0, 6, 55, 0, time.UTC), Raw: "1999-05-19T00:06:55Z", Parsed: true}
+	whoisSrc := sr(model.SourceRegistryWHOIS, true)
+	whoisSrc.Created = model.TimeValue{Time: time.Date(1999, 5, 18, 0, 0, 0, 0, time.UTC), Raw: "19990518 #162310", Parsed: true}
+
+	rec := Merge([]source.SourceRecord{rdapSrc, whoisSrc})
+
+	if len(rec.Conflicts) != 0 {
+		t.Errorf("Conflicts = %+v, want none", rec.Conflicts)
+	}
+	if want := []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS}; !slices.Equal(rec.Created.Sources, want) {
+		t.Errorf("Created.Sources = %v, want %v", rec.Created.Sources, want)
+	}
+}
+
+// The wider tolerance covers one local day, not any gap.
+func TestMerge_DateOnlyValueTwoDaysOffStillConflicts(t *testing.T) {
+	rdapSrc := sr(model.SourceRegistryRDAP, true)
+	rdapSrc.Created = model.TimeValue{Time: time.Date(1999, 5, 20, 12, 0, 0, 0, time.UTC), Raw: "1999-05-20T12:00:00Z", Parsed: true}
+	whoisSrc := sr(model.SourceRegistryWHOIS, true)
+	whoisSrc.Created = model.TimeValue{Time: time.Date(1999, 5, 18, 0, 0, 0, 0, time.UTC), Raw: "1999-05-18", Parsed: true}
+
+	rec := Merge([]source.SourceRecord{rdapSrc, whoisSrc})
+
+	if len(rec.Conflicts) != 1 {
+		t.Errorf("Conflicts = %+v, want one created conflict (60h apart)", rec.Conflicts)
+	}
+}

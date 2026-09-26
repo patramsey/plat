@@ -13,6 +13,28 @@ import (
 
 const clockSkew = 24 * time.Hour
 
+// dateOnlySkew replaces clockSkew when either value is a bare date. A
+// date with no time of day names a local calendar day in an unknown
+// zone, and across UTC-12..UTC+14 that day runs from 14h before to 36h
+// after its midnight UTC. registro.br's "19990518" and its RDAP's
+// 1999-05-19T00:06:55Z (21:06 on 18 May in Brazil) are 24h06m apart.
+const dateOnlySkew = 36 * time.Hour
+
+// withinSkew reports whether two parsed times agree: within clockSkew,
+// or within dateOnlySkew when either was written as a bare date -- a Raw
+// with no ":" carries no time of day.
+func withinSkew(a, b model.TimeValue) bool {
+	d := a.Time.Sub(b.Time)
+	if d < 0 {
+		d = -d
+	}
+	limit := clockSkew
+	if !strings.Contains(a.Raw, ":") || !strings.Contains(b.Raw, ":") {
+		limit = dateOnlySkew
+	}
+	return d <= limit
+}
+
 // Merge combines per-source records into one unified, provenance-
 // annotated Record. It is a pure function — no I/O — and never errors: a
 // source with no usable data simply doesn't contribute to any field.
@@ -265,7 +287,7 @@ func timeCandidates(present []source.SourceRecord, get func(source.SourceRecord)
 
 // timestamp picks the first present (non-empty Raw) candidate as the
 // winner (in precedence order), regardless of whether it parsed. If any
-// pair of present+Parsed candidates differ by more than clockSkew, records
+// pair of present+Parsed candidates disagree (see withinSkew), records
 // one Conflict listing every present candidate's Raw value.
 //
 // Expires is a deliberate exception: on a genuine conflict, the winner
@@ -277,7 +299,7 @@ func timeCandidates(present []source.SourceRecord, get func(source.SourceRecord)
 // no equivalent "safer" direction for e.g. a registrar name or a creation
 // date; an earlier Created or Updated isn't more trustworthy, just older.
 //
-// Sources only includes candidates within clockSkew of the (possibly
+// Sources only includes candidates within skew of the (possibly
 // overridden) winner -- matching scalar()'s convention that Sources means
 // "agrees with the displayed value", not merely "reported something". A
 // candidate whose parsed time genuinely disagrees is excluded and only
@@ -305,11 +327,7 @@ func (m *mergeState) timestamp(field string, cands []timeCandidate) model.Field[
 	conflictFound := false
 	for i := 0; i < len(parsed); i++ {
 		for j := i + 1; j < len(parsed); j++ {
-			d := parsed[i].Time.Sub(parsed[j].Time)
-			if d < 0 {
-				d = -d
-			}
-			if d > clockSkew {
+			if !withinSkew(parsed[i].TimeValue, parsed[j].TimeValue) {
 				conflictFound = true
 			}
 		}
@@ -339,14 +357,8 @@ func (m *mergeState) timestamp(field string, cands []timeCandidate) model.Field[
 		if c.Raw == "" {
 			continue
 		}
-		if winner.Parsed && c.Parsed {
-			d := c.Time.Sub(winner.Time)
-			if d < 0 {
-				d = -d
-			}
-			if d > clockSkew {
-				continue
-			}
+		if winner.Parsed && c.Parsed && !withinSkew(c.TimeValue, winner.TimeValue) {
+			continue
 		}
 		f.Sources = append(f.Sources, c.Source)
 	}
