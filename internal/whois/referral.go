@@ -3,8 +3,10 @@ package whois
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/netip"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/patramsey/plat/internal/domain"
@@ -109,7 +111,11 @@ func (c *Client) Lookup(ctx context.Context, name domain.Name) (*Result, error) 
 		registryHop := c.hop(ctx, registry, name.Punycode, name.TLD)
 		result.Hops = append(result.Hops, registryHop)
 
-		if registryHop.Err == nil && registryHop.Fields.RegistrarWHOISServer != "" {
+		// A registry that names itself as the registrar server (.au's
+		// whois.auda.org.au) would be queried twice and its answer
+		// counted again as registrar-whois.
+		if registryHop.Err == nil && registryHop.Fields.RegistrarWHOISServer != "" &&
+			!sameWHOISServer(registryHop.Fields.RegistrarWHOISServer, registry) {
 			// Same reasoning as the IANA hop above: the registrar's own
 			// WHOIS server generally replies in plain key:value text
 			// regardless of the queried domain's TLD dialect (e.g.
@@ -220,4 +226,19 @@ func (c *Client) asnHop(ctx context.Context, server, query string) Hop {
 		h.ASNFields = &asnf
 	}
 	return h
+}
+
+// sameWHOISServer reports whether a and b name the same WHOIS server:
+// same host (case-insensitive, trailing dot ignored) on the same port,
+// with a missing port meaning 43.
+func sameWHOISServer(a, b string) bool {
+	return serverKey(a) == serverKey(b)
+}
+
+func serverKey(s string) string {
+	host, port, err := net.SplitHostPort(s)
+	if err != nil {
+		host, port = s, "43"
+	}
+	return strings.ToLower(strings.TrimSuffix(host, ".")) + ":" + port
 }
