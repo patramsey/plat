@@ -61,22 +61,6 @@ func fromASNRDAP(meta model.SourceResult, resp *rdap.ASNResponse) source.ASNSour
 	if regEntity, ok := resp.RegistrantEntity(); ok {
 		if source.IsRedactedPlaceholder(regEntity.VCardArray.FullName) {
 			sr.RedactedFields[model.FieldOrgName] = true
-			// RedactedFields alone is not enough to surface a redaction
-			// notice: mergeState.scalar (internal/merge/merge.go, shared
-			// with the domain and IP paths and not touched by this fix)
-			// checks c.Redacted only after an empty-value guard that
-			// fires first for every ASN redaction, since OrgName is
-			// deliberately left empty above -- so a RedactedFields-only
-			// signal is silently dropped before the record ever sees it.
-			// Appending directly to sr.Redactions here bypasses that
-			// broken path entirely and is what merge.MergeASN
-			// (internal/merge/asn.go) actually surfaces as
-			// ASNRecord.Redacted.
-			sr.Redactions = append(sr.Redactions, model.RedactionNotice{
-				Field:  model.FieldOrgName,
-				Source: meta.Source,
-				Reason: "redacted",
-			})
 		} else {
 			sr.OrgName = regEntity.VCardArray.FullName
 		}

@@ -678,7 +678,7 @@ func TestParse_MultiObjectResponseKeepsTheDomainsOwnValues(t *testing.T) {
 		parsed bool
 	}
 	for _, tt := range []struct {
-		fixture, tld, registrar string
+		fixture, tld, registrar   string
 		created, updated, expires date
 	}{
 		{

@@ -189,14 +189,17 @@ func TestFromASNRDAP_RedactedOrgName_ProducesRedactionNoticeEndToEnd(t *testing.
 	if rec.Org.Name.Value != "Example Holdings LLC" {
 		t.Errorf("Org.Name = %q, want the WHOIS source's value (registry-rdap's was redacted)", rec.Org.Name.Value)
 	}
-	found := false
+	// Exactly one: the adapter once appended its own notice to work
+	// around merge dropping the RedactedFields signal, and fixing the
+	// merge without removing that workaround reported it twice.
+	found := 0
 	for _, notice := range rec.Redacted {
 		if notice.Field == model.FieldOrgName && notice.Source == model.SourceRegistryRDAP {
-			found = true
+			found++
 		}
 	}
-	if !found {
-		t.Errorf("rec.Redacted = %+v, want an org.name notice attributed to registry-rdap", rec.Redacted)
+	if found != 1 {
+		t.Errorf("rec.Redacted = %+v, want exactly one org.name notice attributed to registry-rdap", rec.Redacted)
 	}
 }
 

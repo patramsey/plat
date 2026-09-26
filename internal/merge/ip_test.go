@@ -104,3 +104,20 @@ func TestMergeIP_ZeroSources(t *testing.T) {
 		t.Errorf("expected an empty IPRecord from zero sources, got %+v", rec)
 	}
 }
+
+// See TestMerge_RedactionNoticeForAdapterShapedSource: fromIPRDAP leaves
+// a redacted org name empty and sets only RedactedFields.
+func TestMergeIP_RedactionNoticeForAdapterShapedSource(t *testing.T) {
+	rdapSrc := ipsr(model.SourceRegistryRDAP, true)
+	rdapSrc.Handle = "NET-1"
+	rdapSrc.RedactedFields[model.FieldOrgName] = true
+	whoisSrc := ipsr(model.SourceRegistryWHOIS, true)
+	whoisSrc.OrgName = "Example Org"
+
+	rec := MergeIP([]source.IPSourceRecord{rdapSrc, whoisSrc})
+
+	want := []model.RedactionNotice{{Field: model.FieldOrgName, Source: model.SourceRegistryRDAP, Reason: "redacted"}}
+	if !slices.Equal(rec.Redacted, want) {
+		t.Errorf("Redacted = %+v, want %+v", rec.Redacted, want)
+	}
+}

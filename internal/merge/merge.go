@@ -208,13 +208,17 @@ func (m *mergeState) scalar(field string, cands []scalarCandidate) model.Field[s
 	var winner *scalarCandidate
 	for i := range cands {
 		c := &cands[i]
-		if c.Value == "" {
-			continue
-		}
+		// Redacted is checked before the empty-value guard: every
+		// adapter leaves a redacted field's value empty and sets only
+		// RedactedFields, so checking emptiness first dropped every
+		// real redaction before it could be reported.
 		if c.Redacted {
 			if winner == nil {
 				m.redactions = append(m.redactions, model.RedactionNotice{Field: field, Source: c.Source, Reason: "redacted"})
 			}
+			continue
+		}
+		if c.Value == "" {
 			continue
 		}
 		if winner == nil {
