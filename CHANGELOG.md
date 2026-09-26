@@ -4,6 +4,36 @@ All notable changes to `plat` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- `.uk` domains get WHOIS data again. IANA's record for `.uk` has listed
+  no WHOIS server since 2026-08-04, so plat queried RDAP alone and one
+  slow RDAP response failed the whole lookup with exit `3`. plat now falls
+  back to `whois.nic.uk` when IANA names no server, and never overrides
+  one IANA does name. Nominet has announced that this service ends on
+  9 February 2027; after that the fallback fails like any unreachable
+  source.
+- `.uk` WHOIS responses are parsed. Real Nominet output indents every
+  line, headers included, and the parser recognized a header only at
+  column zero -- so it had never extracted a field from a live `.uk`
+  response. Its test fixture had been written in the shape the parser
+  expected rather than recorded, and is replaced by real recordings.
+  Nominet's `[Tag = X]` registrar suffix and its "No registrar listed"
+  sentence no longer produce false registrar conflicts.
+- A WHOIS failure on an IP or ASN lookup now reports why. A timeout or
+  refused connection at the RIR showed as `no data` under `-v`, with no
+  `error` in `-o json`; domain lookups already reported the reason.
+- Reserved ASNs -- `AS0`, `AS23456`, documentation, private-use, and
+  IANA-reserved ranges -- exit `2` with the reason, and the library
+  returns `ErrInvalidInput`, instead of exit `3` claiming no sources
+  could be reached. An `AS` number beyond 32 bits is reported as out of
+  range rather than as an invalid single-label domain.
+- A name with no RDAP service or WHOIS server listed anywhere (e.g.
+  `.gr`) now says so, instead of "no sources could be reached" -- nothing
+  had been queried, so nothing had failed to answer. When `--source`
+  excluded the only source a name has, the message points at the filter.
+
 ## [0.8.0] - 2026-08-28
 
 ### Added
