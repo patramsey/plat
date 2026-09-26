@@ -7,6 +7,26 @@ follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- A free `.be` name is reported as not registered (exit `1`). DNS Belgium
+  answers with "Status: AVAILABLE", which plat rendered as a registered
+  domain, exiting `0`.
+- A refused WHOIS query is a failed source. SWITCH (`.ch`, `.li`)
+  refuses port-43 queries, and `plat nic.ch` exited `0` with an empty
+  record.
+- ARIN IP lookups inside nested networks -- most ISP space -- get a WHOIS
+  record. A bare query returned only a summary, which counted as an
+  empty success. plat now asks ARIN for full records and keeps the most
+  specific network, matching RDAP; ARIN's "Reassigned" and RDAP's
+  "ASSIGNMENT" no longer conflict.
+- `.nl`, `.be`, `.it`, `.cn` and `.at` WHOIS yield the registrars,
+  nameservers and dates their responses carry.
+- RDAP "active" and WHOIS "ok" are one status, not two (RFC 8056).
+- A nameserver spelled in Unicode by one source and punycode by another
+  counts once, with no conflict.
+- A registry that names itself as the registrar WHOIS server (`.au`) is
+  not queried twice and counted as a second source.
+- A date-only WHOIS value no longer conflicts with an RDAP timestamp from
+  the same local day (`google.com.br`).
 - RIPE-region IP and ASN lookups report the owning organization rather
   than a maintainer. RIPE gives its `mnt-by` maintainers the registrant
   role too, so `80.128.0.1` showed "DTAG-NIC" instead of Deutsche Telekom
