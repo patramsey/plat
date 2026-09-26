@@ -38,3 +38,24 @@ func TestBuildQuery(t *testing.T) {
 		})
 	}
 }
+
+// A bare ARIN query for an address inside nested networks returns only a
+// one-line-per-network summary with no key/value record, which parsed to
+// an empty "ok" source. "n + " asks for the full record of every match.
+// It is for IP queries only: "n" means network, so an ASN or domain
+// query must stay bare.
+func TestBuildIPQuery(t *testing.T) {
+	for _, tt := range []struct{ server, want string }{
+		{"whois.arin.net", "n + 12.0.0.1"},
+		{"whois.arin.net:43", "n + 12.0.0.1"},
+		{"whois.ripe.net", "12.0.0.1"},
+		{"127.0.0.1:54321", "12.0.0.1"},
+	} {
+		if got := BuildIPQuery(tt.server, "12.0.0.1"); got != tt.want {
+			t.Errorf("BuildIPQuery(%q) = %q, want %q", tt.server, got, tt.want)
+		}
+	}
+	if got := BuildQuery("whois.arin.net", "AS15169"); got != "AS15169" {
+		t.Errorf("BuildQuery(arin, AS15169) = %q, want the bare ASN", got)
+	}
+}

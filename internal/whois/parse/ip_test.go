@@ -305,3 +305,39 @@ func TestIPStatusAccumulatesUnconditionally(t *testing.T) {
 		t.Errorf("Statuses = %v, want %v (every status line accumulates, no object gating)", f.Statuses, want)
 	}
 }
+
+// ARIN's "n + " answer for 12.0.0.1 lists every matching network, least
+// specific first: AT&T's /8, then the /22 reassigned to a customer. RDAP
+// answers with the most specific network, so WHOIS must too, or the two
+// sources conflict on every field. A reassigned block's holder is a
+// customer, published as CustName.
+func TestParseIP_ARINMultiMatchTakesMostSpecificNetwork(t *testing.T) {
+	raw, err := os.ReadFile("../../../testdata/whois/arin-12.0.0.1-nplus-recorded.txt")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	f := ParseIP(string(raw))
+	if f.Handle != "NET-12-0-0-0-2" {
+		t.Errorf("Handle = %q, want NET-12-0-0-0-2", f.Handle)
+	}
+	if f.NetRange != "12.0.0.0 - 12.0.3.255" {
+		t.Errorf("NetRange = %q, want 12.0.0.0 - 12.0.3.255", f.NetRange)
+	}
+	if f.OrgName != "AT&T CBB TIER-3 LAB" {
+		t.Errorf("OrgName = %q, want AT&T CBB TIER-3 LAB", f.OrgName)
+	}
+}
+
+func TestMostSpecificNetwork_UnparseableRangesLeaveResponseUnchanged(t *testing.T) {
+	raw := "NetRange: garbage\nNetName: A\n\nNetRange: 1.0.0.0\nNetName: B\n"
+	if got := mostSpecificNetwork(raw); got != raw {
+		t.Errorf("mostSpecificNetwork changed a response with no parseable NetRange:\n%s", got)
+	}
+}
+
+func TestMostSpecificNetwork_SkipsAnUnparseableSection(t *testing.T) {
+	raw := "NetRange: 10.0.0.0 - 10.255.255.255\nNetName: WIDE\n\nNetRange: bad - range\nNetName: BAD\n\nNetRange: 10.0.0.0 - 10.0.0.255\nNetName: NARROW\n"
+	if f := ParseIP(raw); f.NetName != "NARROW" {
+		t.Errorf("NetName = %q, want NARROW", f.NetName)
+	}
+}

@@ -18,53 +18,61 @@ import (
 	"github.com/patramsey/plat/model"
 )
 
-// selfReferringWHOIS starts a fake WHOIS server that answers a whole
-// referral chain from ONE host: the IANA hop is referred back to itself,
-// and so is the registrar hop. That is not a contrivance -- example.com's
-// registry response really does name whois.iana.org as the registrar
-// WHOIS server, so a real single lookup hits one host three times. It is
-// also the only shape that can tell paced from un-paced apart, since a
-// limiter never delays the first query to a given server.
+// selfReferringWHOIS starts fake WHOIS servers in the shape of a real
+// example.com lookup: the IANA host refers the query to a registry host,
+// and the registry names the IANA host again as the registrar WHOIS
+// server (example.com's registry really does name whois.iana.org). So
+// one host, IANA's, is queried twice -- the only shape that can tell
+// paced from un-paced apart, since a limiter never delays the first
+// query to a given server. It returns the IANA host's address.
+//
+// The registry and IANA are separate listeners because a registry that
+// names itself as the registrar server is not followed at all.
 func selfReferringWHOIS(t *testing.T) string {
 	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
+	listen := func() net.Listener {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatalf("listen: %v", err)
+		}
+		t.Cleanup(func() { _ = ln.Close() })
+		return ln
 	}
-	t.Cleanup(func() { _ = ln.Close() })
+	serve := func(ln net.Listener, reply func() string) {
+		go func() {
+			for {
+				conn, err := ln.Accept()
+				if err != nil {
+					return
+				}
+				go func() {
+					defer func() { _ = conn.Close() }()
+					buf := make([]byte, 4096)
+					_, _ = conn.Read(buf)
+					_, _ = conn.Write([]byte(reply()))
+				}()
+			}
+		}()
+	}
+	iana, registry := listen(), listen()
 
 	var mu sync.Mutex
-	var hop int
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			go func() {
-				defer func() { _ = conn.Close() }()
-				buf := make([]byte, 4096)
-				n, _ := conn.Read(buf)
-				_ = strings.TrimRight(string(buf[:n]), "\r\n")
-				mu.Lock()
-				hop++
-				n = hop
-				mu.Unlock()
-				var reply string
-				switch n {
-				case 1: // IANA hop: the TLD's registry server is this host
-					reply = "refer: " + ln.Addr().String() + "\n"
-				case 2: // registry hop: refers the registrar query back here
-					reply = "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n" +
-						"Registrar WHOIS Server: " + ln.Addr().String() + "\n"
-				default: // registrar hop: terminal, no further referral
-					reply = "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
-				}
-				_, _ = conn.Write([]byte(reply))
-			}()
+	var ianaQueries int
+	serve(iana, func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		ianaQueries++
+		if ianaQueries == 1 { // IANA hop: the TLD's registry is the other host
+			return "refer: " + registry.Addr().String() + "\n"
 		}
-	}()
-	return ln.Addr().String()
+		// registrar hop, back on the IANA host: terminal
+		return "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
+	})
+	serve(registry, func() string {
+		return "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n" +
+			"Registrar WHOIS Server: " + iana.Addr().String() + "\n"
+	})
+	return iana.Addr().String()
 }
 
 func TestNew_DefaultsAreApplied(t *testing.T) {
@@ -374,9 +382,9 @@ func TestLookup_PacingDelaysRepeatQueriesToOneServer(t *testing.T) {
 	if res.Domain.Registrar.Name.Value == "" {
 		t.Fatal("chain produced no registrar; the test never reached the paced hops")
 	}
-	// Three queries to one host: the first is free, the two after it each
-	// wait a full interval.
-	if want := 2 * interval; elapsed < want {
+	// Two queries to the IANA host: the first is free, the second waits a
+	// full interval.
+	if want := interval; elapsed < want {
 		t.Errorf("elapsed = %v, want >= %v -- repeat queries to one WHOIS server were not paced", elapsed, want)
 	}
 }

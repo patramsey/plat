@@ -3,8 +3,10 @@ package whois
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/netip"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/patramsey/plat/internal/domain"
@@ -13,10 +15,11 @@ import (
 
 func (c *Client) hop(ctx context.Context, server, queryDomain, tld string) Hop {
 	start := time.Now()
-	raw, err := c.query(ctx, server, queryDomain)
+	line := BuildQuery(server, queryDomain)
+	raw, err := c.query(ctx, server, line)
 	h := Hop{
 		Server:  server,
-		Query:   BuildQuery(server, queryDomain),
+		Query:   line,
 		Raw:     raw,
 		Latency: time.Since(start),
 		Err:     err,
@@ -108,7 +111,11 @@ func (c *Client) Lookup(ctx context.Context, name domain.Name) (*Result, error) 
 		registryHop := c.hop(ctx, registry, name.Punycode, name.TLD)
 		result.Hops = append(result.Hops, registryHop)
 
-		if registryHop.Err == nil && registryHop.Fields.RegistrarWHOISServer != "" {
+		// A registry that names itself as the registrar server (.au's
+		// whois.auda.org.au) would be queried twice and its answer
+		// counted again as registrar-whois.
+		if registryHop.Err == nil && registryHop.Fields.RegistrarWHOISServer != "" &&
+			!sameWHOISServer(registryHop.Fields.RegistrarWHOISServer, registry) {
 			// Same reasoning as the IANA hop above: the registrar's own
 			// WHOIS server generally replies in plain key:value text
 			// regardless of the queried domain's TLD dialect (e.g.
@@ -155,10 +162,11 @@ func (c *Client) LookupIP(ctx context.Context, addr netip.Addr) (*Result, error)
 // chain can still read "refer:") and IPFields (the actual payload).
 func (c *Client) ipHop(ctx context.Context, server, query string) Hop {
 	start := time.Now()
-	raw, err := c.query(ctx, server, query)
+	line := BuildIPQuery(server, query)
+	raw, err := c.query(ctx, server, line)
 	h := Hop{
 		Server:  server,
-		Query:   BuildQuery(server, query),
+		Query:   line,
 		Raw:     raw,
 		Latency: time.Since(start),
 		Err:     err,
@@ -203,10 +211,11 @@ func (c *Client) LookupASN(ctx context.Context, asn uint32) (*Result, error) {
 // payload), mirroring ipHop.
 func (c *Client) asnHop(ctx context.Context, server, query string) Hop {
 	start := time.Now()
-	raw, err := c.query(ctx, server, query)
+	line := BuildQuery(server, query)
+	raw, err := c.query(ctx, server, line)
 	h := Hop{
 		Server:  server,
-		Query:   BuildQuery(server, query),
+		Query:   line,
 		Raw:     raw,
 		Latency: time.Since(start),
 		Err:     err,
@@ -217,4 +226,19 @@ func (c *Client) asnHop(ctx context.Context, server, query string) Hop {
 		h.ASNFields = &asnf
 	}
 	return h
+}
+
+// sameWHOISServer reports whether a and b name the same WHOIS server:
+// same host (case-insensitive, trailing dot ignored) on the same port,
+// with a missing port meaning 43.
+func sameWHOISServer(a, b string) bool {
+	return serverKey(a) == serverKey(b)
+}
+
+func serverKey(s string) string {
+	host, port, err := net.SplitHostPort(s)
+	if err != nil {
+		host, port = s, "43"
+	}
+	return strings.ToLower(strings.TrimSuffix(host, ".")) + ":" + port
 }

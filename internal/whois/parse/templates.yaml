@@ -19,7 +19,9 @@ eu:
 fr:
   format: kv
 nl:
-  format: kv
+  # SIDN puts the registrar and nameservers on indented lines under
+  # "Registrar:" and "Domain nameservers:" headers.
+  format: indent
 cz:
   format: kv
   synonyms:
@@ -40,3 +42,21 @@ mx:
     # status that way), but NIC Mexico's "State:" lines are contacts'
     # Mexican states. Mapping to "" keeps them out of status.
     state: ""
+be:
+  # DNS Belgium: tab-indented sections, like EURid's.
+  format: indent
+  synonyms:
+    # The registrar's name is nested: "Registrar:" then "Name:". No other
+    # .be section carries a "Name:" line.
+    name: registrar
+    registered: created
+it:
+  # Section headers with no colon ("Nameservers", "Registrar") and
+  # indented bodies. The registrar's "Organization:" is deliberately not
+  # mapped: the registrant and contact sections use the same sub-key,
+  # and the indent tokenizer does not qualify sub-keys by section.
+  format: indent
+at:
+  format: kv
+  synonyms:
+    changed: updated

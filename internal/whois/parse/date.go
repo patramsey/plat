@@ -39,6 +39,10 @@ var dateLayouts = []string{
 	"02.01.2006 15:04:05",
 	"January 2, 2006",
 	"Mon Jan 02 2006",
+	// DNS Belgium, with an unpadded day ("Mon Jan 1 1996").
+	"Mon Jan 2 2006",
+	// nic.at ("20200427 16:03:40").
+	"20060102 15:04:05",
 	// .io and others emit an ISO-8601 basic offset ("+0000"); RFC 3339
 	// requires "+00:00", so time.Parse rejects it and no other layout
 	// matches.

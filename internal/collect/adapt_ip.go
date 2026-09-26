@@ -142,7 +142,7 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) source.IPSourceRecord {
 		Meta:           meta,
 		Handle:         f.Handle,
 		Name:           f.NetName,
-		Type:           f.NetType,
+		Type:           whoisNetType(f.NetType),
 		StartAddress:   start,
 		EndAddress:     end,
 		CIDR:           cidr,
@@ -297,4 +297,16 @@ func parentHandleFromWHOIS(raw string) string {
 		return raw
 	}
 	return handle
+}
+
+// whoisNetType maps an ARIN WHOIS NetType to ARIN RDAP's name for the same
+// type, so the two sources compare equal. Only "Reassigned" differs by
+// more than case: RDAP calls it "ASSIGNMENT" (verified on
+// NET-12-0-0-0-2, NET-24-0-0-0-2 and NET-199-0-0-0-2). Every other value
+// passes through unchanged.
+func whoisNetType(t string) string {
+	if strings.EqualFold(t, "Reassigned") {
+		return "ASSIGNMENT"
+	}
+	return t
 }

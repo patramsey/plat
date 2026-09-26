@@ -36,7 +36,10 @@ func FuzzParse(f *testing.F) {
 		{"eurid-eu-recorded.txt", "eu"},
 		{"jprs-jp-example.txt", "jp"},
 		{"afnic-fr-example.txt", "fr"},
-		{"sidn-nl-example.txt", "nl"},
+		{"sidn-nl-google-recorded.txt", "nl"},
+		{"dnsbe-be-recorded.txt", "be"},
+		{"cnnic-cn-baidu-recorded.txt", "cn"},
+		{"nicit-it-google-recorded.txt", "it"},
 	}
 	for _, s := range seeds {
 		f.Add(loadFixture(f, s.fixture), s.tld)

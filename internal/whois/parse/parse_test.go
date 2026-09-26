@@ -753,3 +753,85 @@ func TestParse_StateIsDomainStatusForRUAndSE(t *testing.T) {
 		})
 	}
 }
+
+// SWITCH (.ch, .li) refuses port-43 queries outright. Nothing matched
+// the refusal, so fromHop counted it as a successful response with no
+// fields and `plat nic.ch` exited 0 with an empty record.
+func TestParse_SWITCHRefusalIsUnsupported(t *testing.T) {
+	f := Parse(loadFixture(t, "switch-ch-refused-recorded.txt"), "ch")
+	if !f.Unsupported {
+		t.Error("Unsupported = false, want true for SWITCH's refusal")
+	}
+	if f.NotFound {
+		t.Error("NotFound = true; a refusal says nothing about whether the domain exists")
+	}
+}
+
+// The refusal marker must be SWITCH's sentence, not "not permitted":
+// terms-of-use text on real answers says that constantly.
+func TestParse_TermsOfUseNotPermittedIsNotARefusal(t *testing.T) {
+	f := Parse("Domain Name: example.com\nUse of this data for marketing is not permitted.\n", "com")
+	if f.Unsupported {
+		t.Error("Unsupported = true for a real answer whose terms say \"not permitted\"")
+	}
+}
+
+// DNS Belgium: tab-indented sections, the registrar's name nested under
+// "Registrar:" / "Name:", glue in parentheses (IPv6 included), and a
+// "Registered:" date with an unpadded day.
+func TestParse_BEIndentedSections(t *testing.T) {
+	f := Parse(loadFixture(t, "dnsbe-be-recorded.txt"), "be")
+	if f.Domain != "dns.be" {
+		t.Errorf("Domain = %q, want dns.be", f.Domain)
+	}
+	if f.Registrar != "DNS BE vzw/asbl" {
+		t.Errorf("Registrar = %q, want DNS BE vzw/asbl", f.Registrar)
+	}
+	wantNS := []string{"ns1.dns.be", "ns2.dns.be", "ns3.dns.be", "ns5.dns.be"}
+	if !slices.Equal(f.Nameservers, wantNS) {
+		t.Errorf("Nameservers = %v, want %v", f.Nameservers, wantNS)
+	}
+	if !f.Created.Parsed || f.Created.Raw != "Mon Jan 1 1996" {
+		t.Errorf("Created = %+v, want Parsed with Raw \"Mon Jan 1 1996\"", f.Created)
+	}
+	if f.NotFound {
+		t.Error("NotFound = true for a registered domain (its status is NOT AVAILABLE)")
+	}
+}
+
+// DNS Belgium answers an unregistered name with "Status: AVAILABLE", and
+// no not-found marker matched it: a free .be name rendered as a
+// registered domain and exited 0.
+func TestParse_BEAvailableIsNotFound(t *testing.T) {
+	f := Parse(loadFixture(t, "dnsbe-be-notfound-recorded.txt"), "be")
+	if !f.NotFound {
+		t.Error("NotFound = false for DNS Belgium's \"Status: AVAILABLE\"")
+	}
+}
+
+func TestParse_CNSponsoringRegistrarAndRegistrationTime(t *testing.T) {
+	f := Parse(loadFixture(t, "cnnic-cn-baidu-recorded.txt"), "cn")
+	if f.Registrar == "" {
+		t.Error("Registrar empty; CNNIC names it \"Sponsoring Registrar\"")
+	}
+	if !f.Created.Parsed || f.Created.Raw != "2003-03-17 12:20:05" {
+		t.Errorf("Created = %+v, want Parsed with Raw 2003-03-17 12:20:05 (\"Registration Time\")", f.Created)
+	}
+}
+
+func TestParse_ATChangedIsUpdated(t *testing.T) {
+	f := Parse(loadFixture(t, "nicat-at-recorded.txt"), "at")
+	if !f.Updated.Parsed || f.Updated.Raw != "20200427 16:03:40" {
+		t.Errorf("Updated = %+v, want Parsed with Raw \"20200427 16:03:40\" (the domain's own changed:, not a contact's)", f.Updated)
+	}
+}
+
+// .it's section headers ("Nameservers", "Registrar") carry no colon, so
+// nothing under them was read.
+func TestParse_ITNameserversUnderColonlessHeader(t *testing.T) {
+	f := Parse(loadFixture(t, "nicit-it-google-recorded.txt"), "it")
+	wantNS := []string{"ns1.google.com", "ns2.google.com", "ns3.google.com", "ns4.google.com"}
+	if !slices.Equal(f.Nameservers, wantNS) {
+		t.Errorf("Nameservers = %v, want %v", f.Nameservers, wantNS)
+	}
+}

@@ -179,3 +179,46 @@ func TestClient_LookupPrefersIANAReferralOverFallback(t *testing.T) {
 		t.Fatalf("hops = %+v, want registry hop to IANA's referral %q", result.Hops, registryAddr)
 	}
 }
+
+// .au's registry answers with "Registrar WHOIS Server: whois.auda.org.au"
+// -- itself. Following it re-queried the registry and counted its answer
+// a second time, as registrar-whois, overclaiming the provenance.
+func TestClient_LookupSkipsRegistrarHopToTheRegistryItself(t *testing.T) {
+	var registryAddr string
+	registryAddr = startListener(t, func(query string) string {
+		return "Domain Name: google.com.au\nRegistrar WHOIS Server: " + registryAddr + "\n"
+	})
+	ianaAddr := startListener(t, func(query string) string {
+		return "refer: " + registryAddr + "\n"
+	})
+
+	q, err := domain.Normalize("google.com.au")
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
+	result, err := c.Lookup(context.Background(), q.Name)
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if len(result.Hops) != 2 {
+		t.Fatalf("got %d hops, want 2 (IANA, registry) -- the registrar referral names the registry itself", len(result.Hops))
+	}
+}
+
+func TestSameWHOISServer(t *testing.T) {
+	for _, tt := range []struct {
+		a, b string
+		want bool
+	}{
+		{"whois.auda.org.au", "whois.auda.org.au", true},
+		{"WHOIS.AUDA.ORG.AU.", "whois.auda.org.au", true},
+		{"whois.auda.org.au:43", "whois.auda.org.au", true},
+		{"whois.markmonitor.com", "whois.verisign-grs.com", false},
+		{"127.0.0.1:1000", "127.0.0.1:2000", false},
+	} {
+		if got := sameWHOISServer(tt.a, tt.b); got != tt.want {
+			t.Errorf("sameWHOISServer(%q, %q) = %v, want %v", tt.a, tt.b, got, tt.want)
+		}
+	}
+}
