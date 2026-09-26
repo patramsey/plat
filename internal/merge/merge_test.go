@@ -1066,3 +1066,26 @@ func TestNormalizeDomain_FallsBackWhenPunycodeConversionFails(t *testing.T) {
 		t.Error("two different unconvertible domains normalised to the same key")
 	}
 }
+
+// The adapters (FromRDAP, FromWHOIS, the IP adapters) leave a redacted
+// field's value empty and set only RedactedFields. scalar skipped empty
+// values before checking the flag, so a redaction in that shape -- the
+// only shape real sources produce -- never reached rec.Redacted. The
+// tests above pass a placeholder value alongside the flag, which is why
+// they did not notice.
+func TestMerge_RedactionNoticeForAdapterShapedSource(t *testing.T) {
+	registrarRDAP := sr(model.SourceRegistrarRDAP, true)
+	registrarRDAP.RedactedFields[model.FieldRegistrarName] = true
+	registryWHOIS := sr(model.SourceRegistryWHOIS, true)
+	registryWHOIS.Registrar.Name = "Example Registrar"
+
+	rec := Merge([]source.SourceRecord{registrarRDAP, registryWHOIS})
+
+	if rec.Registrar.Name.Value != "Example Registrar" {
+		t.Errorf("Registrar.Name = %q, want Example Registrar", rec.Registrar.Name.Value)
+	}
+	want := []model.RedactionNotice{{Field: model.FieldRegistrarName, Source: model.SourceRegistrarRDAP, Reason: "redacted"}}
+	if !slices.Equal(rec.Redacted, want) {
+		t.Errorf("Redacted = %+v, want %+v", rec.Redacted, want)
+	}
+}

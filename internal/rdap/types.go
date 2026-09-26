@@ -3,6 +3,7 @@ package rdap
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -254,10 +255,18 @@ func (e *EntityList) UnmarshalJSON(b []byte) error {
 // deviation from the expected shape — missing elements, wrong types, an
 // absent jCard entirely — degrades to an empty extraction rather than
 // erroring; jCard is not worth hard-failing a whole document decode over.
+//
+// Tel is a voice number: a property typed "voice" wins over an untyped
+// one, and one typed only "fax" is never used. RIPE lists an abuse
+// contact's voice number and then its fax, and keeping whichever came
+// last reported the fax as the abuse phone. Kind is the vCard "kind"
+// ("org", "individual", "group"), which is how RegistrantEntity tells an
+// organization from a maintainer that shares its role.
 type VCardArray struct {
 	FullName string
 	Email    string
 	Tel      string
+	Kind     string
 }
 
 func (v *VCardArray) UnmarshalJSON(b []byte) error {
@@ -269,6 +278,7 @@ func (v *VCardArray) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(raw[1], &props); err != nil {
 		return nil
 	}
+	var voiceTel, otherTel string
 	for _, p := range props {
 		var prop []json.RawMessage
 		if err := json.Unmarshal(p, &prop); err != nil || len(prop) < 4 {
@@ -287,11 +297,53 @@ func (v *VCardArray) UnmarshalJSON(b []byte) error {
 			v.FullName = value
 		case "email":
 			v.Email = value
+		case "kind":
+			v.Kind = strings.ToLower(value)
 		case "tel":
-			v.Tel = value
+			types := telTypes(prop[1])
+			switch {
+			case types["voice"]:
+				if voiceTel == "" {
+					voiceTel = value
+				}
+			case types["fax"]:
+				// A fax number is not a phone number.
+			default:
+				if otherTel == "" {
+					otherTel = value
+				}
+			}
 		}
 	}
+	v.Tel = voiceTel
+	if v.Tel == "" {
+		v.Tel = otherTel
+	}
 	return nil
+}
+
+// telTypes returns the lowercased "type" parameter values of a jCard tel
+// property. RFC 7095 allows the parameter as a single string or an array.
+func telTypes(params json.RawMessage) map[string]bool {
+	var p struct {
+		Type json.RawMessage `json:"type"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil || len(p.Type) == 0 {
+		return nil
+	}
+	var list []string
+	if err := json.Unmarshal(p.Type, &list); err != nil {
+		var one string
+		if err := json.Unmarshal(p.Type, &one); err != nil {
+			return nil
+		}
+		list = []string{one}
+	}
+	out := make(map[string]bool, len(list))
+	for _, t := range list {
+		out[strings.ToLower(t)] = true
+	}
+	return out
 }
 
 // RegistrarEntity returns the first entity whose Roles includes
@@ -419,12 +471,15 @@ func (n *IPNetworkResponse) entityByRole(role string) (Entity, bool) {
 	return Entity{}, false
 }
 
-// RegistrantEntity returns the first entity whose Roles includes
-// "registrant" (case-insensitive), if any. An IP network's "registrant"
-// entity is its owning organization -- e.g. ARIN's response for 8.8.8.8
-// carries an entity with handle "GOGL" and roles ["registrant"].
+// RegistrantEntity returns the network's owning organization: the
+// "registrant" entity whose vCard kind is "org", or the first registrant
+// if none says so. ARIN's response for 8.8.8.8 has a single registrant,
+// GOGL. RIPE also gives its mnt-by maintainers the registrant role and
+// sorts entities by handle, so for 80.128.0.1 the maintainer DTAG-NIC
+// ("individual") precedes ORG-DTAG1-RIPE ("org", Deutsche Telekom AG),
+// and taking the first registrant reported the maintainer as the owner.
 func (n *IPNetworkResponse) RegistrantEntity() (Entity, bool) {
-	return n.entityByRole("registrant")
+	return registrantOrg(n.Entities)
 }
 
 // AbuseEntity returns the first entity whose Roles includes "abuse", if
@@ -485,11 +540,32 @@ func (a *ASNResponse) entityByRole(role string) (Entity, bool) {
 	return Entity{}, false
 }
 
-// RegistrantEntity returns the first entity whose Roles includes
-// "registrant" (case-insensitive), if any. Mirrors
-// IPNetworkResponse.RegistrantEntity.
+// RegistrantEntity returns the autonomous system's owning organization.
+// Mirrors IPNetworkResponse.RegistrantEntity, and for the same reason:
+// RIPE's response for AS3320 lists the maintainer DTAG-RR as a
+// registrant ahead of the organization.
 func (a *ASNResponse) RegistrantEntity() (Entity, bool) {
-	return a.entityByRole("registrant")
+	return registrantOrg(a.Entities)
+}
+
+// registrantOrg returns the "registrant" entity whose vCard kind is
+// "org", falling back to the first registrant when none is marked as an
+// organization. See IPNetworkResponse.RegistrantEntity.
+func registrantOrg(entities EntityList) (Entity, bool) {
+	var first Entity
+	found := false
+	for _, e := range entities {
+		if !slices.ContainsFunc(e.Roles, func(r string) bool { return strings.EqualFold(r, "registrant") }) {
+			continue
+		}
+		if e.VCardArray.Kind == "org" {
+			return e, true
+		}
+		if !found {
+			first, found = e, true
+		}
+	}
+	return first, found
 }
 
 // AbuseEntity returns the first entity whose Roles includes "abuse", if

@@ -1,0 +1,433 @@
+{
+  "handle" : "AS3333",
+  "startAutnum" : 3333,
+  "endAutnum" : 3333,
+  "name" : "RIPE-NCC-AS",
+  "status" : [ "active" ],
+  "entities" : [ {
+    "handle" : "MDIR-RIPE",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Managing Director" ], [ "kind", { }, "text", "group" ], [ "adr", {
+      "label" : "RIPE Network Coordination Centre\nP.O. Box 10096\n1001 EB Amsterdam\nthe Netherlands"
+    }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+      "type" : "voice"
+    }, "text", "+31 20 535 4444" ], [ "org", { }, "text", "ORG-NCC1-RIPE" ] ] ],
+    "roles" : [ "administrative" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3333",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/MDIR-RIPE"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "OPS4-RIPE",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "RIPE NCC Operations" ], [ "kind", { }, "text", "group" ], [ "adr", {
+      "label" : "Stationsplein 11\n1012 AB Amsterdam\nThe Netherlands"
+    }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+      "type" : "voice"
+    }, "text", "+31 20 535 4444" ], [ "tel", {
+      "type" : "fax"
+    }, "text", "+31 20 535 4445" ], [ "email", {
+      "type" : "abuse"
+    }, "text", "abuse@ripe.net" ] ] ],
+    "roles" : [ "technical" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3333",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/OPS4-RIPE"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "ORG-RIEN1-RIPE",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Reseaux IP Europeens Network Coordination Centre (RIPE NCC)" ], [ "kind", { }, "text", "org" ], [ "adr", {
+      "label" : "P.O. Box 10096\n1001 EB\nAmsterdam\nNETHERLANDS"
+    }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+      "type" : "voice"
+    }, "text", "+31205354444" ], [ "tel", {
+      "type" : "fax"
+    }, "text", "+31205354445" ] ] ],
+    "roles" : [ "registrant" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3333",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/ORG-RIEN1-RIPE"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "RIPE-NCC-END-MNT",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "RIPE-NCC-END-MNT" ], [ "kind", { }, "text", "individual" ], [ "org", { }, "text", "ORG-NCC1-RIPE" ] ] ],
+    "roles" : [ "registrant" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3333",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/RIPE-NCC-END-MNT"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "RIPE-NCC-MNT",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "RIPE-NCC-MNT" ], [ "kind", { }, "text", "individual" ] ] ],
+    "roles" : [ "registrant" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3333",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/RIPE-NCC-MNT"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "OPS4-RIPE",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "RIPE NCC Operations" ], [ "kind", { }, "text", "group" ], [ "adr", {
+      "label" : "Stationsplein 11\n1012 AB Amsterdam\nThe Netherlands"
+    }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+      "type" : "voice"
+    }, "text", "+31 20 535 4444" ], [ "tel", {
+      "type" : "fax"
+    }, "text", "+31 20 535 4445" ], [ "email", {
+      "type" : "abuse"
+    }, "text", "abuse@ripe.net" ] ] ],
+    "roles" : [ "abuse" ],
+    "entities" : [ {
+      "handle" : "ADM6699-RIPE",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Andrea Di Menna" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+        "label" : "RIPE Network Coordination Centre (NCC)\nStationsplein 11\n1012 AB Amsterdam\nThe Netherlands"
+      }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+        "type" : "voice"
+      }, "text", "+31 20 535 4444" ], [ "tel", {
+        "type" : "fax"
+      }, "text", "+31 20 535 4445" ], [ "org", { }, "text", "ORG-Bb2-RIPE" ] ] ],
+      "roles" : [ "technical" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3333",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/ADM6699-RIPE"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    }, {
+      "handle" : "CNAG-RIPE",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Csaba Nagy" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+        "label" : "RIPE Network Coordination Centre (NCC)\nStationsplein 11\n1012 AB Amsterdam\nThe Netherlands"
+      }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+        "type" : "voice"
+      }, "text", "+31 20 535 4444" ], [ "tel", {
+        "type" : "fax"
+      }, "text", "+31 20 535 4445" ] ] ],
+      "roles" : [ "technical" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3333",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/CNAG-RIPE"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    }, {
+      "handle" : "MDIR-RIPE",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Managing Director" ], [ "kind", { }, "text", "group" ], [ "adr", {
+        "label" : "RIPE Network Coordination Centre\nP.O. Box 10096\n1001 EB Amsterdam\nthe Netherlands"
+      }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+        "type" : "voice"
+      }, "text", "+31 20 535 4444" ], [ "org", { }, "text", "ORG-NCC1-RIPE" ] ] ],
+      "roles" : [ "administrative" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3333",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/MDIR-RIPE"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    }, {
+      "handle" : "MENN1-RIPE",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Menno Schepers" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+        "label" : "RIPE Network Coordination Centre (NCC)\nStationsplein 11\n1012 AB Amsterdam\nNetherlands"
+      }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+        "type" : "voice"
+      }, "text", "+31 20 535 4444" ], [ "tel", {
+        "type" : "fax"
+      }, "text", "+31 20 535 4445" ] ] ],
+      "roles" : [ "technical" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3333",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/MENN1-RIPE"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    }, {
+      "handle" : "RCO-RIPE",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Razvan C. Oprea" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+        "label" : "RIPE NCC\nStationsplein 11\n1012 AB Amsterdam\nThe Netherlands"
+      }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+        "type" : "voice"
+      }, "text", "+31 20 535 4444" ], [ "tel", {
+        "type" : "fax"
+      }, "text", "+31 20 535 4445" ] ] ],
+      "roles" : [ "technical" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3333",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/RCO-RIPE"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    }, {
+      "handle" : "RDM397-RIPE",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Rob de Meester" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+        "label" : "RIPE Network Coordination Centre (NCC)\nStationsplein 11\n1012 AB Amsterdam\nThe Netherlands"
+      }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+        "type" : "voice"
+      }, "text", "+31 20 535 4444" ], [ "tel", {
+        "type" : "fax"
+      }, "text", "+31 20 535 4445" ] ] ],
+      "roles" : [ "technical" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3333",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/RDM397-RIPE"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    }, {
+      "handle" : "RIPE-NCC-MNT",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "RIPE-NCC-MNT" ], [ "kind", { }, "text", "individual" ] ] ],
+      "roles" : [ "registrant" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3333",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/RIPE-NCC-MNT"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    }, {
+      "handle" : "SG16480-RIPE",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Saloumeh Ghasemi" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+        "label" : "Stationsplein 11, Amsterdam"
+      }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+        "type" : "voice"
+      }, "text", "+31 20 5354444" ] ] ],
+      "roles" : [ "technical" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3333",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/SG16480-RIPE"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    }, {
+      "handle" : "SO2011-RIPE",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Sjoerd Oostdijck" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+        "label" : "RIPE NCC\nStationsplein 11\n1012 AB Amsterdam\nThe Netherlands"
+      }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+        "type" : "voice"
+      }, "text", "+31 20 535 4444" ], [ "tel", {
+        "type" : "fax"
+      }, "text", "+31 20 535 4445" ] ] ],
+      "roles" : [ "technical" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3333",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/SO2011-RIPE"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    }, {
+      "handle" : "TIB-RIPE",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Timur I Bakeyev" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+        "label" : "RIPE Network Coordination Centre (NCC)\nSingel 258\n1016 AB Amsterdam\nThe Netherlands"
+      }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+        "type" : "voice"
+      }, "text", "+31 20 535 4444" ], [ "tel", {
+        "type" : "fax"
+      }, "text", "+31 20 535 4445" ] ] ],
+      "roles" : [ "technical" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3333",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/TIB-RIPE"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    }, {
+      "handle" : "TOL666-RIPE",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Marco van Tol" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+        "label" : "Ringslang 42\n1422 ZM Uithoorn\nNETHERLANDS"
+      }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+        "type" : "voice"
+      }, "text", "+31 6 3100 3015" ] ] ],
+      "roles" : [ "technical" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3333",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/TOL666-RIPE"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    } ],
+    "objectClassName" : "entity"
+  } ],
+  "remarks" : [ {
+    "description" : [ "Reseaux IP Europeens Network Coordination Centre (RIPE NCC)", "", "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++", "| AS3333 RIPE-NCC-AS |", "| RIPE NCC (Network Coordination Centre) |", "| |", "| RIPE NCC (AS3333) operates an open peering policy: |", "| We advertise only routes from AS-RIPENCC |", "| We will accept any routes offered including TRANSIT! |", "| We will update our aut-num object in the RIPE Whois |", "| Database and kindly request you to update yours |", "| We would prefer not to enter into a peering contract |", "| In the event of problems due to leaked advertisements |", "| it is our policy to shut down peerings and ask |", "| questions later. |", "| We may tag our announcements with the NO_EXPORT or |", "| other communities, please honour these if set. |", "| * AMS-IX - IPv4 * |", "| 80.249.208.68 - Equinix AM3 |", "| 80.249.208.71 - Telecity AMS5 |", "| * AMS-IX - IPv6 * |", "| 2001:7F8:1::A500:3333:1 - Equinix AM3 |", "| 2001:7F8:1::A500:3333:2 - Telecity AMS5 |", "| Telephone: +31 20 535 4444 |", "| Fax: +31 20 535 4445 |", "| Abuse: abuse@ripe.net |", "| Peering: peering@ripe.net |", "| Operations/NOC: ops@ripe.net |", "| Info: https://www.ripe.net/ |", "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++", "| PRIVATE-TRANSIT-V4 |", "| Private transit peering |", "| TeliaSonera |", "| AMS-IX-TRANSIT |", "| SURFnet |", "| KPN Wholesale Service & Op. (AS1136) |", "| Tele2 Sverige AB |", "| Cable & Wireless Netherlands B.V. |", "| BIT |", "| KPN Wholesale Service & Op. (AS286) |", "| AMS-IX-LARGE |", "| AMS-IX BGP4 Peers with a LARGE number of prefixes |", "| Tiscali |", "| Deutsche Telekom AG |", "| Telecom Italia Sparkle |", "| Hurricane Electric |", "| AMS-IX-MEDIUM |", "| Verizon Business, NIKHEF, peering@verizonbusiness.com |", "| iNES Group |", "| Highwinds Network Group Inc. |", "| Lambdanet Communications Deutschland AG |", "| Open Peering |", "| PJSC Datagroup |", "| ISPRIME B.V. |", "| NORDUnet A/S |", "| Arcor AG & Co |", "| State Institute of Information Technologies and Telecommunications |", "| TDC A/S |", "| Swisscom AG |", "| Neterra Ltd. |", "| Anders Business Group Ltd. |", "| IPTP Networks |", "| W-IX |", "| BT |", "| Atrato IP Networks |", "| Belgacom International Carrier Services SA |", "| UPC Broadband Operations |", "| Verizon Business |", "| Colt Telecom Group |", "| COMSTAR-Direct CJSC |", "| RETN Ltd. |", "| AMS-IX-SMALL |", "| Alsatis, AMS-IX, peering@alsatis.com |", "| RIPE NCC (AS112 Project) |", "| SARA |", "| SIDN Stichting Internet Domeinregistratie NL |", "| Amsterdam Internet Exchange (rtr-eun-01) |", "| Plus.line AG |", "| ScanPlus GmbH |", "| Solcon Internetdiensten B.V. |", "| IDnet (IDnet) |", "| SOCO Network Solutions GmbH |", "| ITGate |", "| Concepts ICT Holding B.V. |", "| Luna.nl |", "| TNG - The Net Generation AG |", "| Tele2 Nederland B.V. |", "| EdgeCast Network |", "| NedLook internet solutions |", "| CAIW Netwerken BV |", "| ZeelandNet BV |", "| Virtu Secure Webservices BV |", "| Leaseweb |", "| OVH |", "| InterBox Internet |", "| Amazon.com |", "| Green.ch AG |", "| RIPE NCC Auth DNS Cluster |", "| We Dare B.V. |", "| Titan Networks GmbH |", "| Previder B.V. |", "| Blatzheim Networks Telecom GmbH |", "| SIG/IP- MAN |", "| Akamai International B.V. |", "| Info.nl |", "| Telenor |", "| InfoPact Netwerkdiensten B.V. |", "| Plex Elektronische Informatie BV |", "| Limelight Networks |", "| ASGCNet (Academia Sinica Grid Computing Network Taiwan) (ASNet) |", "| Intermax BV |", "| Caveo Internet B.V. |", "| ISP Services |", "| Hetzner Online AG |", "| INET-People Provider Services |", "| Basefarm |", "| Cyso Managed Hosting |", "| RIPE NCC (K-root server) |", "| Denit Internet Services |", "| BELNET |", "| AT&T Global Network Services |", "| Unilogic Networks B.V. |", "| Aire Networks |", "| Dial Telecom a.s. |", "| Gemeente Den Haag |", "| UNET BV |", "| Momax S.r.l. |", "| Internet Systems Consortium (F-Root) |", "| Exa Networks |", "| Waycom |", "| SpeedXS |", "| Serbia BroadBand |", "| BSO Communication |", "| Duocast |", "| Sarenet |", "| XS4ALL Internet |", "| Kantonsschule Zug |", "| Base IP BV |", "| Lottomatica SpA |", "| Packet Clearing House |", "| Convergenze S.p.a. |", "| OpenCarrier e.G. |", "| Jansen Systemberatung GmbH |", "| GlobalConnect |", "| Wikimedia Foundation Inc. |", "| Easynet Limited |", "| Motto VoIP |", "| I3D |", "| Online Breedband BV |", "| Vialtus Solutions |", "| Breedband Nederland B.V. |", "| ANO Russian Institute for Public Networks (RIPN) |", "| Orange Business Services |", "| Green ISP B.V. |", "| EUnet Finland (Saunalahti Group Oyj) |", "| www.strato.de |", "| TDC Switzerland AG |", "| Telefonica Deutschland GmbH |", "| Verisign |", "| MANDA |", "| Claranet Benelux |", "| Telekom Austria |", "| 1&1 Internet AG |", "| XB Networks |", "| Coolwave Communications BV |", "| Ziggo bv |", "| InterConnect Services B.V. |", "| AMS-IX-V6-TRANSIT |", "| AMS-IX BGP6 Peers who pass us a FULL routing table |", "| AMS-IX-V6 |", "| FreeSAS |", "| Google |", "| IntroWeb Nederland B.V. |", "| xo.com |", "| NTT Communications Global IP Network |", "| Computel Standby BV |", "| tele.dk |", "| Seabone.net |", "| EspritXB B.V. |", "| Portugal Telecom Comunicacoes SA (IPv6) |", "| AMS-IX-COLLECTORS |", "| AMS-IX Route Collectors - Give all, get nothing |", "| Renesys Corp |", "| COLLECTORS |", "| Route Collectors - Give all, get nothing |", "| RIS Project |", "| <Oregon Exchange BGP Router Viewer |", "| ISOLARIO - Istituto Italiano di Telematica CNR Pisa |", "| COLLECTORS-V6 |", "| Route Collectors (IPv6) - Give all, get nothing |", "| AMS-IX Route Servers |", "| RIS Transit |" ]
+  } ],
+  "links" : [ {
+    "value" : "https://rdap.db.ripe.net/autnum/3333",
+    "rel" : "rdap-up",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-up/AS3333",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3333",
+    "rel" : "rdap-up rdap-active",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-up/AS3333?status=active",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3333",
+    "rel" : "rdap-down",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-down/AS3333",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3333",
+    "rel" : "rdap-top",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-top/AS3333",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3333",
+    "rel" : "rdap-top rdap-active",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-top/AS3333?status=active",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3333",
+    "rel" : "rdap-bottom",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-bottom/AS3333",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3333",
+    "rel" : "self",
+    "href" : "https://rdap.db.ripe.net/autnum/3333",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+    "rel" : "copyright",
+    "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+  } ],
+  "events" : [ {
+    "eventAction" : "registration",
+    "eventDate" : "2002-08-13T12:58:13Z"
+  }, {
+    "eventAction" : "last changed",
+    "eventDate" : "2026-03-19T09:33:32Z"
+  } ],
+  "rdapConformance" : [ "nro_rdap_profile_asn_flat_0", "rirSearch1", "autnums", "cidr0", "rdap_level_0", "nro_rdap_profile_0", "redacted" ],
+  "notices" : [ {
+    "title" : "Filtered",
+    "description" : [ "This output has been filtered." ]
+  }, {
+    "title" : "Whois Inaccuracy Reporting",
+    "description" : [ "If you see inaccuracies in the results, please visit:" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3333",
+      "rel" : "inaccuracy-report",
+      "href" : "https://www.ripe.net/contact-form?topic=ripe_dbm&show_form=true",
+      "type" : "text/html"
+    } ]
+  }, {
+    "title" : "Source",
+    "description" : [ "Objects returned came from source", "RIPE" ]
+  }, {
+    "title" : "Terms and Conditions",
+    "description" : [ "This is the RIPE Database query service. The objects are in RDAP format." ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3333",
+      "rel" : "terms-of-service",
+      "href" : "http://www.ripe.net/db/support/db-terms-conditions.pdf",
+      "type" : "application/pdf"
+    } ]
+  } ],
+  "port43" : "whois.ripe.net",
+  "objectClassName" : "autnum",
+  "redacted" : [ {
+    "name" : {
+      "description" : "Personal e-mail information"
+    },
+    "reason" : {
+      "description" : "Personal data"
+    },
+    "prePath" : "$.entities[?(@.handle=='MDIR-RIPE')].vcardArray[1][?(@[0]=='e-mail')]",
+    "method" : "removal"
+  }, {
+    "name" : {
+      "description" : "Personal e-mail information"
+    },
+    "reason" : {
+      "description" : "Personal data"
+    },
+    "prePath" : "$.entities[?(@.handle=='OPS4-RIPE')].vcardArray[1][?(@[0]=='e-mail')]",
+    "method" : "removal"
+  }, {
+    "name" : {
+      "description" : "Personal e-mail information"
+    },
+    "reason" : {
+      "description" : "Personal data"
+    },
+    "prePath" : "$.entities[?(@.handle=='ORG-RIEN1-RIPE')].vcardArray[1][?(@[0]=='e-mail')]",
+    "method" : "removal"
+  }, {
+    "name" : {
+      "description" : "Personal e-mail information"
+    },
+    "reason" : {
+      "description" : "Personal data"
+    },
+    "prePath" : "$.entities[?(@.handle=='OPS4-RIPE')].vcardArray[1][?(@[0]=='e-mail')]",
+    "method" : "removal"
+  } ]
+}

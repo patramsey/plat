@@ -7,6 +7,22 @@ follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- RIPE-region IP and ASN lookups report the owning organization rather
+  than a maintainer. RIPE gives its `mnt-by` maintainers the registrant
+  role too, so `80.128.0.1` showed "DTAG-NIC" instead of Deutsche Telekom
+  AG, and the wrong value won the merge.
+- An RDAP abuse phone is the contact's voice number. The last `tel` in
+  the vCard used to win, so `AS3333` reported RIPE's fax number.
+- WHOIS responses that list contact, nsset or keyset objects after the
+  domain keep the domain's own registrar and dates. `seznam.cz` reported
+  the registry's own contact as its registrar, and `google.it` its tech
+  contact's creation date. `.cz` and `.br` creation and update dates now
+  parse, as does registro.br's `#ticket` date suffix.
+- `.mx` no longer shows a contact's state as the domain status
+  ("nuevoLeon"), and its nameservers are read.
+- GDPR redaction is reported for domain and IP lookups. A redacted
+  source was dropped before the merge checked for redaction, so no
+  notice ever appeared.
 - `.uk` domains get WHOIS data again. IANA's record for `.uk` has listed
   no WHOIS server since 2026-08-04, so plat queried RDAP alone and one
   slow RDAP response failed the whole lookup with exit `3`. plat now falls

@@ -1,0 +1,230 @@
+{
+  "handle" : "80.128.0.0 - 80.146.159.255",
+  "startAddress" : "80.128.0.0",
+  "endAddress" : "80.146.159.255",
+  "ipVersion" : "v4",
+  "name" : "DTAG-DIAL16",
+  "type" : "ASSIGNED PA",
+  "country" : "DE",
+  "parentHandle" : "80.128.0.0 - 80.159.255.255",
+  "cidr0_cidrs" : [ {
+    "v4prefix" : "80.128.0.0",
+    "length" : 12
+  }, {
+    "v4prefix" : "80.144.0.0",
+    "length" : 15
+  }, {
+    "v4prefix" : "80.146.0.0",
+    "length" : 17
+  }, {
+    "v4prefix" : "80.146.128.0",
+    "length" : 19
+  } ],
+  "status" : [ "active" ],
+  "entities" : [ {
+    "handle" : "DTAG-NIC",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "DTAG-NIC" ], [ "kind", { }, "text", "individual" ] ] ],
+    "roles" : [ "registrant" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/DTAG-NIC"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "DTIP",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "DTAG Global IP-Addressing" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+      "label" : "Deutsche Telekom AG\nDarmstadt, Germany"
+    }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+      "type" : "voice"
+    }, "text", "+49 180 2 33 1000" ] ] ],
+    "roles" : [ "administrative" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/DTIP"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "DTST",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Security Team" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+      "label" : "Deutsche Telekom AG\nDarmstadt, Germany"
+    }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+      "type" : "voice"
+    }, "text", "+49 180 2 33 1000" ] ] ],
+    "roles" : [ "technical" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/DTST"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "ORG-DTAG1-RIPE",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Deutsche Telekom AG" ], [ "kind", { }, "text", "org" ], [ "adr", {
+      "label" : "Group Information Security, SDA/Abuse\nDeutsche Telekom Allee 9\nDE 64295 Darmstadt"
+    }, "text", [ "", "", "", "", "", "", "" ] ] ] ],
+    "roles" : [ "registrant" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/ORG-DTAG1-RIPE"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "DTAG4-RIPE",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Deutsche Telekom Abuse Contact" ], [ "kind", { }, "text", "group" ], [ "adr", {
+      "label" : "Deutsche Telekom AG"
+    }, "text", [ "", "", "", "", "", "", "" ] ], [ "email", {
+      "type" : "abuse"
+    }, "text", "abuse@telekom.de" ] ] ],
+    "roles" : [ "abuse" ],
+    "entities" : [ {
+      "handle" : "DTAG-NIC",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "DTAG-NIC" ], [ "kind", { }, "text", "individual" ] ] ],
+      "roles" : [ "registrant" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/DTAG-NIC"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    } ],
+    "objectClassName" : "entity"
+  } ],
+  "remarks" : [ {
+    "description" : [ "Deutsche Telekom AG" ]
+  } ],
+  "links" : [ {
+    "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+    "rel" : "rdap-up",
+    "href" : "https://rdap.db.ripe.net/ips/rirSearch1/rdap-up/80.128.0.0%20-%2080.146.159.255",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+    "rel" : "rdap-up rdap-active",
+    "href" : "https://rdap.db.ripe.net/ips/rirSearch1/rdap-up/80.128.0.0%20-%2080.146.159.255?status=active",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+    "rel" : "rdap-down",
+    "href" : "https://rdap.db.ripe.net/ips/rirSearch1/rdap-down/80.128.0.0%20-%2080.146.159.255",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+    "rel" : "rdap-top",
+    "href" : "https://rdap.db.ripe.net/ips/rirSearch1/rdap-top/80.128.0.0%20-%2080.146.159.255",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+    "rel" : "rdap-top rdap-active",
+    "href" : "https://rdap.db.ripe.net/ips/rirSearch1/rdap-top/80.128.0.0%20-%2080.146.159.255?status=active",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+    "rel" : "rdap-bottom",
+    "href" : "https://rdap.db.ripe.net/ips/rirSearch1/rdap-bottom/80.128.0.0%20-%2080.146.159.255",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+    "rel" : "self",
+    "href" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+    "rel" : "copyright",
+    "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+  } ],
+  "events" : [ {
+    "eventAction" : "registration",
+    "eventDate" : "2002-01-08T09:31:27Z"
+  }, {
+    "eventAction" : "last changed",
+    "eventDate" : "2014-06-18T06:15:30Z"
+  } ],
+  "rdapConformance" : [ "geofeed1", "rirSearch1", "ips", "cidr0", "rdap_level_0", "nro_rdap_profile_0", "redacted" ],
+  "notices" : [ {
+    "title" : "Filtered",
+    "description" : [ "This output has been filtered." ]
+  }, {
+    "title" : "Whois Inaccuracy Reporting",
+    "description" : [ "If you see inaccuracies in the results, please visit:" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+      "rel" : "inaccuracy-report",
+      "href" : "https://www.ripe.net/contact-form?topic=ripe_dbm&show_form=true",
+      "type" : "text/html"
+    } ]
+  }, {
+    "title" : "Source",
+    "description" : [ "Objects returned came from source", "RIPE" ]
+  }, {
+    "title" : "Terms and Conditions",
+    "description" : [ "This is the RIPE Database query service. The objects are in RDAP format." ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/ip/80.128.0.1",
+      "rel" : "terms-of-service",
+      "href" : "http://www.ripe.net/db/support/db-terms-conditions.pdf",
+      "type" : "application/pdf"
+    } ]
+  } ],
+  "port43" : "whois.ripe.net",
+  "objectClassName" : "ip network",
+  "redacted" : [ {
+    "name" : {
+      "description" : "Personal e-mail information"
+    },
+    "reason" : {
+      "description" : "Personal data"
+    },
+    "prePath" : "$.entities[?(@.handle=='DTIP')].vcardArray[1][?(@[0]=='e-mail')]",
+    "method" : "removal"
+  }, {
+    "name" : {
+      "description" : "Personal e-mail information"
+    },
+    "reason" : {
+      "description" : "Personal data"
+    },
+    "prePath" : "$.entities[?(@.handle=='DTST')].vcardArray[1][?(@[0]=='e-mail')]",
+    "method" : "removal"
+  }, {
+    "name" : {
+      "description" : "Personal e-mail information"
+    },
+    "reason" : {
+      "description" : "Personal data"
+    },
+    "prePath" : "$.entities[?(@.handle=='ORG-DTAG1-RIPE')].vcardArray[1][?(@[0]=='e-mail')]",
+    "method" : "removal"
+  }, {
+    "name" : {
+      "description" : "Personal e-mail information"
+    },
+    "reason" : {
+      "description" : "Personal data"
+    },
+    "prePath" : "$.entities[?(@.handle=='DTAG4-RIPE')].vcardArray[1][?(@[0]=='e-mail')]",
+    "method" : "removal"
+  } ]
+}

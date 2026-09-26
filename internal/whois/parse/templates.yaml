@@ -20,3 +20,23 @@ fr:
   format: kv
 nl:
   format: kv
+cz:
+  format: kv
+  synonyms:
+    # CZ.NIC calls the domain's creation "registered"; the "created"
+    # lines in its response belong to contact and nsset objects.
+    registered: created
+    changed: updated
+br:
+  format: kv
+  synonyms:
+    changed: updated
+mx:
+  format: kv
+  synonyms:
+    # NIC Mexico lists nameservers as "DNS:" lines under "Name Servers:".
+    dns: nameservers
+    # "state" is a status synonym globally (.jp, .ru and .se give domain
+    # status that way), but NIC Mexico's "State:" lines are contacts'
+    # Mexican states. Mapping to "" keeps them out of status.
+    state: ""

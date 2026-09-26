@@ -666,3 +666,90 @@ func TestParse_UKNoRegistrarListedIsAbsent(t *testing.T) {
 		t.Errorf("Nameservers = %v, want 8 entries", f.Nameservers)
 	}
 }
+
+// In these registries' responses the domain's own object comes first and
+// contact, nsset and keyset objects follow with the same keys. Assigning
+// on every match let the last object win: seznam.cz reported the
+// trailing CZ.NIC contact's registrar and creation date, google.it the
+// tech contact's dates, and google.com.br a contact's creation date.
+func TestParse_MultiObjectResponseKeepsTheDomainsOwnValues(t *testing.T) {
+	type date struct {
+		raw    string
+		parsed bool
+	}
+	for _, tt := range []struct {
+		fixture, tld, registrar   string
+		created, updated, expires date
+	}{
+		{
+			fixture: "cznic-cz-seznam-recorded.txt", tld: "cz", registrar: "REG-SEZNAM",
+			created: date{"07.10.1996 02:00:00", true},
+			updated: date{"05.09.2022 14:21:11", true},
+			expires: date{"29.10.2027", true},
+		},
+		{
+			fixture: "nicit-it-google-recorded.txt", tld: "it",
+			created: date{"1999-12-10 00:00:00", true},
+			updated: date{"2026-06-09 23:13:34", true},
+			expires: date{"2027-04-21", true},
+		},
+		{
+			// registro.br annotates the creation date with a ticket
+			// number, which must not stop it parsing.
+			fixture: "registrobr-br-google-recorded.txt", tld: "br",
+			created: date{"19990518 #162310", true},
+			updated: date{"20260421", true},
+			expires: date{"20270518", true},
+		},
+	} {
+		t.Run(tt.fixture, func(t *testing.T) {
+			f := Parse(loadFixture(t, tt.fixture), tt.tld)
+			if f.Registrar != tt.registrar {
+				t.Errorf("Registrar = %q, want %q", f.Registrar, tt.registrar)
+			}
+			for _, c := range []struct {
+				name string
+				got  Date
+				want date
+			}{{"Created", f.Created, tt.created}, {"Updated", f.Updated, tt.updated}, {"Expires", f.Expires, tt.expires}} {
+				if c.got.Raw != c.want.raw || c.got.Parsed != c.want.parsed {
+					t.Errorf("%s = {Raw:%q Parsed:%v}, want {Raw:%q Parsed:%v}", c.name, c.got.Raw, c.got.Parsed, c.want.raw, c.want.parsed)
+				}
+			}
+		})
+	}
+}
+
+// .mx contact blocks carry "State: Nuevo Leon" -- the Mexican state. A
+// global "state" synonym, there for .jp third-level records, turned it
+// into four copies of a domain status rendered as "nuevoLeon".
+func TestParse_MXContactStateIsNotAStatus(t *testing.T) {
+	f := Parse(loadFixture(t, "nicmx-mx-recorded.txt"), "mx")
+	if len(f.Statuses) != 0 {
+		t.Errorf("Statuses = %v, want none (.mx publishes no domain status)", f.Statuses)
+	}
+	wantNS := []string{"a.nic.mx", "b.nic.mx", "c.nic.mx"}
+	if !slices.Equal(f.Nameservers, wantNS) {
+		t.Errorf("Nameservers = %v, want %v", f.Nameservers, wantNS)
+	}
+}
+
+// TCI (.ru) and IIS (.se) publish the domain's status as "state:". This
+// pins the global "state" synonym: scoping it to .jp alone (to stop .mx
+// contact states reading as statuses) emptied yandex.ru's status.
+func TestParse_StateIsDomainStatusForRUAndSE(t *testing.T) {
+	for _, tt := range []struct {
+		fixture, tld string
+		want         []string
+	}{
+		{"tcinet-ru-yandex-recorded.txt", "ru", []string{"REGISTERED, DELEGATED, VERIFIED"}},
+		{"iis-se-recorded.txt", "se", []string{"active", "ok"}},
+	} {
+		t.Run(tt.tld, func(t *testing.T) {
+			f := Parse(loadFixture(t, tt.fixture), tt.tld)
+			if !slices.Equal(f.Statuses, tt.want) {
+				t.Errorf("Statuses = %q, want %q", f.Statuses, tt.want)
+			}
+		})
+	}
+}

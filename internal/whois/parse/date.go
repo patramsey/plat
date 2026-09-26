@@ -35,6 +35,8 @@ var dateLayouts = []string{
 	"2006/01/02",
 	"2006.01.02",
 	"02.01.2006",
+	// CZ.NIC ("07.10.1996 02:00:00").
+	"02.01.2006 15:04:05",
 	"January 2, 2006",
 	"Mon Jan 02 2006",
 	// .io and others emit an ISO-8601 basic offset ("+0000"); RFC 3339
@@ -56,6 +58,9 @@ var dateLayouts = []string{
 // exact. This is the same reasoning that keeps CLST out of the list.
 var jstSuffix = regexp.MustCompile(`\s*\(JST\)\s*$`)
 
+// ticketSuffix matches registro.br's " #162310" ticket-number annotation.
+var ticketSuffix = regexp.MustCompile(`\s+#\d+$`)
+
 // ParseDate tries each known WHOIS date layout in turn, on both the raw
 // string and a title-cased variant (WHOIS month abbreviations appear in
 // any case: "aug", "Aug", "AUG"). It never errors — an unrecognized format
@@ -66,7 +71,9 @@ func ParseDate(s string) Date {
 	if raw == "" {
 		return d
 	}
-	parseable := raw
+	// registro.br annotates a date with a ticket number
+	// ("19990518 #162310"); Raw keeps it, the parse ignores it.
+	parseable := ticketSuffix.ReplaceAllString(raw, "")
 	if jstSuffix.MatchString(parseable) {
 		parseable = jstSuffix.ReplaceAllString(parseable, "") + " +0900"
 	}
