@@ -33,6 +33,19 @@ var ErrEmptyLabel = errors.New("domain: domain name contains an empty label")
 // of reservedTLDs' rejection of .local/.internal/etc for domains.
 var ErrReservedIP = errors.New("domain: reserved/private IP address cannot be looked up")
 
+// ErrReservedASN is returned for an IANA special-purpose autonomous
+// system number -- reserved, AS_TRANS, documentation, or private use. No
+// RIR allocates these to an organization, so, like a reserved IP, there
+// is no registration data to look up. It is the ASN counterpart of
+// ErrReservedIP.
+var ErrReservedASN = errors.New("domain: reserved ASN cannot be looked up")
+
+// ErrASNOutOfRange is returned for "AS" followed by a number too large
+// for the 32-bit ASN space. The input is unmistakably an ASN attempt, so
+// it must not fall through to the domain path and be reported as a
+// single-label domain.
+var ErrASNOutOfRange = errors.New("domain: ASN out of range")
+
 var reservedTLDs = map[string]bool{
 	"local":    true,
 	"internal": true,
@@ -94,7 +107,13 @@ func Normalize(input string) (Query, error) {
 		return ipQuery(addr, input)
 	}
 	if asn, ok := parseASNInput(s); ok {
+		if cat := reservedASNCategory(asn); cat != "" {
+			return Query{}, fmt.Errorf("%w: %q is %s and has no registration data to look up", ErrReservedASN, input, cat)
+		}
 		return Query{Kind: KindASN, ASN: asn, Input: input}, nil
+	}
+	if isASNForm(s) {
+		return Query{}, fmt.Errorf("%w: %q exceeds AS4294967295, the largest 32-bit ASN", ErrASNOutOfRange, input)
 	}
 
 	// idna.Lookup (not the bare idna.ToASCII/Punycode profile) is
@@ -165,6 +184,44 @@ func parseASNInput(s string) (uint32, bool) {
 		return 0, false
 	}
 	return uint32(n), true
+}
+
+// isASNForm reports whether s is "AS" followed only by digits -- the
+// shape of an ASN whatever its value, so parseASNInput rejecting it can
+// only mean the number is out of range.
+func isASNForm(s string) bool {
+	if len(s) < 3 || !strings.EqualFold(s[:2], "as") {
+		return false
+	}
+	for _, r := range s[2:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// reservedASNCategory reports why asn is an IANA special-purpose
+// autonomous system number with no registration data to look up, or ""
+// if it is an ordinary, potentially-allocated one. The ranges follow
+// IANA's "Special-Purpose AS Numbers" registry.
+func reservedASNCategory(asn uint32) string {
+	switch {
+	case asn == 0:
+		return "reserved (RFC 7607)"
+	case asn == 23456:
+		return "AS_TRANS, the placeholder for a 4-byte ASN (RFC 6793)"
+	case asn >= 64496 && asn <= 64511, asn >= 65536 && asn <= 65551:
+		return "reserved for documentation (RFC 5398)"
+	case asn >= 64512 && asn <= 65534, asn >= 4200000000 && asn <= 4294967294:
+		return "reserved for private-use networks (RFC 6996)"
+	case asn == 65535, asn == 4294967295:
+		return "reserved (RFC 7300)"
+	case asn >= 65552 && asn <= 131071:
+		return "reserved by IANA"
+	default:
+		return ""
+	}
 }
 
 // v4Broadcast is the IPv4 limited broadcast address, 255.255.255.255 --

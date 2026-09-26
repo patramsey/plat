@@ -303,7 +303,8 @@ func TestNormalize_ClassifiesASNInput(t *testing.T) {
 		{"lowercase prefix", "as15169", 15169},
 		{"mixed case prefix", "As15169", 15169},
 		{"low autnum", "AS1", 1},
-		{"32-bit autnum", "AS4294967294", 4294967294},
+		{"32-bit autnum", "AS131072", 131072},
+		{"last 16-bit autnum before documentation space", "AS64495", 64495},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			q, err := Normalize(tt.input)
@@ -328,6 +329,57 @@ func TestNormalize_RejectsBareNumericAndMalformedASN(t *testing.T) {
 			q, err := Normalize(input)
 			if err == nil && q.Kind == KindASN {
 				t.Errorf("Normalize(%q) classified as ASN %d; want rejection or non-ASN", input, q.ASN)
+			}
+		})
+	}
+}
+
+// Every IANA special-purpose ASN used to reach the lookup, find no
+// RIR to refer to, and exit 3 claiming "no sources could be reached" --
+// the ASN twin of the reserved-IP bug above. Each is rejected up front.
+func TestNormalize_RejectsReservedASNs(t *testing.T) {
+	for _, tt := range []struct {
+		input, wantReason string
+	}{
+		{"AS0", "reserved"},
+		{"AS23456", "AS_TRANS"},
+		{"AS64496", "documentation"},
+		{"AS64511", "documentation"},
+		{"AS64512", "private-use"},
+		{"AS65534", "private-use"},
+		{"AS65535", "reserved"},
+		{"AS65536", "documentation"},
+		{"AS65551", "documentation"},
+		{"AS65552", "reserved"},
+		{"AS131071", "reserved"},
+		{"AS4200000000", "private-use"},
+		{"AS4294967294", "private-use"},
+		{"AS4294967295", "reserved"},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			q, err := Normalize(tt.input)
+			if !errors.Is(err, ErrReservedASN) {
+				t.Fatalf("Normalize(%q) = (%+v, %v), want ErrReservedASN", tt.input, q, err)
+			}
+			if !strings.Contains(err.Error(), tt.wantReason) {
+				t.Errorf("error %q does not name the reason %q", err, tt.wantReason)
+			}
+		})
+	}
+}
+
+// "AS" plus digits is unmistakably an ASN attempt, so one too large for
+// 32 bits must say so -- not fall through to the domain path and report
+// a "single-label input is not a valid domain".
+func TestNormalize_RejectsOutOfRangeASN(t *testing.T) {
+	for _, input := range []string{"AS4294967296", "AS99999999999"} {
+		t.Run(input, func(t *testing.T) {
+			_, err := Normalize(input)
+			if !errors.Is(err, ErrASNOutOfRange) {
+				t.Fatalf("Normalize(%q) error = %v, want ErrASNOutOfRange", input, err)
+			}
+			if strings.Contains(err.Error(), "single-label") {
+				t.Errorf("error %q describes the input as a domain", err)
 			}
 		})
 	}
