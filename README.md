@@ -89,7 +89,7 @@ sudo mv plat /usr/local/bin/
 
 All platforms and checksums on the [releases page](https://github.com/patramsey/plat/releases).
 
-**Go install:**
+**Go install** (Go 1.26 or newer):
 ```bash
 go install github.com/patramsey/plat/cmd/plat@latest
 ```
