@@ -7,6 +7,15 @@ follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- An RDAP 429 whose `Retry-After` outlasts the timeout is reported as a
+  rate limit at once, rather than waiting out the budget and reporting a
+  timeout.
+- `--diff` accepts its own snapshot for an IDN domain; it compared the
+  snapshot's Unicode name against the punycode query and exited `2`.
+- `--no-color` removes colour with an explicit `-o human`, as `NO_COLOR`
+  does.
+- A failed name in a human/plain bulk run no longer leaves a stray blank
+  line on stdout.
 - A free `.be` name is reported as not registered (exit `1`). DNS Belgium
   answers with "Status: AVAILABLE", which plat rendered as a registered
   domain, exiting `0`.

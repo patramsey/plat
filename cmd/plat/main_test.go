@@ -2086,3 +2086,111 @@ func TestHelpExplainsToolAndProvenance(t *testing.T) {
 		t.Errorf("--help output has no json example; got:\n%s", out)
 	}
 }
+
+// --no-color is documented as having the same effect as NO_COLOR, but
+// only NO_COLOR lowered the detected colour profile (colorprofile.Detect
+// reads the environment). With an explicit -o human, the flag reached
+// the renderer choice and nothing else, so a colour terminal still got
+// ANSI. applyNoColor makes the flag lower the profile the same way.
+func TestRunLookupPool_NoColorFlagStripsANSIOnAColorTerminal(t *testing.T) {
+	t.Setenv("CLICOLOR_FORCE", "")
+
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write(fixture)
+	}))
+	defer rdapSrv.Close()
+
+	opts := lookupOptions{NoFollow: true, Concurrency: 1, NoColor: true}
+	client := newTestClient(t, bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL}), opts, []model.SourceID{model.SourceRegistryRDAP})
+
+	ui := applyNoColor(uiConfig{Profile: colorprofile.TrueColor, Width: 80}, opts.NoColor)
+	var stdout, stderr bytes.Buffer
+	if err := runLookupPool(context.Background(), &stdout, &stderr, []string{"example.com"}, opts, render.FormatHuman, ui, client); err != nil {
+		t.Fatalf("runLookupPool: %v\nstderr:\n%s", err, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "\x1b[") {
+		t.Errorf("ANSI present with --no-color on a colour terminal:\n%s", stdout.String())
+	}
+	if !ui.NoColor {
+		t.Error("ui.NoColor = false after applyNoColor(..., true); the stderr error line checks it")
+	}
+}
+
+func TestApplyNoColor_LeavesColourAloneWithoutTheFlag(t *testing.T) {
+	ui := applyNoColor(uiConfig{Profile: colorprofile.TrueColor}, false)
+	if ui.Profile != colorprofile.TrueColor || ui.NoColor {
+		t.Errorf("applyNoColor(false) = %+v, want the input unchanged", ui)
+	}
+}
+
+// The bulk separator was written after every name but the last, whether
+// or not that name printed anything, so a failed name (whose error goes
+// to stderr) left a stray blank line on stdout: two before the record
+// here, or a trailing one when the failure came last.
+func TestRunLookupPool_FailedNamesLeaveNoBlankLines(t *testing.T) {
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write(fixture)
+	}))
+	defer rdapSrv.Close()
+
+	opts := lookupOptions{NoFollow: true, Concurrency: 1}
+	client := newTestClient(t, bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL}), opts, []model.SourceID{model.SourceRegistryRDAP})
+
+	for _, names := range [][]string{
+		{"bad..com", "nosuch.local", "example.com"},
+		{"example.com", "bad..com"},
+		{"example.com", "bad..com", "example.com"},
+	} {
+		t.Run(strings.Join(names, ","), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			_ = runLookupPool(context.Background(), &stdout, &stderr, names, opts, render.FormatPlain, uiConfig{}, client)
+			out := stdout.String()
+			if strings.HasPrefix(out, "\n") {
+				t.Errorf("stdout starts with a blank line:\n%q", out)
+			}
+			if strings.HasSuffix(out, "\n\n") {
+				t.Errorf("stdout ends with a blank line:\n%q", out)
+			}
+			if strings.Contains(out, "\n\n\n") {
+				t.Errorf("stdout has a doubled blank line:\n%q", out)
+			}
+		})
+	}
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("stdout closed") }
+
+// A write to stdout failing mid-run (a closed pipe) is returned, not
+// swallowed into an exit code that claims the lookups succeeded.
+func TestRunLookupPool_StdoutWriteErrorIsReturned(t *testing.T) {
+	fixture, err := os.ReadFile("../../testdata/rdap/com-example.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write(fixture)
+	}))
+	defer rdapSrv.Close()
+
+	opts := lookupOptions{NoFollow: true, Concurrency: 1}
+	client := newTestClient(t, bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL}), opts, []model.SourceID{model.SourceRegistryRDAP})
+
+	var stderr bytes.Buffer
+	err = runLookupPool(context.Background(), failingWriter{}, &stderr, []string{"example.com"}, opts, render.FormatPlain, uiConfig{}, client)
+	if err == nil || !strings.Contains(err.Error(), "stdout closed") {
+		t.Errorf("err = %v, want the stdout write error", err)
+	}
+}

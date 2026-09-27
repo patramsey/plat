@@ -268,3 +268,25 @@ func TestDiffNameMatches_IPWithinRangeOfCIDRlessSnapshot(t *testing.T) {
 		t.Error("an address outside the snapshot's range matched")
 	}
 }
+
+// A domain snapshot's name comes from RDAP's unicodeName when the
+// registry publishes one, while the query is compared in punycode, so
+// `plat --diff s.json bücher.com` rejected the snapshot it had just
+// written. The negative half keeps the match from becoming "anything".
+func TestDiffNameMatches_IDNSnapshotMatchesItsPunycodeQuery(t *testing.T) {
+	snap := machine.Snapshot{ObjectType: "domain", Name: "bücher.com"}
+	q, err := domain.Normalize("bücher.com")
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	if !diffNameMatches(snap, q) {
+		t.Errorf("snapshot %q did not match query %q", snap.Name, q.Name.Punycode)
+	}
+	other, err := domain.Normalize("bucher.com")
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	if diffNameMatches(snap, other) {
+		t.Error("snapshot for bücher.com matched bucher.com")
+	}
+}
