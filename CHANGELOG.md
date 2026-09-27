@@ -4,69 +4,42 @@ All notable changes to `plat` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project
 follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.9.0] - 2026-09-27
+
+Fixes from a live sweep of TLDs, RIRs and CLI paths: wrong data shown as
+fact, lookups reported as succeeding when they had not, parsers that had
+never worked on real registry output, and conflicts between sources that
+agreed.
 
 ### Changed
-- **Breaking:** Free names in about 40 more country-code TLDs exit `1`
-  (not registered) instead of `0`. Their registries' not-found wordings
-  -- CoCCA's "No Object Found", Tucows's "is available for registration",
-  JWhoisServer's "NO OBJECT FOUND!" and a dozen one-offs -- matched no
-  marker, so the answer counted as a registered domain with no fields.
-  Found by a sweep of every ccTLD; each new marker was checked against the
-  sweep's registered answers and matched none. "Error: ratelimit
-  exceeded" is now a rate limit, and `.gq` and `.bo` refusals are failed
-  sources rather than empty successes.
-- plat now requires **Go 1.26** or newer to build or to use as a library
-  (previously 1.25). `golang.org/x/net`, `x/sync` and `x/term` dropped
-  Go 1.25, which is also past its support window now that Go 1.27 is
+- **Breaking:** plat requires **Go 1.26** or newer to build or to use as a
+  library (previously 1.25). `golang.org/x/net`, `x/sync` and `x/term`
+  dropped Go 1.25, which is past its support window now that Go 1.27 is
   current. Release binaries are unaffected.
+- **Breaking:** An unregistered name in `.be` and about 40 other
+  country-code TLDs exits `1` (not registered) instead of `0`. Their
+  registries' not-found wordings -- DNS Belgium's "Status: AVAILABLE",
+  CoCCA's "No Object Found", Tucows's "is available for registration",
+  JWhoisServer's "NO OBJECT FOUND!" and a dozen one-offs -- matched no
+  marker, so plat rendered a free name as a registered domain with no
+  fields. Found by a sweep of every ccTLD; each new marker was checked
+  against the sweep's registered answers and matched none.
+- **Breaking:** A WHOIS server that refuses the query is a failed source.
+  SWITCH (`.ch`, `.li`) refuses port-43 queries, and `plat nic.ch` exited
+  `0` with an empty record; it now exits `3` and says why under `-v`.
+  `.gq`'s "This TLD has no whois server" and `.bo`'s query refusal are
+  treated the same way.
+- **Breaking:** Reserved ASNs -- `AS0`, `AS23456`, documentation,
+  private-use and IANA-reserved ranges -- exit `2` with the reason, and
+  `plat.Client.Lookup` returns `ErrInvalidInput`, instead of exit `3`
+  claiming no sources could be reached. An `AS` number beyond 32 bits is
+  reported as out of range rather than as an invalid single-label domain.
+- **Breaking:** A domain's RDAP status `active` is reported as `ok`, its
+  EPP equivalent (RFC 8056), so it no longer appears alongside WHOIS's
+  `ok` as a second status. Scripts matching `"active"` in `status.value`
+  need updating.
 
 ### Fixed
-- An RDAP 429 whose `Retry-After` outlasts the timeout is reported as a
-  rate limit at once, rather than waiting out the budget and reporting a
-  timeout.
-- `--diff` accepts its own snapshot for an IDN domain; it compared the
-  snapshot's Unicode name against the punycode query and exited `2`.
-- `--no-color` removes colour with an explicit `-o human`, as `NO_COLOR`
-  does.
-- A failed name in a human/plain bulk run no longer leaves a stray blank
-  line on stdout.
-- A free `.be` name is reported as not registered (exit `1`). DNS Belgium
-  answers with "Status: AVAILABLE", which plat rendered as a registered
-  domain, exiting `0`.
-- A refused WHOIS query is a failed source. SWITCH (`.ch`, `.li`)
-  refuses port-43 queries, and `plat nic.ch` exited `0` with an empty
-  record.
-- ARIN IP lookups inside nested networks -- most ISP space -- get a WHOIS
-  record. A bare query returned only a summary, which counted as an
-  empty success. plat now asks ARIN for full records and keeps the most
-  specific network, matching RDAP; ARIN's "Reassigned" and RDAP's
-  "ASSIGNMENT" no longer conflict.
-- `.nl`, `.be`, `.it`, `.cn` and `.at` WHOIS yield the registrars,
-  nameservers and dates their responses carry.
-- RDAP "active" and WHOIS "ok" are one status, not two (RFC 8056).
-- A nameserver spelled in Unicode by one source and punycode by another
-  counts once, with no conflict.
-- A registry that names itself as the registrar WHOIS server (`.au`) is
-  not queried twice and counted as a second source.
-- A date-only WHOIS value no longer conflicts with an RDAP timestamp from
-  the same local day (`google.com.br`).
-- RIPE-region IP and ASN lookups report the owning organization rather
-  than a maintainer. RIPE gives its `mnt-by` maintainers the registrant
-  role too, so `80.128.0.1` showed "DTAG-NIC" instead of Deutsche Telekom
-  AG, and the wrong value won the merge.
-- An RDAP abuse phone is the contact's voice number. The last `tel` in
-  the vCard used to win, so `AS3333` reported RIPE's fax number.
-- WHOIS responses that list contact, nsset or keyset objects after the
-  domain keep the domain's own registrar and dates. `seznam.cz` reported
-  the registry's own contact as its registrar, and `google.it` its tech
-  contact's creation date. `.cz` and `.br` creation and update dates now
-  parse, as does registro.br's `#ticket` date suffix.
-- `.mx` no longer shows a contact's state as the domain status
-  ("nuevoLeon"), and its nameservers are read.
-- GDPR redaction is reported for domain and IP lookups. A redacted
-  source was dropped before the merge checked for redaction, so no
-  notice ever appeared.
 - `.uk` domains get WHOIS data again. IANA's record for `.uk` has listed
   no WHOIS server since 2026-08-04, so plat queried RDAP alone and one
   slow RDAP response failed the whole lookup with exit `3`. plat now falls
@@ -81,18 +54,54 @@ follows [Semantic Versioning](https://semver.org/).
   expected rather than recorded, and is replaced by real recordings.
   Nominet's `[Tag = X]` registrar suffix and its "No registrar listed"
   sentence no longer produce false registrar conflicts.
-- A WHOIS failure on an IP or ASN lookup now reports why. A timeout or
+- RIPE-region IP and ASN lookups report the owning organization rather
+  than a maintainer. RIPE gives its `mnt-by` maintainers the registrant
+  role too, so `80.128.0.1` showed "DTAG-NIC" instead of Deutsche Telekom
+  AG, and the wrong value won the merge.
+- WHOIS responses that list contact, nsset or keyset objects after the
+  domain keep the domain's own registrar and dates. `seznam.cz` reported
+  the registry's own contact as its registrar, and `google.it` its tech
+  contact's creation date. `.cz` and `.br` creation and update dates now
+  parse, as does registro.br's `#ticket` date suffix.
+- `.mx` no longer shows a contact's state as the domain status
+  ("nuevoLeon"), and its nameservers are read.
+- An RDAP abuse phone is the contact's voice number. The last `tel` in
+  the vCard used to win, so `AS3333` reported RIPE's fax number.
+- GDPR redaction is reported for domain and IP lookups. A redacted
+  source was dropped before the merge checked for redaction, so no
+  notice ever appeared.
+- ARIN IP lookups inside nested networks -- most ISP space -- get a WHOIS
+  record. A bare query returned only a summary, which counted as an
+  empty success. plat now asks ARIN for full records and keeps the most
+  specific network, matching RDAP; ARIN's "Reassigned" and RDAP's
+  "ASSIGNMENT" no longer conflict.
+- `.nl`, `.be`, `.it`, `.cn` and `.at` WHOIS yield the registrars,
+  nameservers and dates their responses carry.
+- A nameserver spelled in Unicode by one source and punycode by another
+  counts once, with no conflict.
+- A registry that names itself as the registrar WHOIS server (`.au`,
+  `nic.xyz`, `nic.co`) is not queried twice and counted as a second
+  source.
+- A date-only WHOIS value no longer conflicts with an RDAP timestamp from
+  the same local day (`google.com.br`).
+- "Error: ratelimit exceeded" is recognised as a rate limit rather than
+  an empty successful answer.
+- A WHOIS failure on an IP or ASN lookup reports why. A timeout or
   refused connection at the RIR showed as `no data` under `-v`, with no
   `error` in `-o json`; domain lookups already reported the reason.
-- Reserved ASNs -- `AS0`, `AS23456`, documentation, private-use, and
-  IANA-reserved ranges -- exit `2` with the reason, and the library
-  returns `ErrInvalidInput`, instead of exit `3` claiming no sources
-  could be reached. An `AS` number beyond 32 bits is reported as out of
-  range rather than as an invalid single-label domain.
 - A name with no RDAP service or WHOIS server listed anywhere (e.g.
   `.gr`) now says so, instead of "no sources could be reached" -- nothing
   had been queried, so nothing had failed to answer. When `--source`
   excluded the only source a name has, the message points at the filter.
+- An RDAP 429 whose `Retry-After` outlasts the timeout is reported as a
+  rate limit at once, rather than waiting out the budget and reporting a
+  timeout.
+- `--diff` accepts its own snapshot for an IDN domain; it compared the
+  snapshot's Unicode name against the punycode query and exited `2`.
+- `--no-color` removes colour with an explicit `-o human`, as `NO_COLOR`
+  does.
+- A failed name in a human/plain bulk run no longer leaves a stray blank
+  line on stdout.
 
 ## [0.8.0] - 2026-08-28
 
@@ -510,7 +519,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/patramsey/plat/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/patramsey/plat/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/patramsey/plat/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/patramsey/plat/compare/v0.5.0...v0.6.0
