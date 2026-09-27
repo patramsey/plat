@@ -6,6 +6,12 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- plat now requires **Go 1.26** or newer to build or to use as a library
+  (previously 1.25). `golang.org/x/net`, `x/sync` and `x/term` dropped
+  Go 1.25, which is also past its support window now that Go 1.27 is
+  current. Release binaries are unaffected.
+
 ### Fixed
 - An RDAP 429 whose `Retry-After` outlasts the timeout is reported as a
   rate limit at once, rather than waiting out the budget and reporting a
