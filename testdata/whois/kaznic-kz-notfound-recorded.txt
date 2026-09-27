@@ -1,0 +1,4 @@
+Whois Server for the .kz and .xn--80ao21a top level domains.
+This server is maintained by the KazNIC, the ccTLD manager for the Republic of Kazakhstan.
+
+*** Nothing found for this query.
