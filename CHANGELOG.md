@@ -4,34 +4,43 @@ All notable changes to `plat` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project
 follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.10.0] - 2026-09-27
+
+Follow-ups from v0.9.0's ccTLD sweep: reserved names, WHOIS formats that
+parsed to an empty record, and a v0.9.0 regression in `.bo`. Exit-code
+changes are treated as breaking, as in v0.9.0, which is why this is a
+minor release rather than a patch.
+
+### Changed
+- **Breaking:** A name the registry reports as reserved or restricted --
+  `.ug`, `.dm`, `.bw` and `.qa` policy rejections, and registry-held
+  names such as `nic.om`, `nic.ca`, `nic.nz`, `nic.cn`, `nic.hk` and
+  `nic.kr` -- exits `3` with "the registry reports this name as reserved
+  or restricted" instead of `0` as an empty registered record. It is not
+  reported as "not registered" either, since the name cannot be
+  registered. A name another source does have a record for (e.g.
+  `nic.ke` via RDAP) still exits `0`.
+- **Breaking:** A free `.il` name exits `1` (not registered) instead of
+  `0`. ISOC-IL answers a name with no record with its terms of use and
+  nothing else, which plat read as a registered domain.
+- **Breaking:** `.bo` exit codes change back from v0.9.0's. A registered
+  `.bo` domain exits `0` again instead of `3`, and a free one exits `1`
+  instead of `3`. v0.9.0 mistook the footer on every `.bo` answer
+  ("whois.nic.bo solo acepta consultas con dominios .bo") for a refusal,
+  and `.bo` has no RDAP to fall back on. The footer now means "no
+  record" only when it is the entire answer.
+- **Breaking:** A rate-limited `.lu` lookup is a failed source (exit `3`
+  when it is the only one) instead of an empty successful answer (exit
+  `0`). `.lu`'s "Maximum query rate reached" matched no marker.
 
 ### Fixed
-- A name the registry reports as reserved or restricted -- `.ug`, `.dm`,
-  `.bw` and `.qa` policy rejections, and registry-held names such as
-  `nic.om`, `nic.ca`, `nic.nz`, `nic.cn`, `nic.hk` and `nic.kr` -- exits
-  `3` with "the registry reports this name as reserved or restricted"
-  instead of `0` as an empty registered record. It is not reported as
-  "not registered" either, since the name cannot be registered. A name
-  another source does have a record for (e.g. `nic.ke` via RDAP) still
-  exits `0`.
-- Registered `.bo` domains resolve again. v0.9.0 mistook the footer on
-  every `.bo` answer ("whois.nic.bo solo acepta consultas con dominios
-  .bo") for a refusal, so each one failed with exit `3` -- `.bo` has no
-  RDAP to fall back on. The footer now means "no record" only when it is
-  the entire answer, which is how `.bo` answers a free name.
 - WHOIS-only ccTLDs whose answers parsed to an empty record now show
   their domain, registrar, dates and nameservers: `.gg` and `.je`
   (indented sections), `.bo` (Spanish labels), `.lu` (`domainname`,
   `registrar-name`), and `.it`'s registrar, which shares an
   `Organization:` sub-key with the contact sections.
-- A free `.il` name is reported as not registered instead of registered.
-  ISOC-IL answers a name with no record with its terms of use and
-  nothing else.
-- WHOIS "Registrar Name" is read as the registrar, so `.il`, `.au`, `.ae`
-  and `.cl` answers show one.
-- `.lu`'s "Maximum query rate reached" is recognised as a rate limit
-  rather than an empty successful answer.
+- WHOIS "Registrar Name" is read as the registrar, so `.il`, `.au`,
+  `.ae` and `.cl` answers show one.
 
 ## [0.9.0] - 2026-09-27
 
@@ -548,7 +557,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/patramsey/plat/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/patramsey/plat/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/patramsey/plat/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/patramsey/plat/compare/v0.6.0...v0.7.0
