@@ -198,6 +198,27 @@ var restrictedMarkers = []string{
 	"currently not available for registration",        // .hk
 }
 
+// bareNotFoundAnswers are lines some registries append to every answer,
+// and send on their own when there is no record. The line alone is
+// boilerplate; an answer consisting of nothing else means "no record".
+// .bo's footer was once a refusal marker, which failed every registered
+// .bo domain -- whose full record ends with the same line (#116).
+var bareNotFoundAnswers = []string{
+	"whois.nic.bo solo acepta consultas con dominios .bo",
+}
+
+// isBareNotFoundAnswer reports whether raw's only content line is one of
+// bareNotFoundAnswers.
+func isBareNotFoundAnswer(raw string) bool {
+	var content []string
+	for _, l := range strings.Split(raw, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			content = append(content, l)
+		}
+	}
+	return len(content) == 1 && slices.Contains(bareNotFoundAnswers, strings.ToLower(content[0]))
+}
+
 // notFoundPatterns are not-found signals that need more context than a
 // substring. JWhoisServer (.tg .tn .gf .mq) reports a missing object as
 // "NO OBJECT FOUND!" followed by the object and its type; only a missing
@@ -224,7 +245,6 @@ var unsupportedMarkers = []string{
 	// in the terms of use of countless real answers.
 	"requests of this client are not permitted",
 	"this tld has no whois server", // Freenom's former TLDs (.gq)
-	"solo acepta consultas",        // .bo, refusing the query form
 }
 
 // tokenizeKV handles the default "Key: value" dialect used by most
@@ -476,6 +496,9 @@ func Parse(raw, tld string) Fields {
 			f.NotFound = true
 			break
 		}
+	}
+	if !f.NotFound && isBareNotFoundAnswer(raw) {
+		f.NotFound = true
 	}
 	if !f.NotFound {
 		normalized := strings.ReplaceAll(lowerRaw, "\r", "")

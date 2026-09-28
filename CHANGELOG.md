@@ -14,6 +14,11 @@ follows [Semantic Versioning](https://semver.org/).
   an empty registered record. It is not reported as "not registered"
   either, since the name cannot be registered. A name another source does
   have a record for (e.g. `nic.ke` via RDAP) still exits `0`.
+- Registered `.bo` domains resolve again. v0.9.0 mistook the footer on
+  every `.bo` answer ("whois.nic.bo solo acepta consultas con dominios
+  .bo") for a refusal, so each one failed with exit `3` -- `.bo` has no
+  RDAP to fall back on. The footer now means "no record" only when it is
+  the entire answer, which is how `.bo` answers a free name.
 
 ## [0.9.0] - 2026-09-27
 

@@ -35,6 +35,7 @@ func TestParse_CCTLDNotFoundWordings(t *testing.T) {
 		"nictm-tm-notfound-recorded.txt",    // Domain ... is available for purchase
 		"twnic-tw-notfound-recorded.txt",    // No Found
 		"ws-notfound-recorded.txt",          // The queried object does not exist: <name>.
+		"nicbo-bo-notfound-recorded.txt",    // .bo footer and nothing else (#116)
 	} {
 		t.Run(fixture, func(t *testing.T) {
 			f := Parse(loadFixture(t, fixture), "")
@@ -51,7 +52,6 @@ func TestParse_CCTLDRateLimitAndRefusal(t *testing.T) {
 	}
 	for _, fixture := range []string{
 		"freenom-gq-refused-recorded.txt", // This TLD has no whois server.
-		"nicbo-bo-refused-recorded.txt",   // solo acepta consultas con dominios .bo
 	} {
 		f := Parse(loadFixture(t, fixture), "")
 		if !f.Unsupported {
@@ -135,5 +135,17 @@ func TestParse_RestrictedNames(t *testing.T) {
 				t.Error("NotFound = true; a reserved name would be reported as free")
 			}
 		})
+	}
+}
+
+// .bo ends every answer with "whois.nic.bo solo acepta consultas con
+// dominios .bo" -- a registered domain's full record included. v0.9.0
+// took that footer for a refusal, so every registered .bo domain failed
+// (exit 3; .bo has no RDAP). Only an answer that is the footer and
+// nothing else means there is no record. See #116.
+func TestParse_BOFooterIsNotARefusal(t *testing.T) {
+	f := Parse(loadFixture(t, "nicbo-bo-registered-recorded.txt"), "bo")
+	if f.Unsupported || f.NotFound {
+		t.Errorf("Unsupported=%v NotFound=%v for registered nic.bo; its footer is boilerplate", f.Unsupported, f.NotFound)
 	}
 }
