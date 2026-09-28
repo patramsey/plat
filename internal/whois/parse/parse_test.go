@@ -688,7 +688,7 @@ func TestParse_MultiObjectResponseKeepsTheDomainsOwnValues(t *testing.T) {
 			expires: date{"29.10.2027", true},
 		},
 		{
-			fixture: "nicit-it-google-recorded.txt", tld: "it",
+			fixture: "nicit-it-google-recorded.txt", tld: "it", registrar: "MarkMonitor International Limited",
 			created: date{"1999-12-10 00:00:00", true},
 			updated: date{"2026-06-09 23:13:34", true},
 			expires: date{"2027-04-21", true},

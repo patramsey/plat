@@ -125,6 +125,7 @@ func TestParse_RestrictedNames(t *testing.T) {
 		"cnnic-cn-nic-restricted-recorded.txt", // ...can not be registered online
 		"hkirc-hk-nic-restricted-recorded.txt", // currently not available for registration
 		"pknic-pk-nic-restricted-recorded.txt", // This domain cannot be registered because of...
+		"kisa-kr-nic-restricted-recorded.txt",  // restricted to specifically qualified registrants
 	} {
 		t.Run(fixture, func(t *testing.T) {
 			f := Parse(loadFixture(t, fixture), "")
