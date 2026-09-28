@@ -32,6 +32,7 @@ import (
 	"github.com/patramsey/plat/internal/render/human"
 	"github.com/patramsey/plat/internal/render/machine"
 	"github.com/patramsey/plat/internal/render/plain"
+	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/spinner"
 	"github.com/patramsey/plat/model"
 )
@@ -953,6 +954,14 @@ func lookupOutcomeError(code int, sources []model.SourceResult, filtered bool) e
 			return errors.New("lookup failed -- none of the selected sources has a server listed for this name, so there was nothing to query")
 		}
 		return errors.New("lookup failed -- no RDAP or WHOIS server is listed for this name, so there was nothing to query")
+	}
+	// A restricted name is neither registered nor free, and saying so
+	// beats a generic "sources failed": the source did not fail to answer,
+	// it answered that the name cannot be looked up as either.
+	for _, s := range sources {
+		if s.Err == source.RestrictedReason {
+			return fmt.Errorf("lookup inconclusive -- the registry reports this name as reserved or restricted (checked: %s)", checked)
+		}
 	}
 	failed := 0
 	for _, s := range sources {

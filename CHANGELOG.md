@@ -4,6 +4,17 @@ All notable changes to `plat` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- A name the registry reports as reserved or restricted -- `.ug`, `.dm`,
+  `.bw` and `.qa` policy rejections, and registry-held names such as
+  `nic.om`, `nic.ca`, `nic.nz`, `nic.cn`, `nic.hk` -- exits `3` with "the
+  registry reports this name as reserved or restricted" instead of `0` as
+  an empty registered record. It is not reported as "not registered"
+  either, since the name cannot be registered. A name another source does
+  have a record for (e.g. `nic.ke` via RDAP) still exits `0`.
+
 ## [0.9.0] - 2026-09-27
 
 Fixes from a live sweep of TLDs, RIRs and CLI paths: wrong data shown as

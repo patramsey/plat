@@ -173,6 +173,14 @@ func TestLookupOutcomeError(t *testing.T) {
 			"lookup inconclusive -- 2 of 2 sources failed, so non-existence can't be confirmed (checked: registry-rdap, registry-whois)",
 		},
 		{
+			// A restricted name is neither registered nor free; the
+			// headline must say which, not a generic source failure.
+			"restricted name",
+			3,
+			[]model.SourceResult{{Source: model.SourceRegistryRDAP, NotFound: true}, {Source: model.SourceRegistryWHOIS, Err: "registry restricts this name (reserved or not available for registration)"}},
+			"lookup inconclusive -- the registry reports this name as reserved or restricted (checked: registry-rdap, registry-whois)",
+		},
+		{
 			"total failure, mixed notfound and errored",
 			3,
 			[]model.SourceResult{{Source: model.SourceRegistryRDAP, NotFound: true}, {Source: model.SourceRegistryWHOIS, Err: "timeout"}},
