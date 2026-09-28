@@ -139,7 +139,8 @@ var rateLimitMarkers = []string{
 	"exceeded query limit",
 	"too many requests",
 	"quota exceeded",
-	"ratelimit exceeded", // "Error: ratelimit exceeded" (.aw, .nl under load)
+	"ratelimit exceeded",         // "Error: ratelimit exceeded" (.aw, .nl under load)
+	"maximum query rate reached", // "%% Maximum query rate reached" (.lu)
 }
 
 // The entries after "status: free" come from a 2026-09-27 sweep of every
@@ -186,16 +187,17 @@ var notFoundMarkers = []string{
 // matching neither. "Not available" alone is not a marker: some
 // registries describe a registered domain that way.
 var restrictedMarkers = []string{
-	"violates registry policy",                        // .ug
-	"matches a restricted word",                       // .dm
-	"prohibited string - domain cannot be registered", // CoCCA-style (.bw, .ke)
-	"this domain cannot be registered",                // .pk
-	"reserved by qdr",                                 // .qa
-	"the domain name is not available",                // .qa
-	"reserved domain name",                            // .om
-	"has usage restrictions applied",                  // .ca, .nz
-	"can not be registered online",                    // .cn
-	"currently not available for registration",        // .hk
+	"violates registry policy",                         // .ug
+	"matches a restricted word",                        // .dm
+	"prohibited string - domain cannot be registered",  // CoCCA-style (.bw, .ke)
+	"this domain cannot be registered",                 // .pk
+	"reserved by qdr",                                  // .qa
+	"the domain name is not available",                 // .qa
+	"reserved domain name",                             // .om
+	"has usage restrictions applied",                   // .ca, .nz
+	"can not be registered online",                     // .cn
+	"currently not available for registration",         // .hk
+	"restricted to specifically qualified registrants", // .kr (KISA)
 }
 
 // bareNotFoundAnswers are lines some registries append to every answer,
@@ -217,6 +219,18 @@ func isBareNotFoundAnswer(raw string) bool {
 		}
 	}
 	return len(content) == 1 && slices.Contains(bareNotFoundAnswers, strings.ToLower(content[0]))
+}
+
+// hasContentLine reports whether raw has any line that is neither blank
+// nor a "%" or "#" comment.
+func hasContentLine(raw string) bool {
+	for _, l := range strings.Split(raw, "\n") {
+		l = strings.TrimSpace(l)
+		if l != "" && !strings.HasPrefix(l, "%") && !strings.HasPrefix(l, "#") {
+			return true
+		}
+	}
+	return false
 }
 
 // notFoundPatterns are not-found signals that need more context than a
@@ -409,6 +423,12 @@ func tokenizeIndent(raw string) []kvPair {
 				val := strings.TrimSpace(content[idx+1:])
 				if val != "" && flatKeyPattern.MatchString(key) {
 					out = append(out, kvPair{strings.ToLower(key), val})
+					// The same sub-key also under its section's name
+					// ("registrar organization"), for a template to map
+					// where the bare sub-key is ambiguous: .it's
+					// registrar and contacts all have "Organization:".
+					// Unmapped, it only lands in Unmapped.
+					out = append(out, kvPair{section + " " + strings.ToLower(key), val})
 					continue
 				}
 			}
@@ -498,6 +518,9 @@ func Parse(raw, tld string) Fields {
 		}
 	}
 	if !f.NotFound && isBareNotFoundAnswer(raw) {
+		f.NotFound = true
+	}
+	if !f.NotFound && tmpl.CommentOnlyIsNotFound && !hasContentLine(raw) {
 		f.NotFound = true
 	}
 	if !f.NotFound {

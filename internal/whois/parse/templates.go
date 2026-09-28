@@ -17,6 +17,11 @@ var templatesYAML []byte
 type Template struct {
 	Format   string            `yaml:"format"`
 	Synonyms map[string]string `yaml:"synonyms"`
+	// CommentOnlyIsNotFound marks a registry that answers a name with no
+	// record by sending its comment block (terms of use) and nothing else,
+	// with no not-found wording to match. An answer with no content line
+	// outside comments then means NotFound.
+	CommentOnlyIsNotFound bool `yaml:"commentOnlyIsNotFound"`
 }
 
 var templates map[string]Template

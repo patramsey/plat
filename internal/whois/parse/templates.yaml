@@ -52,11 +52,32 @@ be:
     registered: created
 it:
   # Section headers with no colon ("Nameservers", "Registrar") and
-  # indented bodies. The registrar's "Organization:" is deliberately not
-  # mapped: the registrant and contact sections use the same sub-key,
-  # and the indent tokenizer does not qualify sub-keys by section.
+  # indented bodies. The registrant, contacts and registrar all have an
+  # "Organization:" sub-key, so only the section-qualified form is mapped.
   format: indent
+  synonyms:
+    registrar organization: registrar
 at:
   format: kv
   synonyms:
     changed: updated
+gg:
+  # Island Networks (.gg, .je): indented sections like Nominet's.
+  format: indent
+je:
+  format: indent
+bo:
+  format: kv
+  synonyms:
+    dominio: domain
+    fecha de registro: created
+    fecha de vencimiento: expires
+lu:
+  format: kv
+  synonyms:
+    domainname: domain
+    registrar-name: registrar
+il:
+  format: kv
+  # ISOC-IL answers a name with no record with its terms of use alone.
+  commentOnlyIsNotFound: true
