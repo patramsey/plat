@@ -71,6 +71,7 @@ var defaultSynonyms = map[string]string{
 	"name servers":                           fNameservers,
 	"domain nameservers":                     fNameservers,
 	"sponsoring registrar":                   fRegistrar, // CNNIC (.cn)
+	"registrar name":                         fRegistrar, // .il, .au
 	"registration time":                      fCreated,   // CNNIC (.cn)
 	"nserver":                                fNameservers,
 	"nameservers":                            fNameservers,

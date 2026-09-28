@@ -28,6 +28,8 @@ follows [Semantic Versioning](https://semver.org/).
 - A free `.il` name is reported as not registered instead of registered.
   ISOC-IL answers a name with no record with its terms of use and
   nothing else.
+- WHOIS "Registrar Name" is read as the registrar, so `.il`, `.au`, `.ae`
+  and `.cl` answers show one.
 - `.lu`'s "Maximum query rate reached" is recognised as a rate limit
   rather than an empty successful answer.
 

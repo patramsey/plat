@@ -22,7 +22,8 @@ func TestParse_CCTLDFormats(t *testing.T) {
 			created: "2004-11-19", expires: "2030-12-31"},
 		{fixture: "dnslu-lu-registered-recorded.txt", tld: "lu", domain: "nic.lu",
 			registrar: "Fondation Restena", nameservers: []string{"ns1.restena.lu", "ns2.restena.lu"}},
-		{fixture: "isoc-il-recorded.txt", tld: "il", domain: "isoc.org.il"},
+		{fixture: "isoc-il-recorded.txt", tld: "il", domain: "isoc.org.il",
+			registrar: "Israel Internet Association ISOC-IL"},
 		{fixture: "nicit-it-google-recorded.txt", tld: "it", domain: "google.it",
 			registrar: "MarkMonitor International Limited"},
 	} {
