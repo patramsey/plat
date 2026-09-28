@@ -1,0 +1,10 @@
+
+                **********************************************************
+                *            The UG ccTLD Registry Database              *
+                **********************************************************
+
+                Domain Name: zzqq-nonexistent-73519.ug
+                >>> The domain contains special characters not allowed.
+                >>> This domain violates registry policy.
+                >>> Last update of WHOIS database: 2026-09-27T23:06:13 <<<
+            

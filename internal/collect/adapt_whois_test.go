@@ -3,6 +3,7 @@ package collect
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -224,5 +225,19 @@ func TestFromWHOIS_IANAHopNetworkErrorIsSurfaced(t *testing.T) {
 	}
 	if sources[0].Present {
 		t.Error("Present = true, want false: no data was ever fetched")
+	}
+}
+
+// A registry answering that the name is reserved or restricted is a
+// failed source with that reason: not a registered domain (the old
+// behaviour, exit 0) and not a free one (NotFound, exit 1), since the
+// name cannot be registered either. See #111.
+func TestFromHop_RestrictedIsAFailedSourceWithTheReason(t *testing.T) {
+	sr := fromHop(model.SourceRegistryWHOIS, whois.Hop{Fields: parse.Fields{Restricted: true, Domain: "nic.om"}})
+	if sr.Meta.OK || sr.Meta.NotFound || sr.Present {
+		t.Errorf("Meta = %+v, Present = %v; want a failed source, not found=false, not present", sr.Meta, sr.Present)
+	}
+	if !strings.Contains(sr.Meta.Err, "restricts this name") {
+		t.Errorf("Meta.Err = %q, want the reason", sr.Meta.Err)
 	}
 }

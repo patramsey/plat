@@ -21,9 +21,13 @@ type Fields struct {
 	Updated              Date
 	Expires              Date
 	RateLimited          bool
-	NotFound             bool
-	Unsupported          bool
-	Unmapped             map[string][]string
+	// Restricted is set when the registry answers that the name is
+	// reserved, prohibited or otherwise restricted: neither registered
+	// nor available (see restrictedMarkers).
+	Restricted  bool
+	NotFound    bool
+	Unsupported bool
+	Unmapped    map[string][]string
 }
 
 type kvPair struct{ key, val string }
@@ -170,6 +174,28 @@ var notFoundMarkers = []string{
 	"domain is not registered",              // .rs
 	"no se encuentra registrado",            // .ar
 	"no found",                              // .tw
+}
+
+// restrictedMarkers identify an answer that the name is reserved,
+// prohibited or otherwise restricted -- neither registered nor available.
+// Reporting it as registered (the old behaviour: no marker matched) or as
+// not registered (which reads as "free") would both be wrong; collect
+// turns it into a failed source with the reason, so the lookup is
+// inconclusive. From the 2026-09-27 ccTLD sweep (#111), each checked
+// against the sweep's registered answers and genuinely-free answers and
+// matching neither. "Not available" alone is not a marker: some
+// registries describe a registered domain that way.
+var restrictedMarkers = []string{
+	"violates registry policy",                        // .ug
+	"matches a restricted word",                       // .dm
+	"prohibited string - domain cannot be registered", // CoCCA-style (.bw, .ke)
+	"this domain cannot be registered",                // .pk
+	"reserved by qdr",                                 // .qa
+	"the domain name is not available",                // .qa
+	"reserved domain name",                            // .om
+	"has usage restrictions applied",                  // .ca, .nz
+	"can not be registered online",                    // .cn
+	"currently not available for registration",        // .hk
 }
 
 // notFoundPatterns are not-found signals that need more context than a
@@ -466,6 +492,12 @@ func Parse(raw, tld string) Fields {
 			break
 		}
 	}
+	for _, marker := range restrictedMarkers {
+		if strings.Contains(lowerRaw, marker) {
+			f.Restricted = true
+			break
+		}
+	}
 
 	for _, p := range pairs {
 		// A template can map a key to "" to say it is not a synonym for
@@ -543,6 +575,10 @@ func Parse(raw, tld string) Fields {
 	// "available" is a substring of the registered answer.
 	if slices.ContainsFunc(f.Statuses, func(s string) bool { return strings.EqualFold(strings.TrimSpace(s), "available") }) {
 		f.NotFound = true
+	}
+	// A restricted name is not a free one, whatever else the answer says.
+	if f.Restricted {
+		f.NotFound = false
 	}
 	return f
 }

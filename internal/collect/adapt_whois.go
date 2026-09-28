@@ -66,6 +66,16 @@ func fromHop(src model.SourceID, hop whois.Hop) source.SourceRecord {
 		meta.Err = "registry does not support WHOIS for this TLD"
 		return source.SourceRecord{Meta: meta}
 	}
+	if f.Restricted {
+		// The registry says the name is reserved or restricted. That is
+		// neither a registered domain nor a free one -- NotFound would
+		// read as "available" -- so it is a failed source with the
+		// reason, and the lookup is inconclusive unless another source
+		// has the record.
+		meta.OK = false
+		meta.Err = source.RestrictedReason
+		return source.SourceRecord{Meta: meta}
+	}
 	if f.RateLimited {
 		// Same reasoning as Unsupported above: a rate-limit refusal is a
 		// server declining to answer, not a successful-but-empty lookup.

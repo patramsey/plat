@@ -76,8 +76,8 @@ func TestParse_JWhoisRegisteredWithMissingContactsIsFound(t *testing.T) {
 	}
 }
 
-// No registered answer in testdata may trip a not-found, refusal or
-// rate-limit marker: a marker that does makes a taken domain look free.
+// No registered answer in testdata may trip a not-found, refusal,
+// rate-limit or restricted marker: a marker that does makes a taken domain look free.
 // Every fixture whose name does not say otherwise is a registered answer.
 func TestParse_NoRegisteredFixtureTripsAMarker(t *testing.T) {
 	paths, err := filepath.Glob("../../../testdata/whois/*.txt")
@@ -88,7 +88,8 @@ func TestParse_NoRegisteredFixtureTripsAMarker(t *testing.T) {
 	for _, p := range paths {
 		name := filepath.Base(p)
 		if strings.Contains(name, "notfound") || strings.Contains(name, "ratelimited") ||
-			strings.Contains(name, "refused") || strings.Contains(name, "not-supported") {
+			strings.Contains(name, "refused") || strings.Contains(name, "not-supported") ||
+			strings.Contains(name, "restricted") {
 			continue
 		}
 		raw, err := os.ReadFile(p)
@@ -96,13 +97,43 @@ func TestParse_NoRegisteredFixtureTripsAMarker(t *testing.T) {
 			t.Fatalf("reading %s: %v", name, err)
 		}
 		f := Parse(string(raw), "")
-		if f.NotFound || f.RateLimited || f.Unsupported {
-			t.Errorf("%s: NotFound=%v RateLimited=%v Unsupported=%v, want all false for a registered answer",
-				name, f.NotFound, f.RateLimited, f.Unsupported)
+		if f.NotFound || f.RateLimited || f.Unsupported || f.Restricted {
+			t.Errorf("%s: NotFound=%v RateLimited=%v Unsupported=%v Restricted=%v, want all false for a registered answer",
+				name, f.NotFound, f.RateLimited, f.Unsupported, f.Restricted)
 		}
 		checked++
 	}
 	if checked < 20 {
 		t.Errorf("checked only %d registered fixtures; the name filter is too broad", checked)
+	}
+}
+
+// Some registries answer that a name is reserved, prohibited or otherwise
+// restricted: neither registered nor available. Those answers matched no
+// marker and counted as a registered domain with no fields (exit 0). They
+// must not read as "not registered" either, which would suggest the name
+// is free. See #111.
+func TestParse_RestrictedNames(t *testing.T) {
+	for _, fixture := range []string{
+		"uganda-ug-restricted-recorded.txt",    // This domain violates registry policy.
+		"dm-restricted-recorded.txt",           // Domain name matches a restricted word
+		"bocra-bw-restricted-recorded.txt",     // Prohibited String - Domain Cannot Be Registered
+		"qdr-qa-restricted-recorded.txt",       // Reserved by QDR
+		"qdr-qa-nic-restricted-recorded.txt",   // The Domain Name is not Available
+		"om-nic-restricted-recorded.txt",       // Reserved Domain Name
+		"cira-ca-nic-restricted-recorded.txt",  // ...has usage restrictions applied to it
+		"cnnic-cn-nic-restricted-recorded.txt", // ...can not be registered online
+		"hkirc-hk-nic-restricted-recorded.txt", // currently not available for registration
+		"pknic-pk-nic-restricted-recorded.txt", // This domain cannot be registered because of...
+	} {
+		t.Run(fixture, func(t *testing.T) {
+			f := Parse(loadFixture(t, fixture), "")
+			if !f.Restricted {
+				t.Error("Restricted = false; a reserved name would be reported as registered")
+			}
+			if f.NotFound {
+				t.Error("NotFound = true; a reserved name would be reported as free")
+			}
+		})
 	}
 }
