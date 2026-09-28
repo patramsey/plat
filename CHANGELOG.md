@@ -7,6 +7,15 @@ follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- **Breaking:** Free names in about 40 more country-code TLDs exit `1`
+  (not registered) instead of `0`. Their registries' not-found wordings
+  -- CoCCA's "No Object Found", Tucows's "is available for registration",
+  JWhoisServer's "NO OBJECT FOUND!" and a dozen one-offs -- matched no
+  marker, so the answer counted as a registered domain with no fields.
+  Found by a sweep of every ccTLD; each new marker was checked against the
+  sweep's registered answers and matched none. "Error: ratelimit
+  exceeded" is now a rate limit, and `.gq` and `.bo` refusals are failed
+  sources rather than empty successes.
 - plat now requires **Go 1.26** or newer to build or to use as a library
   (previously 1.25). `golang.org/x/net`, `x/sync` and `x/term` dropped
   Go 1.25, which is also past its support window now that Go 1.27 is

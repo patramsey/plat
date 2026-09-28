@@ -135,14 +135,49 @@ var rateLimitMarkers = []string{
 	"exceeded query limit",
 	"too many requests",
 	"quota exceeded",
+	"ratelimit exceeded", // "Error: ratelimit exceeded" (.aw, .nl under load)
 }
 
+// The entries after "status: free" come from a 2026-09-27 sweep of every
+// country-code TLD, which found 74 free names reported as registered
+// because their registry's wording matched none of the above (#113).
+// Each was checked against 183 registered answers from the same sweep and
+// every registered fixture, and matched none of them; keep it that way --
+// TestParse_NoRegisteredFixtureTripsAMarker guards the fixtures. That is
+// why CoCCA's "No Object Found" is matched only after "status:" or
+// "message:", never alone: JWhoisServer prints "NO OBJECT FOUND!" for
+// each missing contact inside a registered domain's answer (see
+// notFoundPatterns for its domain-level form).
 var notFoundMarkers = []string{
 	"no match",
 	"not found",
 	"no entries found",
 	"no data found",
 	"status: free",
+	"status: no object found",               // CoCCA-style registries
+	"message: no object found",              // .sr
+	"object does not exist",                 // CoCCA-style, .by, .ws
+	"object_not_found",                      // .mx, for a free name
+	"is available for registration",         // Tucows registry: .in .my .bh .ky .pw .to
+	"is available for purchase",             // .tm
+	"registration status: available",        // .bg
+	"not registered, and may be available",  // .pk
+	"no information available about domain", // .pl
+	"no record found for",                   // .ls
+	"no such domain",                        // .lu
+	"nothing found",                         // .at, .kz
+	"has not been registered",               // .hk
+	"domain is not registered",              // .rs
+	"no se encuentra registrado",            // .ar
+	"no found",                              // .tw
+}
+
+// notFoundPatterns are not-found signals that need more context than a
+// substring. JWhoisServer (.tg .tn .gf .mq) reports a missing object as
+// "NO OBJECT FOUND!" followed by the object and its type; only a missing
+// object of type domain means the queried domain is free.
+var notFoundPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`no object found!\s*\n\s*object:[ .]*\S+\s*\n\s*type:[ .]*domain\b`),
 }
 
 // unsupportedMarkers flag a registry WHOIS service flatly refusing a
@@ -162,6 +197,8 @@ var unsupportedMarkers = []string{
 	// form. Matched as the whole sentence: "not permitted" alone appears
 	// in the terms of use of countless real answers.
 	"requests of this client are not permitted",
+	"this tld has no whois server", // Freenom's former TLDs (.gq)
+	"solo acepta consultas",        // .bo, refusing the query form
 }
 
 // tokenizeKV handles the default "Key: value" dialect used by most
@@ -412,6 +449,15 @@ func Parse(raw, tld string) Fields {
 		if strings.Contains(lowerRaw, marker) {
 			f.NotFound = true
 			break
+		}
+	}
+	if !f.NotFound {
+		normalized := strings.ReplaceAll(lowerRaw, "\r", "")
+		for _, p := range notFoundPatterns {
+			if p.MatchString(normalized) {
+				f.NotFound = true
+				break
+			}
 		}
 	}
 	for _, marker := range unsupportedMarkers {
