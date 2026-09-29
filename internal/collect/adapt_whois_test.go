@@ -26,15 +26,15 @@ func loadWHOISFixture(t *testing.T, name string) string {
 }
 
 func TestFromWHOIS_RegistryAndRegistrarHops(t *testing.T) {
-	registryRaw := loadWHOISFixture(t, "verisign-com-example.txt")
-	registrarRaw := "Domain Name: example.com\nRegistrant Organization: Example Corp\nRegistrar: Example Registrar, Inc.\n"
+	registryRaw := loadWHOISFixture(t, "verisign-com-google-recorded.txt")
+	registrarRaw := loadWHOISFixture(t, "markmonitor-registrar-google-recorded.txt")
 
 	result := &whois.Result{
-		Domain: "example.com",
+		Domain: "google.com",
 		Hops: []whois.Hop{
 			{Server: "whois.iana.org", Latency: 5 * time.Millisecond}, // IANA hop — not a data source
 			{Server: "whois.verisign-grs.com", Raw: registryRaw, Fields: parse.Parse(registryRaw, "com"), Latency: 20 * time.Millisecond},
-			{Server: "whois.example-registrar.example", Raw: registrarRaw, Fields: parse.Parse(registrarRaw, "com"), Latency: 15 * time.Millisecond},
+			{Server: "whois.markmonitor.com", Raw: registrarRaw, Fields: parse.Parse(registrarRaw, ""), Latency: 15 * time.Millisecond},
 		},
 	}
 
@@ -49,19 +49,24 @@ func TestFromWHOIS_RegistryAndRegistrarHops(t *testing.T) {
 	if sources[1].Meta.Source != model.SourceRegistrarWHOIS {
 		t.Errorf("sources[1].Meta.Source = %q, want %q", sources[1].Meta.Source, model.SourceRegistrarWHOIS)
 	}
-	if sources[0].Registrar.IANAID != "1234" {
-		t.Errorf("registry hop Registrar.IANAID = %q, want %q (read from Fields.Unmapped)", sources[0].Registrar.IANAID, "1234")
+	if sources[0].Registrar.IANAID != "292" {
+		t.Errorf("registry hop Registrar.IANAID = %q, want %q (read from Fields.Unmapped)", sources[0].Registrar.IANAID, "292")
 	}
-	if sources[0].Registrar.AbuseEmail != "abuse@example-registrar.example" {
-		t.Errorf("registry hop Registrar.AbuseEmail = %q, want %q", sources[0].Registrar.AbuseEmail, "abuse@example-registrar.example")
+	if sources[0].Registrar.AbuseEmail != "abusecomplaints@markmonitor.com" {
+		t.Errorf("registry hop Registrar.AbuseEmail = %q, want %q", sources[0].Registrar.AbuseEmail, "abusecomplaints@markmonitor.com")
 	}
-	if sources[1].Registrar.Name != "Example Registrar, Inc." {
-		t.Errorf("registrar hop Registrar.Name = %q, want %q", sources[1].Registrar.Name, "Example Registrar, Inc.")
+	// The registrar spells its own name differently from the registry.
+	if sources[1].Registrar.Name != "MarkMonitor, Inc." {
+		t.Errorf("registrar hop Registrar.Name = %q, want %q", sources[1].Registrar.Name, "MarkMonitor, Inc.")
 	}
 }
 
+// No registry in the 2026-09 sweeps redacts a registrar's name, so there
+// is no recording of one; this input is synthetic, and says so. It
+// exercises the placeholder rule itself: a registrar value that is a
+// known redaction placeholder must not be surfaced as a name.
 func TestFromWHOIS_RedactedRegistrant(t *testing.T) {
-	raw := loadWHOISFixture(t, "gdpr-redacted-de.txt")
+	raw := "Domain: example.de\nRegistrar: REDACTED FOR PRIVACY\nStatus: connect\n" // synthetic, see above
 	result := &whois.Result{
 		Domain: "example.de",
 		Hops: []whois.Hop{
@@ -112,7 +117,7 @@ func TestFromWHOIS_TooFewHops(t *testing.T) {
 }
 
 func TestFromWHOIS_NotFoundHop(t *testing.T) {
-	raw := loadWHOISFixture(t, "notfound.txt")
+	raw := loadWHOISFixture(t, "verisign-com-notfound-recorded.txt")
 	result := &whois.Result{
 		Domain: "nonexistent-domain-xyz.com",
 		Hops: []whois.Hop{
@@ -171,7 +176,7 @@ func TestFromWHOIS_RateLimitedHop(t *testing.T) {
 	// case above -- fromHop previously checked Unsupported but not
 	// RateLimited, so this fell through to Meta.OK=true with all fields
 	// empty, indistinguishable from a genuine successful lookup.
-	raw := loadWHOISFixture(t, "ratelimited.txt")
+	raw := loadWHOISFixture(t, "aw-ratelimited-recorded.txt")
 	result := &whois.Result{
 		Domain: "example.com",
 		Hops: []whois.Hop{

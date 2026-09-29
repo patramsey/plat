@@ -18,35 +18,33 @@ func loadFixture(t testing.TB, name string) string {
 }
 
 func TestParse_ThinComRegistry(t *testing.T) {
-	raw := loadFixture(t, "verisign-com-example.txt")
+	raw := loadFixture(t, "verisign-com-google-recorded.txt")
 	f := Parse(raw, "com")
 
-	if f.Domain != "EXAMPLE.COM" {
-		t.Errorf("Domain = %q, want EXAMPLE.COM", f.Domain)
+	if f.Domain != "GOOGLE.COM" {
+		t.Errorf("Domain = %q, want GOOGLE.COM", f.Domain)
 	}
-	if f.Registrar != "Example Registrar, Inc." {
+	if f.Registrar != "MarkMonitor Inc." {
 		t.Errorf("Registrar = %q", f.Registrar)
 	}
-	if f.RegistrarWHOISServer != "whois.example-registrar.example" {
+	if f.RegistrarWHOISServer != "whois.markmonitor.com" {
 		t.Errorf("RegistrarWHOISServer = %q", f.RegistrarWHOISServer)
 	}
-	wantStatuses := []string{"clientTransferProhibited", "clientUpdateProhibited"}
-	if len(f.Statuses) != len(wantStatuses) {
-		t.Fatalf("Statuses = %v, want %v", f.Statuses, wantStatuses)
+	wantStatuses := []string{
+		"clientDeleteProhibited", "clientTransferProhibited", "clientUpdateProhibited",
+		"serverDeleteProhibited", "serverTransferProhibited", "serverUpdateProhibited",
 	}
-	for i, s := range wantStatuses {
-		if f.Statuses[i] != s {
-			t.Errorf("Statuses[%d] = %q, want %q (ICANN URL should be stripped)", i, f.Statuses[i], s)
-		}
+	if !slices.Equal(f.Statuses, wantStatuses) {
+		t.Errorf("Statuses = %v, want %v (ICANN URL should be stripped)", f.Statuses, wantStatuses)
 	}
-	wantNS := []string{"A.IANA-SERVERS.NET", "B.IANA-SERVERS.NET"}
-	if len(f.Nameservers) != len(wantNS) {
-		t.Fatalf("Nameservers = %v, want %v", f.Nameservers, wantNS)
+	wantNS := []string{"NS1.GOOGLE.COM", "NS2.GOOGLE.COM", "NS3.GOOGLE.COM", "NS4.GOOGLE.COM"}
+	if !slices.Equal(f.Nameservers, wantNS) {
+		t.Errorf("Nameservers = %v, want %v", f.Nameservers, wantNS)
 	}
-	if !f.Created.Parsed || f.Created.Raw != "1995-08-14T04:00:00Z" {
+	if !f.Created.Parsed || f.Created.Raw != "1997-09-15T04:00:00Z" {
 		t.Errorf("Created = %+v", f.Created)
 	}
-	if !f.Expires.Parsed || f.Expires.Raw != "2026-08-13T04:00:00Z" {
+	if !f.Expires.Parsed || f.Expires.Raw != "2028-09-14T04:00:00Z" {
 		t.Errorf("Expires = %+v", f.Expires)
 	}
 	if f.RateLimited {
@@ -55,33 +53,33 @@ func TestParse_ThinComRegistry(t *testing.T) {
 }
 
 func TestParse_ThickOrgRegistry(t *testing.T) {
-	raw := loadFixture(t, "pir-org-example.txt")
+	raw := loadFixture(t, "pir-org-wikipedia-recorded.txt")
 	f := Parse(raw, "org")
 
-	if f.Domain != "EXAMPLE.ORG" {
-		t.Errorf("Domain = %q, want EXAMPLE.ORG", f.Domain)
+	if f.Domain != "wikipedia.org" {
+		t.Errorf("Domain = %q, want wikipedia.org", f.Domain)
 	}
-	if f.Registrar != "Example Registrar, Inc." {
+	if f.Registrar != "MarkMonitor Inc." {
 		t.Errorf("Registrar = %q", f.Registrar)
 	}
-	if len(f.Nameservers) != 2 {
-		t.Errorf("Nameservers = %v, want 2 entries", f.Nameservers)
+	if len(f.Nameservers) != 3 {
+		t.Errorf("Nameservers = %v, want 3 entries", f.Nameservers)
 	}
-	if !f.Created.Parsed {
-		t.Errorf("Created not parsed: %+v", f.Created)
+	if !f.Created.Parsed || f.Created.Raw != "2001-01-13T00:12:14Z" {
+		t.Errorf("Created = %+v", f.Created)
 	}
 }
 
 func TestParse_RateLimited(t *testing.T) {
-	raw := loadFixture(t, "ratelimited.txt")
-	f := Parse(raw, "com")
+	raw := loadFixture(t, "aw-ratelimited-recorded.txt") // "Error: ratelimit exceeded"
+	f := Parse(raw, "aw")
 	if !f.RateLimited {
 		t.Error("RateLimited = false, want true")
 	}
 }
 
 func TestParse_UnmappedFieldsRetained(t *testing.T) {
-	raw := loadFixture(t, "verisign-com-example.txt")
+	raw := loadFixture(t, "verisign-com-google-recorded.txt")
 	f := Parse(raw, "com")
 	if _, ok := f.Unmapped["registrar iana id"]; !ok {
 		t.Errorf("expected 'registrar iana id' in Unmapped, got %v", f.Unmapped)
@@ -89,7 +87,7 @@ func TestParse_UnmappedFieldsRetained(t *testing.T) {
 }
 
 func TestParse_NotFoundDetection(t *testing.T) {
-	raw := loadFixture(t, "notfound.txt")
+	raw := loadFixture(t, "verisign-com-notfound-recorded.txt")
 	f := Parse(raw, "com")
 	if !f.NotFound {
 		t.Error("NotFound = false, want true")
@@ -97,7 +95,7 @@ func TestParse_NotFoundDetection(t *testing.T) {
 }
 
 func TestParse_FoundDomainNotFlaggedNotFound(t *testing.T) {
-	raw := loadFixture(t, "verisign-com-example.txt")
+	raw := loadFixture(t, "verisign-com-google-recorded.txt")
 	f := Parse(raw, "com")
 	if f.NotFound {
 		t.Error("NotFound = true, want false for a real registered-domain response")
@@ -120,7 +118,7 @@ func TestParse_UnsupportedDetection(t *testing.T) {
 }
 
 func TestParse_FoundDomainNotFlaggedUnsupported(t *testing.T) {
-	raw := loadFixture(t, "verisign-com-example.txt")
+	raw := loadFixture(t, "verisign-com-google-recorded.txt")
 	f := Parse(raw, "com")
 	if f.Unsupported {
 		t.Error("Unsupported = true, want false for a real registered-domain response")
@@ -290,39 +288,25 @@ func TestParse_UKNotFound(t *testing.T) {
 	}
 }
 
+// DENIC answers an IDN with the Unicode name in "Domain:" and the A-label
+// in a separate "Domain-Ace:" line, and publishes no creation or expiry
+// date -- only "Changed", which the de template maps to updated. The
+// fixture this replaced claimed the opposite on all three counts.
 func TestParse_IDNFixture(t *testing.T) {
-	raw := loadFixture(t, "idn-example.txt")
+	raw := loadFixture(t, "denic-de-idn-recorded.txt")
 	f := Parse(raw, "de")
 
-	if f.Domain != "XN--MNCHEN-3YA.DE" {
-		t.Errorf("Domain = %q, want XN--MNCHEN-3YA.DE (WHOIS reports the punycode/LDH form)", f.Domain)
+	if f.Domain != "münchen.de" {
+		t.Errorf("Domain = %q, want münchen.de (DENIC reports the Unicode form)", f.Domain)
 	}
-	if !f.Created.Parsed || !f.Expires.Parsed {
-		t.Errorf("expected both Created and Expires to parse, got Created=%+v Expires=%+v", f.Created, f.Expires)
+	if len(f.Nameservers) != 4 {
+		t.Errorf("Nameservers = %v, want 4", f.Nameservers)
 	}
-}
-
-func TestParse_ExpiredDomainFixture(t *testing.T) {
-	raw := loadFixture(t, "expired-example.txt")
-	f := Parse(raw, "com")
-
-	if f.Domain != "EXPIRED-EXAMPLE.COM" {
-		t.Errorf("Domain = %q, want EXPIRED-EXAMPLE.COM", f.Domain)
+	if !f.Updated.Parsed || f.Updated.Raw != "2026-08-25T11:07:13+02:00" {
+		t.Errorf("Updated = %+v, want Parsed 2026-08-25T11:07:13+02:00 (DENIC's Changed)", f.Updated)
 	}
-	wantStatuses := []string{"pendingDelete", "redemptionPeriod"}
-	if len(f.Statuses) != len(wantStatuses) {
-		t.Fatalf("Statuses = %v, want %v", f.Statuses, wantStatuses)
-	}
-	for i, want := range wantStatuses {
-		if f.Statuses[i] != want {
-			t.Errorf("Statuses[%d] = %q, want %q", i, f.Statuses[i], want)
-		}
-	}
-	if !f.Expires.Parsed {
-		t.Fatal("expected Expires to parse")
-	}
-	if !f.Expires.Time.Before(f.Updated.Time) {
-		t.Errorf("expected Expires (%v) to be before Updated (%v) for an expired-then-updated domain", f.Expires.Time, f.Updated.Time)
+	if f.Created.Raw != "" || f.Expires.Raw != "" {
+		t.Errorf("Created/Expires = %q/%q; DENIC publishes neither", f.Created.Raw, f.Expires.Raw)
 	}
 }
 

@@ -3,6 +3,7 @@ package rdap
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -243,7 +244,7 @@ func TestClientDomain_UnparseableEventDate(t *testing.T) {
 }
 
 func TestClientDomain_RetriesOn429(t *testing.T) {
-	fixture, err := os.ReadFile("../../testdata/rdap/org-thick-example.json")
+	fixture, err := os.ReadFile("../../testdata/rdap/pir-org-wikipedia-recorded.json")
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
 	}
@@ -273,8 +274,8 @@ func TestClientDomain_RetriesOn429(t *testing.T) {
 	if result.Domain == nil {
 		t.Fatal("Domain is nil")
 	}
-	if result.Domain.LDHName != "EXAMPLE.ORG" {
-		t.Errorf("LDHName = %q, want EXAMPLE.ORG", result.Domain.LDHName)
+	if result.Domain.LDHName != "wikipedia.org" {
+		t.Errorf("LDHName = %q, want wikipedia.org", result.Domain.LDHName)
 	}
 }
 
@@ -561,17 +562,15 @@ func TestClient_ASN_RealARINGolden(t *testing.T) {
 
 	// ARIN nests its abuse-role entity inside the top-level registrant
 	// entity's own "entities" array rather than listing it at the top
-	// level -- unlike the abuse-role entity in the collect package's
-	// hand-built arinLikeASN test fixture, which (like every other ASN
-	// adapter test) places it at the top level for convenience.
-	// AbuseEntity's entityByRole deliberately only scans top-level
-	// entities (mirrors DomainResponse's M3-era "nested traversal is a
-	// later milestone" scope), so it must NOT find ARIN's real, nested
-	// abuse entity here. This golden is what proves that gap is real on
-	// live data, not just a theoretical corner the hand-built fixtures
-	// never exercised.
-	if _, ok := a.AbuseEntity(); ok {
-		t.Error("AbuseEntity() ok = true, want false (ARIN's abuse entity is nested under registrant, not top-level)")
+	// level. AbuseEntity once scanned only top-level entities, so this
+	// test asserted it found nothing -- pinning the gap as intended. The
+	// contact is read from where ARIN puts it (#133).
+	abuse, ok := a.AbuseEntity()
+	if !ok {
+		t.Fatal("AbuseEntity() ok = false, want ARIN's abuse contact nested under the registrant")
+	}
+	if abuse.VCardArray.Email != "network-abuse@google.com" {
+		t.Errorf("abuse Email = %q, want network-abuse@google.com", abuse.VCardArray.Email)
 	}
 
 	registered, ok := a.Registered()
@@ -1034,5 +1033,34 @@ func TestClient_RemembersAHostThatNeededTheFallback(t *testing.T) {
 	}
 	if got := defaultAttempts.Load(); got != 1 {
 		t.Errorf("default-cipher handshakes = %d, want 1 (the second lookup should go straight to the fallback)", got)
+	}
+}
+
+// The gTLD RDAP profile nests the registrar's abuse contact inside the
+// registrar entity; plat only looked at top-level entities, so it never
+// read an abuse contact from gTLD RDAP (#133). PIR also writes the phone
+// as a tel: URI, which must not reach the merge as "tel:+1...".
+func TestDomain_AbuseContactNestedInRegistrar(t *testing.T) {
+	for _, tt := range []struct{ fixture, email, tel string }{
+		{"markmonitor-registrar-google-recorded.json", "", "+1.2086851750"},
+		{"pir-org-wikipedia-recorded.json", "abusecomplaints@markmonitor.com", "+1.2083895740"},
+	} {
+		t.Run(tt.fixture, func(t *testing.T) {
+			b, err := os.ReadFile("../../testdata/rdap/" + tt.fixture)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var d DomainResponse
+			if err := json.Unmarshal(b, &d); err != nil {
+				t.Fatal(err)
+			}
+			abuse, ok := d.AbuseEntity()
+			if !ok {
+				t.Fatal("AbuseEntity() ok = false, want the contact nested in the registrar entity")
+			}
+			if abuse.VCardArray.Email != tt.email || abuse.VCardArray.Tel != tt.tel {
+				t.Errorf("abuse = %q / %q, want %q / %q", abuse.VCardArray.Email, abuse.VCardArray.Tel, tt.email, tt.tel)
+			}
+		})
 	}
 }

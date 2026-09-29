@@ -1,0 +1,25 @@
+% Restricted rights.
+% 
+% Terms and Conditions of Use
+% 
+% The above data may only be used within the scope of technical or
+% administrative necessities of Internet operation or to remedy legal
+% problems.
+% The use for other purposes, in particular for advertising, is not permitted.
+% 
+% The DENIC whois service on port 43 doesn't disclose any information concerning
+% the domain holder, general request and abuse contact.
+% This information can be obtained through use of our web-based whois service
+% available at the DENIC website:
+% https://webwhois.denic.de/?lang=en
+% 
+% 
+
+Domain: münchen.de
+Domain-Ace: xn--mnchen-3ya.de
+Nserver: ns01e.muenchen.de
+Nserver: ns02e.muenchen.de
+Nserver: ns05e.muenchen.de
+Nserver: ns06e.muenchen.de
+Status: connect
+Changed: 2026-08-25T11:07:13+02:00

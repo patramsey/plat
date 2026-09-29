@@ -54,6 +54,11 @@ follows [Semantic Versioning](https://semver.org/).
   client keeps its TLS policy.
 - A registrar WHOIS referral that is a URL rather than a host (ZACR's
   `http://www.dns.net.za/whois`) is no longer dialled.
+- RDAP abuse contacts are read where registries put them: nested inside
+  the registrar entity (the gTLD RDAP profile) or, for ARIN, inside the
+  registrant. plat read only top-level entities, so gTLD RDAP never
+  supplied an abuse contact -- it came only from WHOIS, which registries
+  are retiring. A `tel:` URI value is unwrapped to the bare number.
 
 ## [0.10.0] - 2026-09-27
 

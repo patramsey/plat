@@ -59,23 +59,29 @@ func TestFromRDAP_RegistryFixture(t *testing.T) {
 	}
 }
 
+// A real registrar RDAP answer (MarkMonitor, google.com). Its abuse
+// contact is nested inside the registrar entity, as the gTLD RDAP profile
+// specifies (#133), and carries a phone and a contact URI but no email.
+// Its redaction remarks sit on the registrant entity, which plat does not
+// model, so there is no top-level redaction notice -- the hand-written
+// fixture this replaced invented one.
 func TestFromRDAP_RegistrarFixtureWithEntities(t *testing.T) {
-	d := loadRDAPFixture(t, "registrar-example.json")
+	d := loadRDAPFixture(t, "markmonitor-registrar-google-recorded.json")
 	result := &rdap.Result{Domain: d, Raw: []byte("raw bytes")}
 
 	sr := FromRDAP(model.SourceRegistrarRDAP, result, 30*time.Millisecond, nil)
 
-	if sr.Registrar.Name != "Example Registrar, Inc." {
-		t.Errorf("Registrar.Name = %q, want %q", sr.Registrar.Name, "Example Registrar, Inc.")
+	if sr.Registrar.Name != "Markmonitor Inc." {
+		t.Errorf("Registrar.Name = %q, want %q", sr.Registrar.Name, "Markmonitor Inc.")
 	}
-	if sr.Registrar.AbuseEmail != "abuse@example-registrar.example" {
-		t.Errorf("Registrar.AbuseEmail = %q, want %q", sr.Registrar.AbuseEmail, "abuse@example-registrar.example")
+	if sr.Registrar.AbusePhone != "+1.2086851750" {
+		t.Errorf("Registrar.AbusePhone = %q, want %q (nested in the registrar entity)", sr.Registrar.AbusePhone, "+1.2086851750")
 	}
-	if sr.Registrar.AbusePhone != "+1.5555550100" {
-		t.Errorf("Registrar.AbusePhone = %q, want %q", sr.Registrar.AbusePhone, "+1.5555550100")
+	if sr.Registrar.AbuseEmail != "" {
+		t.Errorf("Registrar.AbuseEmail = %q, want empty (MarkMonitor's abuse contact has none)", sr.Registrar.AbuseEmail)
 	}
-	if len(sr.Redactions) != 1 {
-		t.Errorf("Redactions = %+v, want one entry from the top-level REDACTED FOR PRIVACY remark", sr.Redactions)
+	if len(sr.Redactions) != 0 {
+		t.Errorf("Redactions = %+v, want none at the top level", sr.Redactions)
 	}
 }
 
