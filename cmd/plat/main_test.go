@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/patramsey/plat/internal/source"
+
 	"github.com/charmbracelet/colorprofile"
 
 	"github.com/patramsey/plat"
@@ -179,6 +181,14 @@ func TestLookupOutcomeError(t *testing.T) {
 			3,
 			[]model.SourceResult{{Source: model.SourceRegistryRDAP, NotFound: true}, {Source: model.SourceRegistryWHOIS, Err: "registry restricts this name (reserved or not available for registration)"}},
 			"lookup inconclusive -- the registry reports this name as reserved or restricted (checked: registry-rdap, registry-whois)",
+		},
+		{
+			// An answer plat could not read is not a connectivity
+			// failure; the headline says so and where to look (#120).
+			"unrecognised answer",
+			3,
+			[]model.SourceResult{{Source: model.SourceRegistryWHOIS, Err: source.UnrecognisedReason}},
+			"lookup inconclusive -- the registry's answer could not be read; -v or --raw shows it (checked: registry-whois)",
 		},
 		{
 			"total failure, mixed notfound and errored",

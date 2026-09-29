@@ -150,8 +150,16 @@ func fromASNHop(meta model.SourceResult, hop whois.Hop) source.ASNSourceRecord {
 		meta.Err = "WHOIS server rate-limited this query"
 		return source.ASNSourceRecord{Meta: meta}
 	}
-	meta.OK = true
 	f := hop.ASNFields
+	if !hop.Fields.NotFound && f.Handle == "" && f.Name == "" && f.OrgName == "" && f.Number == "" {
+		// Nothing readable and no known wording matched: a failed source,
+		// not an empty success (#120). ARIN's multi-match summary (#95)
+		// was this shape.
+		meta.OK = false
+		meta.Err = source.UnrecognisedReason
+		return source.ASNSourceRecord{Meta: meta}
+	}
+	meta.OK = true
 
 	// Unlike WHOIS's IP netblock objects (which report a hyphenated
 	// "<start> - <end>" NetRange for the whole allocation), a WHOIS

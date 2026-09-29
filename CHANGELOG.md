@@ -4,6 +4,18 @@ All notable changes to `plat` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **Breaking:** A WHOIS answer that plat cannot read -- no field parsed,
+  and no known not-found, refusal, rate-limit or restricted wording --
+  is a failed source instead of a successful one with no data. A lookup
+  with no other source now exits `3` ("the registry's answer could not
+  be read; -v or --raw shows it") instead of `0` with an empty record.
+  This was the root of the ccTLD sweep's bugs: an unknown not-found
+  wording read as a registered domain. Replaying every recorded sweep
+  answer changes none today; it catches wording not yet seen.
+
 ## [0.10.0] - 2026-09-27
 
 Follow-ups from v0.9.0's ccTLD sweep: reserved names, WHOIS formats that

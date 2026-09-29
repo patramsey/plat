@@ -134,8 +134,16 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) source.IPSourceRecord {
 		meta.Err = "WHOIS server rate-limited this query"
 		return source.IPSourceRecord{Meta: meta}
 	}
-	meta.OK = true
 	f := hop.IPFields
+	if !hop.Fields.NotFound && f.Handle == "" && f.NetRange == "" && f.CIDR == "" && f.NetName == "" && f.OrgName == "" {
+		// Nothing readable and no known wording matched: a failed source,
+		// not an empty success (#120). ARIN's multi-match summary (#95)
+		// was this shape.
+		meta.OK = false
+		meta.Err = source.UnrecognisedReason
+		return source.IPSourceRecord{Meta: meta}
+	}
+	meta.OK = true
 	start, end, cidr := rangeAndCIDRFromNetRange(f.NetRange, f.CIDR)
 
 	sr := source.IPSourceRecord{
