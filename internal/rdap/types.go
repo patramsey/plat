@@ -223,6 +223,7 @@ func (d *DomainResponse) RelatedRegistrarURL() (string, bool) {
 // Registrant/admin/tech/billing contact values are deliberately not
 // modeled — see the "Redaction and contacts" section of README.md.
 type Entity struct {
+	Handle     string     `json:"handle"`
 	Roles      []string   `json:"roles"`
 	VCardArray VCardArray `json:"vcardArray"`
 }

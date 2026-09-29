@@ -197,7 +197,7 @@ func TestNormalize_ClassifiesIPInput(t *testing.T) {
 	}{
 		{"bare IPv4", "8.8.8.8", KindIPv4, "8.8.8.8"},
 		{"bare IPv6", "2001:4860:4860::8888", KindIPv6, "2001:4860:4860::8888"},
-		{"bracketed IPv6", "[2001:db8::1]", KindIPv6, "2001:db8::1"},
+		{"bracketed IPv6", "[2001:4860:4860::8888]", KindIPv6, "2001:4860:4860::8888"},
 		{"IPv4 CIDR resolves to network address", "8.8.8.0/24", KindIPv4, "8.8.8.0"},
 		{"IPv4 pasted as a URL", "https://8.8.8.8/whois", KindIPv4, "8.8.8.8"},
 	}
@@ -270,6 +270,15 @@ func TestNormalize_RejectsReservedIPs(t *testing.T) {
 		{"IPv6 multicast", "ff02::1"},
 		{"bracketed IPv6 loopback", "[::1]"},
 		{"private IPv4 CIDR", "10.0.0.0/8"},
+		// #125: documentation and reserved space answered three different
+		// ways -- "not registered", "no server listed", or IANA's record.
+		{"IPv4 documentation, TEST-NET-1", "192.0.2.1"},
+		{"IPv4 documentation, TEST-NET-2", "198.51.100.1"},
+		{"IPv4 documentation, TEST-NET-3", "203.0.113.1"},
+		{"IPv6 documentation", "2001:db8::1"},
+		{"IPv6 documentation, RFC 9637", "3fff::1"},
+		{"IPv4 reserved for future use", "240.0.0.1"},
+		{"IPv4 this network", "0.1.2.3"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -466,5 +475,28 @@ func TestNormalizeSingleLabelKeepsItsOwnError(t *testing.T) {
 	}
 	if errors.Is(err, ErrEmptyLabel) {
 		t.Fatal("Normalize(\"localhost\") reported ErrEmptyLabel; single-label and empty-label are distinct failures")
+	}
+}
+
+// The reserved-range rejection must stop at the range boundaries, and
+// leave alone the special-purpose ranges whose RIR record is informative
+// (ARIN answers 100.64.0.0/10 and 198.18.0.0/15 with IANA's record).
+func TestNormalize_NeighboursOfReservedRangesStillAccepted(t *testing.T) {
+	for _, input := range []string{
+		"192.0.3.1",     // just past TEST-NET-1
+		"198.51.101.1",  // just past TEST-NET-2
+		"203.0.114.1",   // just past TEST-NET-3
+		"223.255.255.1", // just below 240.0.0.0/4
+		"1.0.0.1",       // just past 0.0.0.0/8
+		"2001:db9::1",   // just past 2001:db8::/32
+		"3fff:1000::1",  // just past 3fff::/20
+		"100.64.0.1",    // shared address space, kept: ARIN has IANA's record
+		"198.18.0.1",    // benchmarking, kept: ARIN has IANA's record
+	} {
+		t.Run(input, func(t *testing.T) {
+			if _, err := Normalize(input); err != nil {
+				t.Errorf("Normalize(%q) = %v, want it looked up", input, err)
+			}
+		})
 	}
 }

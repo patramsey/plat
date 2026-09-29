@@ -28,7 +28,7 @@ func fromIPRDAP(meta model.SourceResult, resp *rdap.IPNetworkResponse) source.IP
 	sr := source.IPSourceRecord{
 		Meta:           meta,
 		Handle:         resp.Handle,
-		Name:           resp.Name,
+		Name:           rdapObjectName(resp.Name, resp.Entities),
 		Type:           resp.Type,
 		StartAddress:   resp.StartAddress,
 		EndAddress:     resp.EndAddress,
@@ -317,4 +317,24 @@ func whoisNetType(t string) string {
 		return "ASSIGNMENT"
 	}
 	return t
+}
+
+// rdapObjectName returns an IP network's or autnum's RDAP name, or "" when
+// the name is really one of the response's entity handles in "ORG-" form.
+// AFRINIC sets name to the registrant organisation's handle
+// ("ORG-AFNC1-AFRINIC" for 196.216.2.0/23, "ORG-BAdI1-AFRINIC" for
+// AS36936), which then outranked WHOIS's real netname in the merge
+// (#126). An "ORG-" handle is never a network name; ARIN's 8.8.8.8 is
+// named GOGL, which is also its organisation's handle and a real name,
+// so equality alone is not enough.
+func rdapObjectName(name string, entities rdap.EntityList) string {
+	if !strings.HasPrefix(strings.ToUpper(name), "ORG-") {
+		return name
+	}
+	for _, e := range entities {
+		if strings.EqualFold(e.Handle, name) {
+			return ""
+		}
+	}
+	return name
 }

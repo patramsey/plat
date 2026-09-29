@@ -2,6 +2,7 @@ package collect
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/patramsey/plat/internal/source"
@@ -564,5 +565,35 @@ func TestFromIPHop_UnrecognisedAnswerIsAFailedSource(t *testing.T) {
 	sr := fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS}, whois.Hop{Raw: "unreadable", IPFields: &parse.IPFields{}})
 	if sr.Meta.OK || sr.Present || sr.Meta.Err != source.UnrecognisedReason {
 		t.Errorf("Meta = %+v, Present = %v; want a failed source with the unrecognised reason", sr.Meta, sr.Present)
+	}
+}
+
+// AFRINIC's RDAP puts the registrant organisation's handle in the
+// network's name field, so plat displayed "ORG-AFNC1-AFRINIC" as the
+// network name and WHOIS's real netname lost the merge. See #126.
+func TestFromIPRDAP_AFRINICOrgHandleIsNotANetworkName(t *testing.T) {
+	b, err := os.ReadFile("../../testdata/rdap/afrinic-196.216.2.1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resp rdap.IPNetworkResponse
+	if err := json.Unmarshal(b, &resp); err != nil {
+		t.Fatal(err)
+	}
+	sr := fromIPRDAP(model.SourceResult{Source: model.SourceRegistryRDAP, OK: true}, &resp)
+	if sr.Name != "" {
+		t.Errorf("Name = %q, want empty (it is the registrant's handle, not a network name)", sr.Name)
+	}
+	if sr.OrgName == "" {
+		t.Error("OrgName empty; only the name should be dropped")
+	}
+}
+
+// ARIN's 8.8.8.8 is named GOGL, which is also its organisation's handle:
+// a real name that must be kept. Only an "ORG-" form handle is dropped.
+func TestFromIPRDAP_NameEqualToANonORGHandleIsKept(t *testing.T) {
+	resp := rdap.IPNetworkResponse{Name: "GOGL", Entities: rdap.EntityList{{Handle: "GOGL", Roles: []string{"registrant"}}}}
+	if sr := fromIPRDAP(model.SourceResult{Source: model.SourceRegistryRDAP, OK: true}, &resp); sr.Name != "GOGL" {
+		t.Errorf("Name = %q, want GOGL", sr.Name)
 	}
 }

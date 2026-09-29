@@ -31,7 +31,7 @@ func fromASNRDAP(meta model.SourceResult, resp *rdap.ASNResponse) source.ASNSour
 	sr := source.ASNSourceRecord{
 		Meta:           meta,
 		Handle:         normalizeASNHandle(resp.Handle),
-		Name:           resp.Name,
+		Name:           rdapObjectName(resp.Name, resp.Entities),
 		Type:           resp.Type,
 		Country:        resp.Country,
 		RedactedFields: map[string]bool{},

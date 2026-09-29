@@ -15,6 +15,12 @@ follows [Semantic Versioning](https://semver.org/).
   This was the root of the ccTLD sweep's bugs: an unknown not-found
   wording read as a registered domain. Replaying every recorded sweep
   answer changes none today; it catches wording not yet seen.
+- **Breaking:** Documentation and reserved IP ranges -- `192.0.2.0/24`,
+  `198.51.100.0/24`, `203.0.113.0/24`, `2001:db8::/32`, `3fff::/20`,
+  `240.0.0.0/4` and `0.0.0.0/8` -- exit `2` with the reason, like other
+  reserved addresses. They were answered as "not registered" (exit `1`),
+  "no server listed" (exit `3`) or with IANA's TEST-NET record (exit
+  `0`), depending on the range.
 
 ### Fixed
 - Registrar URLs and abuse phone numbers that differ only in formatting
@@ -24,6 +30,9 @@ follows [Semantic Versioning](https://semver.org/).
 - The Web.com-family registrar WHOIS rate limit ("IP Address Has Reached
   Rate Limit", register.com, domain.com) is recognised as a rate limit
   rather than an empty answer.
+- AFRINIC IP and ASN lookups show the network or AS name. AFRINIC's RDAP
+  puts the registrant organisation's handle (`ORG-AFNC1-AFRINIC`) in the
+  name field, which outranked WHOIS's real name.
 
 ## [0.10.0] - 2026-09-27
 
