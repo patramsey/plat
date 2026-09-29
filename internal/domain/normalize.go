@@ -251,9 +251,33 @@ func reservedIPCategory(addr netip.Addr) string {
 		return "a link-local address"
 	case addr.IsLinkLocalMulticast(), addr.IsMulticast():
 		return "a multicast address"
-	default:
-		return ""
 	}
+	for _, r := range reservedPrefixes {
+		if r.prefix.Contains(addr) {
+			return r.category
+		}
+	}
+	return ""
+}
+
+// reservedPrefixes are special-purpose ranges net/netip has no predicate
+// for. Without them the documentation ranges were answered three ways --
+// "not registered" (2001:db8::/32, 203.0.113.0/24), "no server listed"
+// (3fff::/20, 240.0.0.0/4), or IANA's TEST-NET record from ARIN
+// (192.0.2.0/24, 198.51.100.0/24) -- none of which says the range can
+// never be allocated (#125). 100.64.0.0/10 and 198.18.0.0/15 are left
+// out on purpose: ARIN answers them with IANA's informative record.
+var reservedPrefixes = []struct {
+	prefix   netip.Prefix
+	category string
+}{
+	{netip.MustParsePrefix("0.0.0.0/8"), `"this network" (RFC 791)`},
+	{netip.MustParsePrefix("192.0.2.0/24"), "a documentation address (RFC 5737)"},
+	{netip.MustParsePrefix("198.51.100.0/24"), "a documentation address (RFC 5737)"},
+	{netip.MustParsePrefix("203.0.113.0/24"), "a documentation address (RFC 5737)"},
+	{netip.MustParsePrefix("240.0.0.0/4"), "reserved for future use (RFC 1112)"},
+	{netip.MustParsePrefix("2001:db8::/32"), "a documentation address (RFC 3849)"},
+	{netip.MustParsePrefix("3fff::/20"), "a documentation address (RFC 9637)"},
 }
 
 // ipQuery classifies addr into a Query, rejecting it up front with

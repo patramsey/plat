@@ -1,6 +1,8 @@
 package collect
 
 import (
+	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/patramsey/plat/internal/merge"
@@ -454,5 +456,19 @@ func TestFromASNHop_UnrecognisedAnswerIsAFailedSource(t *testing.T) {
 	sr := fromASNHop(model.SourceResult{Source: model.SourceRegistryWHOIS}, whois.Hop{Raw: "unreadable", ASNFields: &parse.ASNFields{}})
 	if sr.Meta.OK || sr.Present || sr.Meta.Err != source.UnrecognisedReason {
 		t.Errorf("Meta = %+v, Present = %v; want a failed source with the unrecognised reason", sr.Meta, sr.Present)
+	}
+}
+
+func TestFromASNRDAP_AFRINICOrgHandleIsNotAnASName(t *testing.T) {
+	b, err := os.ReadFile("../../testdata/rdap/afrinic-as36936.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resp rdap.ASNResponse
+	if err := json.Unmarshal(b, &resp); err != nil {
+		t.Fatal(err)
+	}
+	if sr := fromASNRDAP(model.SourceResult{Source: model.SourceRegistryRDAP, OK: true}, &resp); sr.Name != "" {
+		t.Errorf("Name = %q, want empty (it is the registrant's handle)", sr.Name)
 	}
 }
