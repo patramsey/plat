@@ -95,7 +95,7 @@ pipelines don't need to special-case absence.
   ```json
   { "source": "registry-rdap", "ok": true, "notFound": false, "latencyMs": 89, "error": "timeout" }
   ```
-  `error` is omitted when empty. `source` is one of `registry-rdap`, `registrar-rdap`, `registry-whois`, `registrar-whois` — these full names are what every `sources` array uses throughout this schema, in JSON/NDJSON, always. The human/plain terminal views abbreviate them to 2-letter codes (`GR`/`RR`/`GW`/`RW`) purely for display, with a legend printed once per lookup; that abbreviation is a rendering choice, not part of this schema.
+  `error` is omitted when empty. `"unavailable": true` appears only on a source that has no service for this name -- a retired WHOIS, a TLD the server does not support, or a server that refuses every query. `error` then gives the reason. Such a source is left out when deciding whether the name exists: a free name is "not registered" on the remaining sources' word. The field is omitted otherwise, so records without one are unchanged. `source` is one of `registry-rdap`, `registrar-rdap`, `registry-whois`, `registrar-whois` — these full names are what every `sources` array uses throughout this schema, in JSON/NDJSON, always. The human/plain terminal views abbreviate them to 2-letter codes (`GR`/`RR`/`GW`/`RW`) purely for display, with a legend printed once per lookup; that abbreviation is a rendering choice, not part of this schema.
 
 ## IP records
 

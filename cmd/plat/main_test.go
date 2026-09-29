@@ -191,6 +191,28 @@ func TestLookupOutcomeError(t *testing.T) {
 			"lookup inconclusive -- the registry's answer could not be read; -v or --raw shows it (checked: registry-whois)",
 		},
 		{
+			// A retired WHOIS has no say in whether the name exists; the
+			// claim rests on RDAP alone, and says so (#131).
+			"not registered, WHOIS unavailable",
+			1,
+			[]model.SourceResult{{Source: model.SourceRegistryRDAP, NotFound: true}, {Source: model.SourceRegistryWHOIS, Unavailable: true, Err: "registry does not support WHOIS for this TLD"}},
+			"is not registered (checked: registry-rdap)",
+		},
+		{
+			// SWITCH (.ch): the only source refuses every query.
+			"only source unavailable",
+			3,
+			[]model.SourceResult{{Source: model.SourceRegistryWHOIS, Unavailable: true, Err: "registry does not support WHOIS for this TLD"}},
+			"lookup failed -- no source has a service for this name (registry-whois: registry does not support WHOIS for this TLD)",
+		},
+		{
+			// An unavailable source is not counted among the failures.
+			"a failure alongside an unavailable source",
+			3,
+			[]model.SourceResult{{Source: model.SourceRegistryRDAP, Err: "timeout"}, {Source: model.SourceRegistryWHOIS, Unavailable: true, Err: "registry does not support WHOIS for this TLD"}},
+			"lookup inconclusive -- 1 of 1 sources failed, so non-existence can't be confirmed (checked: registry-rdap)",
+		},
+		{
 			"total failure, mixed notfound and errored",
 			3,
 			[]model.SourceResult{{Source: model.SourceRegistryRDAP, NotFound: true}, {Source: model.SourceRegistryWHOIS, Err: "timeout"}},

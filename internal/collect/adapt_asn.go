@@ -143,6 +143,7 @@ func fromASNHop(meta model.SourceResult, hop whois.Hop) source.ASNSourceRecord {
 	if hop.Fields.Unsupported {
 		meta.OK = false
 		meta.Err = "registry does not support WHOIS for this autnum"
+		meta.Unavailable = true // no service for this name: left out of the outcome (#131)
 		return source.ASNSourceRecord{Meta: meta}
 	}
 	if hop.Fields.RateLimited {

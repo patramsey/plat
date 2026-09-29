@@ -1,0 +1,37 @@
+Domain Name: nic.africa
+Registry Domain ID: 2_DOMAIN-AFRICA
+Registrar WHOIS Server: http://www.dns.net.za/whois
+Registrar URL: http://dns.business
+Updated Date: 2025-01-31T07:04:41Z
+Creation Date: 2017-02-15T21:20:26Z
+Registry Expiry Date: 2999-12-12T21:59:59Z
+Registrar Registration Expiration Date: 2999-12-12T21:59:59Z
+Registrar: DNS Africa
+Registrar IANA ID: 9999
+Registrar Abuse Contact Email: abuse@registry.net.za
+Registrar Abuse Contact Phone: +27.115682800
+Reseller: 
+Domain Status: ok https://icann.org/epp#ok
+Registrant Organization: 
+Registrant Country: ZA
+Registrant Email: Please contact the RDDS service of the listed Registrar for Registrant, Admin, or Tech contact information.
+Admin Email: Please contact the RDDS service of the listed Registrar for Registrant, Admin, or Tech contact information.
+Tech Email: Please contact the RDDS service of the listed Registrar for Registrant, Admin, or Tech contact information.
+Billing Email: Please contact the RDDS service of the listed Registrar for Registrant, Admin, or Tech contact information.
+Name Server: ns2us.dns.business
+Name Server: ns1.dnservices.co.za
+Name Server: nsp.netnod.se
+DNSSEC: unsigned
+
+URL of the ICANN Whois Inaccuracy Complaint Form: https://www.icann.org/wicf/
+>>> Last update of WHOIS database: 2026-09-29T04:31:15Z <<<
+
+For more information on Whois status codes, please visit https://icann.org/epp
+
+The use of this facility is subject to the following terms and
+==============================================================
+conditions: https://registry.africa/whois-terms-and-conditions
+==============================================================
+Copyright (c) Registry Africa Ltd
+=================================
+

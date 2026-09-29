@@ -114,7 +114,10 @@ func (c *Client) Lookup(ctx context.Context, name domain.Name) (*Result, error) 
 		// A registry that names itself as the registrar server (.au's
 		// whois.auda.org.au) would be queried twice and its answer
 		// counted again as registrar-whois.
-		if registryHop.Err == nil && registryHop.Fields.RegistrarWHOISServer != "" &&
+		// Nor one that is not a host at all: ZACR (.africa) names the web
+		// page "http://www.dns.net.za/whois", which cannot be dialled on
+		// port 43 (#128).
+		if registryHop.Err == nil && isWHOISHost(registryHop.Fields.RegistrarWHOISServer) &&
 			!sameWHOISServer(registryHop.Fields.RegistrarWHOISServer, registry) {
 			// Same reasoning as the IANA hop above: the registrar's own
 			// WHOIS server generally replies in plain key:value text
@@ -241,4 +244,11 @@ func serverKey(s string) string {
 		host, port = s, "43"
 	}
 	return strings.ToLower(strings.TrimSuffix(host, ".")) + ":" + port
+}
+
+// isWHOISHost reports whether a registrar WHOIS referral names a host (and
+// optional port) rather than a URL or anything else that cannot be
+// dialled on port 43.
+func isWHOISHost(s string) bool {
+	return s != "" && !strings.Contains(s, "/") && !strings.ContainsAny(s, " \t")
 }

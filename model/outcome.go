@@ -21,13 +21,19 @@ const (
 	OutcomeFailed
 )
 
-// Classify applies the rules above to a record's per-source results.
+// Classify applies the rules above to a record's per-source results. A
+// source marked Unavailable is left out, as if it had not been queried;
+// if nothing else remains, the outcome is OutcomeFailed.
 func Classify(sources []SourceResult) Outcome {
 	if len(sources) == 0 {
 		return OutcomeFailed
 	}
 	hasData, hasNotFound, hasFailed := false, false, false
 	for _, s := range sources {
+		if s.Unavailable {
+			// No service for this name: its answer says nothing either way.
+			continue
+		}
 		switch {
 		case s.OK:
 			hasData = true

@@ -127,6 +127,7 @@ func fromIPHop(meta model.SourceResult, hop whois.Hop) source.IPSourceRecord {
 	if hop.Fields.Unsupported {
 		meta.OK = false
 		meta.Err = "registry does not support WHOIS for this network"
+		meta.Unavailable = true // no service for this name: left out of the outcome (#131)
 		return source.IPSourceRecord{Meta: meta}
 	}
 	if hop.Fields.RateLimited {

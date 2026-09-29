@@ -66,6 +66,7 @@ func fromHop(src model.SourceID, hop whois.Hop) source.SourceRecord {
 		// domain confirmedly doesn't exist).
 		meta.OK = false
 		meta.Err = "registry does not support WHOIS for this TLD"
+		meta.Unavailable = true // no service for this name: left out of the outcome (#131)
 		return source.SourceRecord{Meta: meta}
 	}
 	if f.Restricted {

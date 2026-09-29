@@ -1407,3 +1407,15 @@ func TestBoxFitsWidth(t *testing.T) {
 		}
 	}
 }
+
+// See plain's TestRenderSources_UnavailableSource (#131).
+func TestRenderSources_UnavailableSource(t *testing.T) {
+	var buf bytes.Buffer
+	err := RenderSources(&buf, NewTheme(true), 200, []model.SourceResult{{Source: model.SourceRegistryWHOIS, Unavailable: true, Err: "registry does not support WHOIS for this TLD"}}, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "unavailable: registry does not support WHOIS for this TLD") {
+		t.Errorf("sources block = %q, want the source marked unavailable with its reason", buf.String())
+	}
+}

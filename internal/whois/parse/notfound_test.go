@@ -158,3 +158,22 @@ func TestParse_WebComRegistrarRateLimit(t *testing.T) {
 		t.Error("RateLimited = false for \"IP Address Has Reached Rate Limit\"")
 	}
 }
+
+// GMO Registry (.shop, .tokyo, ...) retired WHOIS and answers every query,
+// registered or free, with the same notice. Read as an answer, it
+// outranked RDAP's 404 and every free GMO name exited 0 as registered.
+// See #127.
+func TestParse_RetiredWHOISIsARefusal(t *testing.T) {
+	f := Parse(loadFixture(t, "gmo-shop-refused-recorded.txt"), "shop")
+	if !f.Unsupported || f.NotFound {
+		t.Errorf("Unsupported=%v NotFound=%v, want a refusal", f.Unsupported, f.NotFound)
+	}
+}
+
+// ZACR (.africa) answers a free name with "Available" and "No information
+// was found matching that query." See #128.
+func TestParse_ZACRNotFound(t *testing.T) {
+	if f := Parse(loadFixture(t, "zacr-africa-notfound-recorded.txt"), "africa"); !f.NotFound {
+		t.Error("NotFound = false for ZACR's not-found answer")
+	}
+}

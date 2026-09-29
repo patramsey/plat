@@ -318,3 +318,28 @@ func TestEncode_LifecycleAbsentWhenNil(t *testing.T) {
 		t.Errorf("lifecycle key present, want omitted when Record.Lifecycle is nil")
 	}
 }
+
+// An unavailable source is marked in JSON; an ordinary one is not, so
+// existing output is byte-for-byte unchanged (#131).
+func TestEncode_UnavailableSource(t *testing.T) {
+	rec := model.Record{Sources: []model.SourceResult{
+		{Source: model.SourceRegistryRDAP, NotFound: true},
+		{Source: model.SourceRegistryWHOIS, Unavailable: true, Err: "registry does not support WHOIS for this TLD"},
+	}}
+	var buf bytes.Buffer
+	if err := Encode(&buf, rec, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Sources []map[string]any `json:"sources"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := doc.Sources[0]["unavailable"]; ok {
+		t.Errorf("sources[0] = %v; an available source must not carry \"unavailable\"", doc.Sources[0])
+	}
+	if doc.Sources[1]["unavailable"] != true {
+		t.Errorf("sources[1] = %v, want \"unavailable\": true", doc.Sources[1])
+	}
+}

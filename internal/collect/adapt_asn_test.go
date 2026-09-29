@@ -472,3 +472,10 @@ func TestFromASNRDAP_AFRINICOrgHandleIsNotAnASName(t *testing.T) {
 		t.Errorf("Name = %q, want empty (it is the registrant's handle)", sr.Name)
 	}
 }
+
+func TestFromASNHop_UnsupportedIsUnavailable(t *testing.T) {
+	sr := fromASNHop(model.SourceResult{Source: model.SourceRegistryWHOIS}, whois.Hop{Fields: parse.Fields{Unsupported: true}, ASNFields: &parse.ASNFields{}})
+	if !sr.Meta.Unavailable || sr.Meta.OK {
+		t.Errorf("Meta = %+v, want Unavailable", sr.Meta)
+	}
+}

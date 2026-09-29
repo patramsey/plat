@@ -129,6 +129,8 @@ func writeSourcesBlock(tw *tabwriter.Writer, sources []model.SourceResult, notQu
 			status = "ok"
 		case s.NotFound:
 			status = "not found"
+		case s.Unavailable:
+			status = "unavailable: " + s.Err
 		case s.Err != "":
 			status = s.Err
 		}

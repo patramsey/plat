@@ -3,16 +3,19 @@ package rdap
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -74,11 +77,15 @@ type Client struct {
 	UserAgent string
 }
 
+// defaultHTTP is the client used when Client.HTTP is nil. A variable so
+// tests can substitute one that trusts an httptest certificate.
+var defaultHTTP = http.DefaultClient
+
 func (c *Client) httpClient() *http.Client {
 	if c.HTTP != nil {
 		return c.HTTP
 	}
-	return http.DefaultClient
+	return defaultHTTP
 }
 
 func (c *Client) timeout() time.Duration {
@@ -116,7 +123,26 @@ func (c *Client) do(ctx context.Context, reqURL string) (*rawResponse, error) {
 	req.Header.Set("Accept", "application/rdap+json")
 	req.Header.Set("User-Agent", c.userAgent())
 
-	resp, err := c.httpClient().Do(req)
+	// Some registries (rdap.nic.cat, rdap.nic.eus and ten more) offer only
+	// RSA key exchange, which Go leaves out of its defaults for lack of
+	// forward secrecy. After a handshake failure the request is retried
+	// once on the shared fallback client, with those suites added after
+	// the defaults; a host that then succeeds is remembered, so later
+	// requests go straight to the fallback. Only plat's own default client
+	// does this: a caller's http.Client keeps its TLS policy, and a server
+	// that can do better never sees the weaker suites (#129).
+	hc := c.httpClient()
+	viaFallback := c.HTTP == nil && tlsFallback.needs(req.URL.Host)
+	if viaFallback {
+		hc = tlsFallback.clientFor(hc)
+	}
+	resp, err := hc.Do(req)
+	if err != nil && c.HTTP == nil && !viaFallback && isTLSHandshakeFailure(err) {
+		resp, err = tlsFallback.clientFor(hc).Do(req.Clone(ctx))
+		if err == nil {
+			tlsFallback.remember(req.URL.Host)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("rdap: requesting %s: %w", reqURL, err)
 	}
@@ -354,3 +380,79 @@ func (c *Client) asnAt(ctx context.Context, reqURL string) (*Result, error) {
 	return fetchAt(c, ctx, reqURL, "autnum",
 		func(r *Result, a *ASNResponse) { r.ASN = a })
 }
+
+// isTLSHandshakeFailure reports whether err is the server's TLS
+// handshake_failure alert -- what a server sends when it shares no cipher
+// suite with the client. crypto/tls surfaces a remote alert as a
+// *net.OpError with Op "remote error" around an unexported alert type.
+func isTLSHandshakeFailure(err error) bool {
+	var op *net.OpError
+	return errors.As(err, &op) && op.Op == "remote error" && op.Err != nil &&
+		op.Err.Error() == "tls: handshake failure"
+}
+
+// rsaKeyExchangeSuites are the TLS 1.2 RSA key-exchange suites Go omits
+// from its defaults. TLS 1.3 is unaffected by CipherSuites.
+var rsaKeyExchangeSuites = []uint16{
+	tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+	tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+	tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+	tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+}
+
+// legacyTLSClient returns base with the RSA key-exchange suites added
+// after Go's defaults, keeping everything else about its transport --
+// root CAs, proxy, timeouts.
+func legacyTLSClient(base *http.Client) *http.Client {
+	t, ok := base.Transport.(*http.Transport)
+	if !ok || t == nil {
+		t = http.DefaultTransport.(*http.Transport)
+	}
+	clone := t.Clone()
+	cfg := &tls.Config{}
+	if clone.TLSClientConfig != nil {
+		cfg = clone.TLSClientConfig.Clone()
+	}
+	var suites []uint16
+	for _, s := range tls.CipherSuites() {
+		suites = append(suites, s.ID)
+	}
+	cfg.CipherSuites = append(suites, rsaKeyExchangeSuites...)
+	clone.TLSClientConfig = cfg
+	return &http.Client{Transport: clone, Timeout: base.Timeout, CheckRedirect: base.CheckRedirect, Jar: base.Jar}
+}
+
+// tlsFallback is the shared RSA key-exchange fallback: one client, built
+// once from the default client, and a record of the hosts that needed
+// it. Twelve RDAP servers do (rdap.nic.cat, .eus, .scot, .bayern, ...),
+// all apparently one backend. Once a host has needed the fallback, later
+// requests to it go straight there, so only the first pays for a failed
+// default handshake; and the one transport keeps its connections alive
+// instead of a new transport being built per request.
+var tlsFallback fallbackState
+
+type fallbackState struct {
+	mu     sync.Mutex
+	base   *http.Client
+	client *http.Client
+	hosts  sync.Map // "host:port" -> struct{}, hosts that needed the fallback
+}
+
+// clientFor returns the shared fallback client derived from base,
+// building it on first use (and again only if base changes, which only
+// tests do).
+func (f *fallbackState) clientFor(base *http.Client) *http.Client {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.client == nil || f.base != base {
+		f.base, f.client = base, legacyTLSClient(base)
+	}
+	return f.client
+}
+
+func (f *fallbackState) needs(host string) bool {
+	_, ok := f.hosts.Load(host)
+	return ok
+}
+
+func (f *fallbackState) remember(host string) { f.hosts.Store(host, struct{}{}) }
