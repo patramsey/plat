@@ -222,3 +222,27 @@ func TestSameWHOISServer(t *testing.T) {
 		}
 	}
 }
+
+// ZACR's registry answer names "http://www.dns.net.za/whois" as the
+// registrar WHOIS server: a web page, not a port-43 host. Following it
+// dialled "http://www.dns.net.za/whois:43" and recorded a failed
+// registrar-whois source. See #128.
+func TestClient_LookupDoesNotFollowAURLReferral(t *testing.T) {
+	registryAddr := startListener(t, func(query string) string {
+		return "Domain Name: nic.africa\nRegistrar WHOIS Server: http://www.dns.net.za/whois\n"
+	})
+	ianaAddr := startListener(t, func(query string) string {
+		return "refer: " + registryAddr + "\n"
+	})
+	q, err := domain.Normalize("nic.africa")
+	if err != nil {
+		t.Fatalf("Normalize: %v", err)
+	}
+	result, err := (&Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}).Lookup(context.Background(), q.Name)
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if len(result.Hops) != 2 {
+		t.Errorf("got %d hops, want 2 (IANA, registry): a URL is not a WHOIS server", len(result.Hops))
+	}
+}

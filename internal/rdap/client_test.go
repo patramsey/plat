@@ -2,6 +2,7 @@ package rdap
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -944,5 +945,47 @@ func TestClientDomain_429RetryTransportErrorIsReturned(t *testing.T) {
 	// response, so the server can see a third request.
 	if hits.Load() < 2 {
 		t.Errorf("hits = %d, want the retry to have been sent", hits.Load())
+	}
+}
+
+// rsaOnlyTLSServer serves a domain object over TLS 1.2 offering only
+// TLS_RSA_WITH_AES_128_CBC_SHA, as rdap.nic.cat and rdap.nic.eus do. Go
+// leaves RSA key exchange out of its defaults, so a default client's
+// handshake fails. See #129.
+func rsaOnlyTLSServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write([]byte(`{"objectClassName":"domain","ldhName":"NIC.CAT"}`))
+	}))
+	//nolint:gosec // G402: deliberately weak, to reproduce rdap.nic.cat's only offering.
+	srv.TLS = &tls.Config{CipherSuites: []uint16{tls.TLS_RSA_WITH_AES_128_CBC_SHA}, MaxVersion: tls.VersionTLS12}
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestClient_RetriesWithRSAKeyExchangeAfterHandshakeFailure(t *testing.T) {
+	srv := rsaOnlyTLSServer(t)
+	orig := defaultHTTP
+	defaultHTTP = srv.Client() // plat's default client, trusting the test certificate
+	t.Cleanup(func() { defaultHTTP = orig })
+
+	res, err := (&Client{}).Domain(context.Background(), srv.URL, "NIC.CAT")
+	if err != nil {
+		t.Fatalf("Domain: %v; want the RSA key-exchange fallback to succeed", err)
+	}
+	if res.Domain == nil || res.Domain.LDHName != "NIC.CAT" {
+		t.Errorf("Domain = %+v, want NIC.CAT", res.Domain)
+	}
+}
+
+// A caller who supplies their own http.Client keeps their TLS policy:
+// no silent downgrade.
+func TestClient_NoRSAFallbackForACallerSuppliedClient(t *testing.T) {
+	srv := rsaOnlyTLSServer(t)
+	_, err := (&Client{HTTP: srv.Client()}).Domain(context.Background(), srv.URL, "NIC.CAT")
+	if !isTLSHandshakeFailure(err) {
+		t.Errorf("err = %v, want the handshake failure, unretried", err)
 	}
 }

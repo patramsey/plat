@@ -3,11 +3,13 @@ package rdap
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
@@ -74,11 +76,15 @@ type Client struct {
 	UserAgent string
 }
 
+// defaultHTTP is the client used when Client.HTTP is nil. A variable so
+// tests can substitute one that trusts an httptest certificate.
+var defaultHTTP = http.DefaultClient
+
 func (c *Client) httpClient() *http.Client {
 	if c.HTTP != nil {
 		return c.HTTP
 	}
-	return http.DefaultClient
+	return defaultHTTP
 }
 
 func (c *Client) timeout() time.Duration {
@@ -117,6 +123,15 @@ func (c *Client) do(ctx context.Context, reqURL string) (*rawResponse, error) {
 	req.Header.Set("User-Agent", c.userAgent())
 
 	resp, err := c.httpClient().Do(req)
+	if err != nil && c.HTTP == nil && isTLSHandshakeFailure(err) {
+		// Some registries (rdap.nic.cat, rdap.nic.eus) offer only RSA key
+		// exchange, which Go leaves out of its defaults for lack of
+		// forward secrecy. Retry once with those suites added -- only for
+		// plat's own default client, only after a handshake failure, so a
+		// server that can do better never sees them and a caller's own
+		// client keeps its TLS policy (#129).
+		resp, err = legacyTLSClient(c.httpClient()).Do(req.Clone(ctx))
+	}
 	if err != nil {
 		return nil, fmt.Errorf("rdap: requesting %s: %w", reqURL, err)
 	}
@@ -353,4 +368,45 @@ func (c *Client) ASN(ctx context.Context, baseURL string, asn uint32) (*Result, 
 func (c *Client) asnAt(ctx context.Context, reqURL string) (*Result, error) {
 	return fetchAt(c, ctx, reqURL, "autnum",
 		func(r *Result, a *ASNResponse) { r.ASN = a })
+}
+
+// isTLSHandshakeFailure reports whether err is the server's TLS
+// handshake_failure alert -- what a server sends when it shares no cipher
+// suite with the client. crypto/tls surfaces a remote alert as a
+// *net.OpError with Op "remote error" around an unexported alert type.
+func isTLSHandshakeFailure(err error) bool {
+	var op *net.OpError
+	return errors.As(err, &op) && op.Op == "remote error" && op.Err != nil &&
+		op.Err.Error() == "tls: handshake failure"
+}
+
+// rsaKeyExchangeSuites are the TLS 1.2 RSA key-exchange suites Go omits
+// from its defaults. TLS 1.3 is unaffected by CipherSuites.
+var rsaKeyExchangeSuites = []uint16{
+	tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+	tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+	tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+	tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+}
+
+// legacyTLSClient returns base with the RSA key-exchange suites added
+// after Go's defaults, keeping everything else about its transport --
+// root CAs, proxy, timeouts.
+func legacyTLSClient(base *http.Client) *http.Client {
+	t, ok := base.Transport.(*http.Transport)
+	if !ok || t == nil {
+		t = http.DefaultTransport.(*http.Transport)
+	}
+	clone := t.Clone()
+	cfg := &tls.Config{}
+	if clone.TLSClientConfig != nil {
+		cfg = clone.TLSClientConfig.Clone()
+	}
+	var suites []uint16
+	for _, s := range tls.CipherSuites() {
+		suites = append(suites, s.ID)
+	}
+	cfg.CipherSuites = append(suites, rsaKeyExchangeSuites...)
+	clone.TLSClientConfig = cfg
+	return &http.Client{Transport: clone, Timeout: base.Timeout, CheckRedirect: base.CheckRedirect, Jar: base.Jar}
 }

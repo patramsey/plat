@@ -21,6 +21,12 @@ follows [Semantic Versioning](https://semver.org/).
   reserved addresses. They were answered as "not registered" (exit `1`),
   "no server listed" (exit `3`) or with IANA's TEST-NET record (exit
   `0`), depending on the range.
+- **Breaking:** A free name in a gTLD whose registry has retired WHOIS
+  (GMO Registry: `.shop`, `.tokyo`, ...) exits `3` instead of `0`. The
+  retirement notice read as a registered WHOIS answer, which outranked
+  RDAP's "not found".
+- **Breaking:** A free `.africa` name exits `1` instead of `0`; ZACR's
+  "No information was found matching that query" matched no marker.
 
 ### Fixed
 - Registrar URLs and abuse phone numbers that differ only in formatting
@@ -33,6 +39,13 @@ follows [Semantic Versioning](https://semver.org/).
 - AFRINIC IP and ASN lookups show the network or AS name. AFRINIC's RDAP
   puts the registrant organisation's handle (`ORG-AFNC1-AFRINIC`) in the
   name field, which outranked WHOIS's real name.
+- RDAP works for registries that only offer RSA key exchange over TLS
+  (`.cat`, `.eus`). plat retries once with those cipher suites after a
+  TLS handshake failure -- only with its own default HTTP client, so a
+  server that can do better never sees them and a library caller's
+  client keeps its TLS policy.
+- A registrar WHOIS referral that is a URL rather than a host (ZACR's
+  `http://www.dns.net.za/whois`) is no longer dialled.
 
 ## [0.10.0] - 2026-09-27
 

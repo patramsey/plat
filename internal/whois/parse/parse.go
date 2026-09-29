@@ -161,22 +161,23 @@ var notFoundMarkers = []string{
 	"no entries found",
 	"no data found",
 	"status: free",
-	"status: no object found",               // CoCCA-style registries
-	"message: no object found",              // .sr
-	"object does not exist",                 // CoCCA-style, .by, .ws
-	"object_not_found",                      // .mx, for a free name
-	"is available for registration",         // Tucows registry: .in .my .bh .ky .pw .to
-	"is available for purchase",             // .tm
-	"registration status: available",        // .bg
-	"not registered, and may be available",  // .pk
-	"no information available about domain", // .pl
-	"no record found for",                   // .ls
-	"no such domain",                        // .lu
-	"nothing found",                         // .at, .kz
-	"has not been registered",               // .hk
-	"domain is not registered",              // .rs
-	"no se encuentra registrado",            // .ar
-	"no found",                              // .tw
+	"status: no object found",                      // CoCCA-style registries
+	"message: no object found",                     // .sr
+	"object does not exist",                        // CoCCA-style, .by, .ws
+	"object_not_found",                             // .mx, for a free name
+	"is available for registration",                // Tucows registry: .in .my .bh .ky .pw .to
+	"is available for purchase",                    // .tm
+	"registration status: available",               // .bg
+	"not registered, and may be available",         // .pk
+	"no information available about domain",        // .pl
+	"no record found for",                          // .ls
+	"no such domain",                               // .lu
+	"nothing found",                                // .at, .kz
+	"has not been registered",                      // .hk
+	"domain is not registered",                     // .rs
+	"no se encuentra registrado",                   // .ar
+	"no found",                                     // .tw
+	"no information was found matching that query", // ZACR (.africa)
 }
 
 // restrictedMarkers identify an answer that the name is reserved,
@@ -260,7 +261,8 @@ var unsupportedMarkers = []string{
 	// form. Matched as the whole sentence: "not permitted" alone appears
 	// in the terms of use of countless real answers.
 	"requests of this client are not permitted",
-	"this tld has no whois server", // Freenom's former TLDs (.gq)
+	"this tld has no whois server",   // Freenom's former TLDs (.gq)
+	"whois service has been retired", // gTLD registries under ICANN\'s RDAP transition (GMO: .shop, .tokyo)
 }
 
 // tokenizeKV handles the default "Key: value" dialect used by most
