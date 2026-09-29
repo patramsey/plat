@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -122,15 +123,25 @@ func (c *Client) do(ctx context.Context, reqURL string) (*rawResponse, error) {
 	req.Header.Set("Accept", "application/rdap+json")
 	req.Header.Set("User-Agent", c.userAgent())
 
-	resp, err := c.httpClient().Do(req)
-	if err != nil && c.HTTP == nil && isTLSHandshakeFailure(err) {
-		// Some registries (rdap.nic.cat, rdap.nic.eus) offer only RSA key
-		// exchange, which Go leaves out of its defaults for lack of
-		// forward secrecy. Retry once with those suites added -- only for
-		// plat's own default client, only after a handshake failure, so a
-		// server that can do better never sees them and a caller's own
-		// client keeps its TLS policy (#129).
-		resp, err = legacyTLSClient(c.httpClient()).Do(req.Clone(ctx))
+	// Some registries (rdap.nic.cat, rdap.nic.eus and ten more) offer only
+	// RSA key exchange, which Go leaves out of its defaults for lack of
+	// forward secrecy. After a handshake failure the request is retried
+	// once on the shared fallback client, with those suites added after
+	// the defaults; a host that then succeeds is remembered, so later
+	// requests go straight to the fallback. Only plat's own default client
+	// does this: a caller's http.Client keeps its TLS policy, and a server
+	// that can do better never sees the weaker suites (#129).
+	hc := c.httpClient()
+	viaFallback := c.HTTP == nil && tlsFallback.needs(req.URL.Host)
+	if viaFallback {
+		hc = tlsFallback.clientFor(hc)
+	}
+	resp, err := hc.Do(req)
+	if err != nil && c.HTTP == nil && !viaFallback && isTLSHandshakeFailure(err) {
+		resp, err = tlsFallback.clientFor(hc).Do(req.Clone(ctx))
+		if err == nil {
+			tlsFallback.remember(req.URL.Host)
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("rdap: requesting %s: %w", reqURL, err)
@@ -410,3 +421,38 @@ func legacyTLSClient(base *http.Client) *http.Client {
 	clone.TLSClientConfig = cfg
 	return &http.Client{Transport: clone, Timeout: base.Timeout, CheckRedirect: base.CheckRedirect, Jar: base.Jar}
 }
+
+// tlsFallback is the shared RSA key-exchange fallback: one client, built
+// once from the default client, and a record of the hosts that needed
+// it. Twelve RDAP servers do (rdap.nic.cat, .eus, .scot, .bayern, ...),
+// all apparently one backend. Once a host has needed the fallback, later
+// requests to it go straight there, so only the first pays for a failed
+// default handshake; and the one transport keeps its connections alive
+// instead of a new transport being built per request.
+var tlsFallback fallbackState
+
+type fallbackState struct {
+	mu     sync.Mutex
+	base   *http.Client
+	client *http.Client
+	hosts  sync.Map // "host:port" -> struct{}, hosts that needed the fallback
+}
+
+// clientFor returns the shared fallback client derived from base,
+// building it on first use (and again only if base changes, which only
+// tests do).
+func (f *fallbackState) clientFor(base *http.Client) *http.Client {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.client == nil || f.base != base {
+		f.base, f.client = base, legacyTLSClient(base)
+	}
+	return f.client
+}
+
+func (f *fallbackState) needs(host string) bool {
+	_, ok := f.hosts.Load(host)
+	return ok
+}
+
+func (f *fallbackState) remember(host string) { f.hosts.Store(host, struct{}{}) }

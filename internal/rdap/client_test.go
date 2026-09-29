@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"os"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -987,5 +988,51 @@ func TestClient_NoRSAFallbackForACallerSuppliedClient(t *testing.T) {
 	_, err := (&Client{HTTP: srv.Client()}).Domain(context.Background(), srv.URL, "NIC.CAT")
 	if !isTLSHandshakeFailure(err) {
 		t.Errorf("err = %v, want the handshake failure, unretried", err)
+	}
+}
+
+// The fallback transport is built once and shared: a new transport per
+// request meant no connection reuse, and idle connections left behind
+// under bulk use.
+func TestTLSFallback_TransportIsShared(t *testing.T) {
+	base := &http.Client{}
+	if a, b := tlsFallback.clientFor(base), tlsFallback.clientFor(base); a != b {
+		t.Error("clientFor returned a different client on the second call; want one shared fallback client")
+	}
+}
+
+// A host that needed RSA key exchange once goes straight to the fallback
+// afterwards: only the first lookup pays for a failed default handshake.
+// Twelve RDAP servers need it (rdap.nic.cat, .eus, .scot, ...).
+func TestClient_RemembersAHostThatNeededTheFallback(t *testing.T) {
+	var defaultAttempts atomic.Int32
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rdap+json")
+		_, _ = w.Write([]byte(`{"objectClassName":"domain","ldhName":"NIC.CAT"}`))
+	}))
+	//nolint:gosec // G402: deliberately weak, to reproduce rdap.nic.cat's only offering.
+	srv.TLS = &tls.Config{
+		CipherSuites: []uint16{tls.TLS_RSA_WITH_AES_128_CBC_SHA},
+		MaxVersion:   tls.VersionTLS12,
+		GetConfigForClient: func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
+			if !slices.Contains(hi.CipherSuites, tls.TLS_RSA_WITH_AES_128_CBC_SHA) {
+				defaultAttempts.Add(1) // a hello with Go's defaults only
+			}
+			return nil, nil
+		},
+	}
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	orig := defaultHTTP
+	defaultHTTP = srv.Client()
+	t.Cleanup(func() { defaultHTTP = orig })
+
+	for i := 0; i < 2; i++ {
+		if _, err := (&Client{}).Domain(context.Background(), srv.URL, "NIC.CAT"); err != nil {
+			t.Fatalf("lookup %d: %v", i+1, err)
+		}
+	}
+	if got := defaultAttempts.Load(); got != 1 {
+		t.Errorf("default-cipher handshakes = %d, want 1 (the second lookup should go straight to the fallback)", got)
 	}
 }
