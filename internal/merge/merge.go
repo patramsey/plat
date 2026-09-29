@@ -213,10 +213,48 @@ func normalizeDomain(s string) string {
 // comparisonKey returns the normaliser used to decide whether two source
 // values for a field are the same fact.
 func comparisonKey(field, s string) string {
-	if field == model.FieldDomain {
+	switch field {
+	case model.FieldDomain:
 		return normalizeDomain(s)
+	case model.FieldRegistrarURL:
+		return normalizeURL(s)
+	case model.FieldRegistrarAbusePhone, model.FieldOrgAbusePhone:
+		return normalizePhone(s)
 	}
 	return normalizeScalar(s)
+}
+
+// normalizeURL compares a registrar URL by host and path: registry and
+// registrar WHOIS write the same URL with and without a scheme, "www." or
+// a trailing slash, and in either case ("WWW.ENOMDOMAINS.COM" vs
+// "http://www.enomdomains.com"). A different host or path still
+// conflicts (#123).
+func normalizeURL(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://")
+	s = strings.TrimPrefix(s, "www.")
+	return strings.TrimSuffix(s, "/")
+}
+
+// normalizePhone compares a phone number by its digits: "+1.4806242505",
+// "+1-480-624-2505" and "+14806242505" are one number. A ten-digit number
+// written with no "+" and no leading 0 ("480-624-2505") is taken as North
+// American and gains its country code; a national number with a leading
+// 0 cannot be matched without knowing its country, so it stays distinct
+// (#123).
+func normalizePhone(s string) string {
+	s = strings.TrimSpace(s)
+	var digits strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			digits.WriteRune(r)
+		}
+	}
+	d := digits.String()
+	if len(d) == 10 && !strings.HasPrefix(s, "+") && !strings.HasPrefix(d, "0") {
+		d = "1" + d
+	}
+	return d
 }
 
 // scalar picks the first present, non-empty, non-redacted candidate (in

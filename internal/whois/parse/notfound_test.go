@@ -150,3 +150,11 @@ func TestParse_BOFooterIsNotARefusal(t *testing.T) {
 		t.Errorf("Unsupported=%v NotFound=%v for registered nic.bo; its footer is boilerplate", f.Unsupported, f.NotFound)
 	}
 }
+
+// Web.com-family registrar WHOIS (register.com, domain.com) rate-limits
+// with this sentence and nothing else. See #122.
+func TestParse_WebComRegistrarRateLimit(t *testing.T) {
+	if f := Parse(loadFixture(t, "webcom-registrar-ratelimited-recorded.txt"), ""); !f.RateLimited {
+		t.Error("RateLimited = false for \"IP Address Has Reached Rate Limit\"")
+	}
+}

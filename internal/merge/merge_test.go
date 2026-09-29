@@ -1148,3 +1148,39 @@ func TestMerge_DateOnlyValueTwoDaysOffStillConflicts(t *testing.T) {
 		t.Errorf("Conflicts = %+v, want one created conflict (60h apart)", rec.Conflicts)
 	}
 }
+
+// Registry and registrar WHOIS format the same registrar URL and abuse
+// phone differently; a registrar-WHOIS sweep found about 15 such false
+// conflicts across 13 of 45 domains. Real differences from the same
+// sweep must still conflict. See #123.
+func TestComparisonKey_URLAndPhoneFormatting(t *testing.T) {
+	same := []struct{ field, a, b string }{
+		{model.FieldRegistrarURL, "https://www.godaddy.com", "http://www.godaddy.com"},
+		{model.FieldRegistrarURL, "https://www.namesilo.com/", "http://www.namesilo.com"},
+		{model.FieldRegistrarURL, "WWW.ENOMDOMAINS.COM", "http://www.enomdomains.com"},
+		{model.FieldRegistrarURL, "www.gname.com", "http://www.gname.com"},
+		{model.FieldRegistrarURL, "https://ovh.com", "http://www.ovh.com"},
+		{model.FieldRegistrarAbusePhone, "+1.4806242505", "480-624-2505"},
+		{model.FieldRegistrarAbusePhone, "+1.6502620100", "+16502620100"},
+		{model.FieldRegistrarAbusePhone, "+44.2074218250", "+442074218250"},
+		{model.FieldOrgAbusePhone, "+1-650-253-0000", "+1.6502530000"},
+	}
+	for _, c := range same {
+		if comparisonKey(c.field, c.a) != comparisonKey(c.field, c.b) {
+			t.Errorf("%s: %q and %q compare different, want the same", c.field, c.a, c.b)
+		}
+	}
+	differ := []struct{ field, a, b string }{
+		{model.FieldRegistrarURL, "http://tucowsdomains.com", "http://www.tucows.com"},
+		{model.FieldRegistrarURL, "https://dnsimple.com", "http://www.1api.net"},
+		{model.FieldRegistrarURL, "www.35.com", "http://domain.35.com"},
+		{model.FieldRegistrarAbusePhone, "+1.4153197517", "+1.6503198930"},
+		{model.FieldRegistrarAbusePhone, "+1.7203101849", "7202492374"},
+		{model.FieldRegistrarAbusePhone, "+44.2074218250", "02074218250"},
+	}
+	for _, c := range differ {
+		if comparisonKey(c.field, c.a) == comparisonKey(c.field, c.b) {
+			t.Errorf("%s: %q and %q compare the same, want different", c.field, c.a, c.b)
+		}
+	}
+}
