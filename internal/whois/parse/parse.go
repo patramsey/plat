@@ -141,6 +141,7 @@ var rateLimitMarkers = []string{
 	"too many requests",
 	"quota exceeded",
 	"ratelimit exceeded",         // "Error: ratelimit exceeded" (.aw, .nl under load)
+	"has reached rate limit",     // "IP Address Has Reached Rate Limit" (Web.com registrars)
 	"maximum query rate reached", // "%% Maximum query rate reached" (.lu)
 }
 

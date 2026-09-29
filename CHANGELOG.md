@@ -16,6 +16,15 @@ follows [Semantic Versioning](https://semver.org/).
   wording read as a registered domain. Replaying every recorded sweep
   answer changes none today; it catches wording not yet seen.
 
+### Fixed
+- Registrar URLs and abuse phone numbers that differ only in formatting
+  -- `https://www.godaddy.com` vs `http://www.godaddy.com`, a trailing
+  slash or missing scheme, `+1.4806242505` vs `480-624-2505` -- no longer
+  raise a conflict. A different host or number still does.
+- The Web.com-family registrar WHOIS rate limit ("IP Address Has Reached
+  Rate Limit", register.com, domain.com) is recognised as a rate limit
+  rather than an empty answer.
+
 ## [0.10.0] - 2026-09-27
 
 Follow-ups from v0.9.0's ccTLD sweep: reserved names, WHOIS formats that
