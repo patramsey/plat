@@ -649,3 +649,16 @@ func TestNoNotQueriedLineWhenNothingFiltered(t *testing.T) {
 		t.Errorf("unfiltered verbose run gained a not-queried line; got:\n%s", buf.String())
 	}
 }
+
+// -v distinguishes a source with no service for the name from one that
+// failed (#131).
+func TestRenderSources_UnavailableSource(t *testing.T) {
+	var buf bytes.Buffer
+	err := RenderSources(&buf, []model.SourceResult{{Source: model.SourceRegistryWHOIS, Unavailable: true, Err: "registry does not support WHOIS for this TLD"}}, nil, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "unavailable: registry does not support WHOIS for this TLD") {
+		t.Errorf("sources block = %q, want the source marked unavailable with its reason", buf.String())
+	}
+}

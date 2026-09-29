@@ -935,8 +935,23 @@ func lookupOneASN(ctx context.Context, stdout, stderr io.Writer, client *plat.Cl
 // can't be asserted with confidence. filtered reports whether a flag such
 // as --source excluded any source before the lookup ran.
 func lookupOutcomeError(code int, sources []model.SourceResult, filtered bool) error {
-	names := make([]string, len(sources))
-	for i, s := range sources {
+	// A source with no service for the name (a retired WHOIS, say) had no
+	// say in the outcome, so it is not listed as checked or counted as a
+	// failure (#131). If it is all there was, say that.
+	var usable []model.SourceResult
+	var unavailable []string
+	for _, s := range sources {
+		if s.Unavailable {
+			unavailable = append(unavailable, fmt.Sprintf("%s: %s", s.Source, s.Err))
+			continue
+		}
+		usable = append(usable, s)
+	}
+	if len(sources) > 0 && len(usable) == 0 {
+		return fmt.Errorf("lookup failed -- no source has a service for this name (%s)", strings.Join(unavailable, "; "))
+	}
+	names := make([]string, len(usable))
+	for i, s := range usable {
 		names[i] = string(s.Source)
 	}
 	checked := strings.Join(names, ", ")
@@ -971,12 +986,12 @@ func lookupOutcomeError(code int, sources []model.SourceResult, filtered bool) e
 		}
 	}
 	failed := 0
-	for _, s := range sources {
+	for _, s := range usable {
 		if !s.OK && !s.NotFound {
 			failed++
 		}
 	}
-	return fmt.Errorf("lookup inconclusive -- %d of %d sources failed, so non-existence can't be confirmed (checked: %s)", failed, len(sources), checked)
+	return fmt.Errorf("lookup inconclusive -- %d of %d sources failed, so non-existence can't be confirmed (checked: %s)", failed, len(usable), checked)
 }
 
 func renderRecord(w io.Writer, format render.Format, record model.Record, raw, verbose, showConflicts, quiet bool, ui uiConfig) error {

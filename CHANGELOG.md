@@ -6,6 +6,11 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `model.SourceResult.Unavailable` (JSON `"unavailable": true`, omitted
+  when false) marks a source with no service for the name.
+  `model.Classify` leaves such sources out.
+
 ### Changed
 - **Breaking:** A WHOIS answer that plat cannot read -- no field parsed,
   and no known not-found, refusal, rate-limit or restricted wording --
@@ -22,9 +27,12 @@ follows [Semantic Versioning](https://semver.org/).
   "no server listed" (exit `3`) or with IANA's TEST-NET record (exit
   `0`), depending on the range.
 - **Breaking:** A free name in a gTLD whose registry has retired WHOIS
-  (GMO Registry: `.shop`, `.tokyo`, ...) exits `3` instead of `0`. The
-  retirement notice read as a registered WHOIS answer, which outranked
-  RDAP's "not found".
+  (GMO Registry: `.shop`, `.tokyo`, ...) exits `1` (not registered)
+  instead of `0`. The retirement notice read as a registered WHOIS
+  answer, which outranked RDAP's "not found". A WHOIS server with no
+  service for a name -- retired, TLD unsupported, or refusing every query
+  (`.ch`) -- is now *unavailable* rather than failed, and is left out of
+  the outcome; `-v` shows it as "unavailable" with the reason.
 - **Breaking:** A free `.africa` name exits `1` instead of `0`; ZACR's
   "No information was found matching that query" matched no marker.
 

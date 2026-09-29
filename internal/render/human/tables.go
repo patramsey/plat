@@ -42,6 +42,8 @@ func writeSources(b *strings.Builder, th Theme, width int, sources []model.Sourc
 				status = th.OK.Render("✓ ok")
 			case s.NotFound:
 				status = th.Warn.Render("– not found")
+			case s.Unavailable:
+				status = th.Muted.Render("– unavailable: " + s.Err)
 			case s.Err != "":
 				status = th.Err.Render("✗ " + s.Err)
 			}

@@ -122,9 +122,17 @@ type SourceResult struct {
 	Source   SourceID
 	OK       bool
 	NotFound bool
-	Latency  time.Duration
-	Err      string
-	Raw      []byte
+	// Unavailable reports that the source has no service for this name:
+	// the server answered, but only to say it does not serve it -- a
+	// retired WHOIS (GMO: .shop, .tokyo), "TLD is not supported", or a
+	// refusal of all queries (SWITCH: .ch). Its answer says nothing about
+	// the name, so Classify leaves it out: a free .shop name is not found
+	// on RDAP's word alone, rather than inconclusive. Err gives the
+	// reason. Distinct from a failure, which might have held the record.
+	Unavailable bool
+	Latency     time.Duration
+	Err         string
+	Raw         []byte
 }
 
 // Record is a domain lookup's unified, provenance-annotated result:

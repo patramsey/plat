@@ -55,11 +55,12 @@ func buildASNView(r model.ASNRecord, opts Options) asnRecordView {
 	}
 	for _, s := range r.Sources {
 		sv := sourceView{
-			Source:    string(s.Source),
-			OK:        s.OK,
-			NotFound:  s.NotFound,
-			LatencyMs: s.Latency.Milliseconds(),
-			Error:     s.Err,
+			Source:      string(s.Source),
+			OK:          s.OK,
+			NotFound:    s.NotFound,
+			Unavailable: s.Unavailable,
+			LatencyMs:   s.Latency.Milliseconds(),
+			Error:       s.Err,
 		}
 		if opts.Raw && len(s.Raw) > 0 {
 			if json.Valid(s.Raw) {

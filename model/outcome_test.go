@@ -24,3 +24,24 @@ func TestClassify(t *testing.T) {
 		})
 	}
 }
+
+// A source with no service for the name (retired WHOIS, unsupported TLD,
+// refused queries) says nothing about the name, so it is left out: a free
+// .shop name is not found on RDAP's 404 alone.
+func TestClassify_UnavailableSourcesAreLeftOut(t *testing.T) {
+	retired := SourceResult{Source: SourceRegistryWHOIS, Unavailable: true, Err: "WHOIS service retired"}
+	for _, tt := range []struct {
+		name    string
+		sources []SourceResult
+		want    Outcome
+	}{
+		{"not found, plus an unavailable WHOIS", []SourceResult{{Source: SourceRegistryRDAP, NotFound: true}, retired}, OutcomeNotFound},
+		{"data, plus an unavailable WHOIS", []SourceResult{{Source: SourceRegistryRDAP, OK: true}, retired}, OutcomeOK},
+		{"only an unavailable source", []SourceResult{retired}, OutcomeFailed},
+		{"not found, unavailable and a real failure", []SourceResult{{Source: SourceRegistryRDAP, NotFound: true}, retired, {Source: SourceRegistrarWHOIS, Err: "timeout"}}, OutcomeFailed},
+	} {
+		if got := Classify(tt.sources); got != tt.want {
+			t.Errorf("%s: Classify = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}

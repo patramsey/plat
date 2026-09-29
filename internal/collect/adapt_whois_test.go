@@ -285,3 +285,12 @@ func TestFromHop_NotFoundIsNotUnrecognised(t *testing.T) {
 		t.Errorf("Meta = %+v, want NotFound with no error", sr.Meta)
 	}
 }
+
+// A WHOIS server with no service for the name is unavailable, not failed,
+// so it does not stop RDAP's not-found from standing (#131).
+func TestFromHop_UnsupportedIsUnavailable(t *testing.T) {
+	sr := fromHop(model.SourceRegistryWHOIS, whois.Hop{Fields: parse.Fields{Unsupported: true}})
+	if !sr.Meta.Unavailable || sr.Meta.OK || sr.Meta.NotFound || sr.Meta.Err == "" {
+		t.Errorf("Meta = %+v, want Unavailable with the reason in Err", sr.Meta)
+	}
+}

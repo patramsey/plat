@@ -597,3 +597,10 @@ func TestFromIPRDAP_NameEqualToANonORGHandleIsKept(t *testing.T) {
 		t.Errorf("Name = %q, want GOGL", sr.Name)
 	}
 }
+
+func TestFromIPHop_UnsupportedIsUnavailable(t *testing.T) {
+	sr := fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS}, whois.Hop{Fields: parse.Fields{Unsupported: true}, IPFields: &parse.IPFields{}})
+	if !sr.Meta.Unavailable || sr.Meta.OK {
+		t.Errorf("Meta = %+v, want Unavailable", sr.Meta)
+	}
+}

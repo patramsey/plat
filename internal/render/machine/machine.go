@@ -73,12 +73,14 @@ type lifecycleView struct {
 }
 
 type sourceView struct {
-	Source    string          `json:"source"`
-	OK        bool            `json:"ok"`
-	NotFound  bool            `json:"notFound"`
-	LatencyMs int64           `json:"latencyMs"`
-	Error     string          `json:"error,omitempty"`
-	Raw       json.RawMessage `json:"raw,omitempty"`
+	Source   string `json:"source"`
+	OK       bool   `json:"ok"`
+	NotFound bool   `json:"notFound"`
+	// Unavailable is omitted when false, so existing output is unchanged.
+	Unavailable bool            `json:"unavailable,omitempty"`
+	LatencyMs   int64           `json:"latencyMs"`
+	Error       string          `json:"error,omitempty"`
+	Raw         json.RawMessage `json:"raw,omitempty"`
 }
 
 type recordView struct {
@@ -207,11 +209,12 @@ func buildView(r model.Record, opts Options) recordView {
 	}
 	for _, s := range r.Sources {
 		sv := sourceView{
-			Source:    string(s.Source),
-			OK:        s.OK,
-			NotFound:  s.NotFound,
-			LatencyMs: s.Latency.Milliseconds(),
-			Error:     s.Err,
+			Source:      string(s.Source),
+			OK:          s.OK,
+			NotFound:    s.NotFound,
+			Unavailable: s.Unavailable,
+			LatencyMs:   s.Latency.Milliseconds(),
+			Error:       s.Err,
 		}
 		if opts.Raw && len(s.Raw) > 0 {
 			if json.Valid(s.Raw) {
