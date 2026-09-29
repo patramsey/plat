@@ -963,6 +963,13 @@ func lookupOutcomeError(code int, sources []model.SourceResult, filtered bool) e
 			return fmt.Errorf("lookup inconclusive -- the registry reports this name as reserved or restricted (checked: %s)", checked)
 		}
 	}
+	// Likewise an answer plat could not read (#120): the source answered,
+	// so "failed" would suggest a network problem that did not happen.
+	for _, s := range sources {
+		if s.Err == source.UnrecognisedReason {
+			return fmt.Errorf("lookup inconclusive -- the registry's answer could not be read; -v or --raw shows it (checked: %s)", checked)
+		}
+	}
 	failed := 0
 	for _, s := range sources {
 		if !s.OK && !s.NotFound {

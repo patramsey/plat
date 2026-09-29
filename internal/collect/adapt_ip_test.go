@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/patramsey/plat/internal/source"
+
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/internal/whois/parse"
@@ -553,5 +555,14 @@ func TestFromIPHop_ARINReassignedMatchesRDAPAssignment(t *testing.T) {
 	sr := fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS}, hop)
 	if sr.Type != "ASSIGNMENT" {
 		t.Errorf("Type = %q, want ASSIGNMENT (ARIN RDAP's name for the same type)", sr.Type)
+	}
+}
+
+// See TestFromHop_UnrecognisedAnswerIsAFailedSource (#120): ARIN's
+// multi-match summary (#95) was this shape for IPs.
+func TestFromIPHop_UnrecognisedAnswerIsAFailedSource(t *testing.T) {
+	sr := fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS}, whois.Hop{Raw: "unreadable", IPFields: &parse.IPFields{}})
+	if sr.Meta.OK || sr.Present || sr.Meta.Err != source.UnrecognisedReason {
+		t.Errorf("Meta = %+v, Present = %v; want a failed source with the unrecognised reason", sr.Meta, sr.Present)
 	}
 }

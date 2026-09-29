@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/patramsey/plat/internal/source"
+
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/internal/whois/parse"
 	"github.com/patramsey/plat/model"
@@ -239,5 +241,47 @@ func TestFromHop_RestrictedIsAFailedSourceWithTheReason(t *testing.T) {
 	}
 	if !strings.Contains(sr.Meta.Err, "restricts this name") {
 		t.Errorf("Meta.Err = %q, want the reason", sr.Meta.Err)
+	}
+}
+
+// A WHOIS answer that yields no fields and matches no not-found, refusal,
+// rate-limit or restricted wording is not a registered domain: it is an
+// answer plat could not read. Counting it as a success is how 74 free
+// ccTLD names were reported as registered (#113) before their wording
+// was known. See #120.
+func TestFromHop_UnrecognisedAnswerIsAFailedSource(t *testing.T) {
+	sr := fromHop(model.SourceRegistryWHOIS, whois.Hop{Raw: "Some wording plat has never seen.\n", Fields: parse.Fields{}})
+	if sr.Meta.OK || sr.Meta.NotFound || sr.Present {
+		t.Errorf("Meta = %+v, Present = %v; want a failed source", sr.Meta, sr.Present)
+	}
+	if sr.Meta.Err != source.UnrecognisedReason {
+		t.Errorf("Meta.Err = %q, want %q", sr.Meta.Err, source.UnrecognisedReason)
+	}
+	if string(sr.Meta.Raw) == "" {
+		t.Error("Meta.Raw dropped; -v and --raw need the answer that could not be read")
+	}
+}
+
+// Anything parsed -- even one field -- is still an answer plat read.
+func TestFromHop_AnyParsedFieldIsStillASuccess(t *testing.T) {
+	for name, f := range map[string]parse.Fields{
+		"domain":      {Domain: "example.tld"},
+		"registrar":   {Registrar: "Example Registrar"},
+		"nameservers": {Nameservers: []string{"ns1.example.tld"}},
+		"status":      {Statuses: []string{"ok"}},
+		"expires":     {Expires: parse.ParseDate("2030-01-01")},
+	} {
+		sr := fromHop(model.SourceRegistryWHOIS, whois.Hop{Fields: f})
+		if !sr.Meta.OK {
+			t.Errorf("%s only: Meta = %+v, want OK", name, sr.Meta)
+		}
+	}
+}
+
+// A not-found answer keeps meaning "not registered", not "unreadable".
+func TestFromHop_NotFoundIsNotUnrecognised(t *testing.T) {
+	sr := fromHop(model.SourceRegistryWHOIS, whois.Hop{Fields: parse.Fields{NotFound: true}})
+	if !sr.Meta.NotFound || sr.Meta.Err != "" {
+		t.Errorf("Meta = %+v, want NotFound with no error", sr.Meta)
 	}
 }

@@ -3,6 +3,8 @@ package collect
 import (
 	"strings"
 
+	"github.com/patramsey/plat/internal/whois/parse"
+
 	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/model"
@@ -85,6 +87,16 @@ func fromHop(src model.SourceID, hop whois.Hop) source.SourceRecord {
 		meta.Err = "WHOIS server rate-limited this query"
 		return source.SourceRecord{Meta: meta}
 	}
+	if !f.NotFound && !parsedAnything(f) {
+		// The server answered, but nothing in the answer could be read and
+		// no known not-found, refusal, rate-limit or restricted wording
+		// matched. Counting that as a success is how unknown not-found
+		// wordings reported free names as registered (#113); it is a
+		// failed source instead, with the raw answer kept (#120).
+		meta.OK = false
+		meta.Err = source.UnrecognisedReason
+		return source.SourceRecord{Meta: meta}
+	}
 	meta.OK = !f.NotFound
 	meta.NotFound = f.NotFound
 
@@ -136,4 +148,12 @@ func firstUnmapped(m map[string][]string, key string) (string, bool) {
 		return "", false
 	}
 	return vals[0], true
+}
+
+// parsedAnything reports whether a WHOIS answer yielded any domain field.
+// A lone status line counts: an answer plat partly understands is still
+// an answer it read.
+func parsedAnything(f parse.Fields) bool {
+	return f.Domain != "" || f.Registrar != "" || len(f.Nameservers) > 0 || len(f.Statuses) > 0 ||
+		f.Created.Raw != "" || f.Updated.Raw != "" || f.Expires.Raw != ""
 }

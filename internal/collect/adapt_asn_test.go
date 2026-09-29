@@ -449,3 +449,10 @@ func TestFromASNHop_RedactedOrgName(t *testing.T) {
 		t.Error("Present = false, want true (Handle is populated even though OrgName is redacted)")
 	}
 }
+
+func TestFromASNHop_UnrecognisedAnswerIsAFailedSource(t *testing.T) {
+	sr := fromASNHop(model.SourceResult{Source: model.SourceRegistryWHOIS}, whois.Hop{Raw: "unreadable", ASNFields: &parse.ASNFields{}})
+	if sr.Meta.OK || sr.Present || sr.Meta.Err != source.UnrecognisedReason {
+		t.Errorf("Meta = %+v, Present = %v; want a failed source with the unrecognised reason", sr.Meta, sr.Present)
+	}
+}
