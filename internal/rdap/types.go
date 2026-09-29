@@ -226,6 +226,34 @@ type Entity struct {
 	Handle     string     `json:"handle"`
 	Roles      []string   `json:"roles"`
 	VCardArray VCardArray `json:"vcardArray"`
+	// Entities are nested entities -- where the gTLD RDAP profile puts
+	// the registrar's abuse contact, and where ARIN puts a registrant's.
+	Entities EntityList `json:"entities"`
+}
+
+// nestedByRole returns the first entity with role nested one level under
+// an entity with role parent.
+func nestedByRole(entities EntityList, parent, role string) (Entity, bool) {
+	for _, e := range entities {
+		if !hasRole(e, parent) {
+			continue
+		}
+		for _, n := range e.Entities {
+			if hasRole(n, role) {
+				return n, true
+			}
+		}
+	}
+	return Entity{}, false
+}
+
+func hasRole(e Entity, role string) bool {
+	for _, r := range e.Roles {
+		if strings.EqualFold(r, role) {
+			return true
+		}
+	}
+	return false
 }
 
 // EntityList tolerates the "entities" array being malformed, mirroring
@@ -301,6 +329,11 @@ func (v *VCardArray) UnmarshalJSON(b []byte) error {
 		case "kind":
 			v.Kind = strings.ToLower(value)
 		case "tel":
+			// A tel property can be a "uri" value ("tel:+1.2083895740",
+			// PIR); the merge compares it with WHOIS's bare number.
+			if len(value) > 4 && strings.EqualFold(value[:4], "tel:") {
+				value = value[4:]
+			}
 			types := telTypes(prop[1])
 			switch {
 			case types["voice"]:
@@ -353,13 +386,17 @@ func (d *DomainResponse) RegistrarEntity() (Entity, bool) {
 	return d.entityByRole("registrar")
 }
 
-// AbuseEntity returns the first entity whose Roles includes "abuse". Per
-// RDAP convention this may be nested under the registrar entity in some
-// implementations; M3 only looks at top-level entities, since abuse
-// contact info is frequently duplicated there too — nested traversal is
-// left for a later milestone.
+// AbuseEntity returns the abuse contact: a top-level entity with the
+// "abuse" role, or else the one the gTLD RDAP profile nests inside the
+// registrar entity. Only the top level was once read, on the premise that
+// the contact is usually duplicated there; in every recorded response
+// (Verisign, PIR, MarkMonitor) it is only nested, so gTLD RDAP never
+// supplied an abuse contact (#133).
 func (d *DomainResponse) AbuseEntity() (Entity, bool) {
-	return d.entityByRole("abuse")
+	if e, ok := d.entityByRole("abuse"); ok {
+		return e, true
+	}
+	return nestedByRole(d.Entities, "registrar", "abuse")
 }
 
 func (d *DomainResponse) entityByRole(role string) (Entity, bool) {
@@ -483,10 +520,14 @@ func (n *IPNetworkResponse) RegistrantEntity() (Entity, bool) {
 	return registrantOrg(n.Entities)
 }
 
-// AbuseEntity returns the first entity whose Roles includes "abuse", if
-// any. Mirrors DomainResponse.AbuseEntity.
+// AbuseEntity returns the network's abuse contact: a top-level "abuse"
+// entity, or else one nested inside the registrant, which is where ARIN
+// puts it (#133).
 func (n *IPNetworkResponse) AbuseEntity() (Entity, bool) {
-	return n.entityByRole("abuse")
+	if e, ok := n.entityByRole("abuse"); ok {
+		return e, true
+	}
+	return nestedByRole(n.Entities, "registrant", "abuse")
 }
 
 // eventBySlot mirrors DomainResponse.eventBySlot.
@@ -569,10 +610,12 @@ func registrantOrg(entities EntityList) (Entity, bool) {
 	return first, found
 }
 
-// AbuseEntity returns the first entity whose Roles includes "abuse", if
-// any. Mirrors DomainResponse.AbuseEntity.
+// AbuseEntity mirrors IPNetworkResponse.AbuseEntity.
 func (a *ASNResponse) AbuseEntity() (Entity, bool) {
-	return a.entityByRole("abuse")
+	if e, ok := a.entityByRole("abuse"); ok {
+		return e, true
+	}
+	return nestedByRole(a.Entities, "registrant", "abuse")
 }
 
 // eventBySlot mirrors DomainResponse.eventBySlot.

@@ -18,11 +18,9 @@ import (
 func FuzzDomainResponseUnmarshal(f *testing.F) {
 	fixtures := []string{
 		"com-example.json",
-		"eu-gdpr-example.json",
-		"expired-example.json",
-		"idn-example.json",
-		"org-thick-example.json",
-		"registrar-example.json",
+		"pir-org-wikipedia-recorded.json",
+		"markmonitor-registrar-google-recorded.json",
+		"verisign-com-idn-recorded.json",
 	}
 	for _, name := range fixtures {
 		b, err := os.ReadFile("../../testdata/rdap/" + name)

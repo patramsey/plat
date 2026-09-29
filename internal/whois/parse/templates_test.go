@@ -19,10 +19,10 @@ var templateManifest = []struct {
 	wantNSCount int
 }{
 	{tld: "de", fixture: "denic-de-recorded.txt", wantDomain: "denic.de", wantNSCount: 4},
-	{tld: "jp", fixture: "jprs-jp-example.txt", wantDomain: "EXAMPLE.JP", wantNSCount: 2},
+	{tld: "jp", fixture: "jprs-jp-google-recorded.txt", wantDomain: "GOOGLE.JP", wantNSCount: 4},
 	{tld: "uk", fixture: "nominet-uk-recorded.txt", wantDomain: "bbc.co.uk", wantNSCount: 8},
 	{tld: "eu", fixture: "eurid-eu-recorded.txt", wantDomain: "europa.eu", wantNSCount: 12},
-	{tld: "fr", fixture: "afnic-fr-example.txt", wantDomain: "example.fr", wantNSCount: 2},
+	{tld: "fr", fixture: "afnic-fr-recorded.txt", wantDomain: "nic.fr", wantNSCount: 4},
 	{tld: "nl", fixture: "sidn-nl-google-recorded.txt", wantDomain: "google.nl", wantNSCount: 4},
 	{tld: "cz", fixture: "cznic-cz-seznam-recorded.txt", wantDomain: "seznam.cz", wantNSCount: 2},
 	{tld: "br", fixture: "registrobr-br-google-recorded.txt", wantDomain: "google.com.br", wantNSCount: 4},
@@ -145,38 +145,47 @@ func TestParse_EURIDHasNoStatusOrDates(t *testing.T) {
 }
 
 func TestParse_JPRSBracketDialect(t *testing.T) {
-	raw := loadFixture(t, "jprs-jp-example.txt")
+	raw := loadFixture(t, "jprs-jp-google-recorded.txt")
 	f := Parse(raw, "jp")
 
-	if f.Domain != "EXAMPLE.JP" {
-		t.Errorf("Domain = %q, want EXAMPLE.JP", f.Domain)
+	if f.Domain != "GOOGLE.JP" {
+		t.Errorf("Domain = %q, want GOOGLE.JP", f.Domain)
 	}
-	wantNS := []string{"a.dns.jp", "b.dns.jp"}
-	if len(f.Nameservers) != len(wantNS) {
+	wantNS := []string{"ns1.google.com", "ns2.google.com", "ns3.google.com", "ns4.google.com"}
+	if !slices.Equal(f.Nameservers, wantNS) {
 		t.Fatalf("Nameservers = %v, want %v (brackets dialect should tokenize [Name Server] lines)", f.Nameservers, wantNS)
 	}
-	if !f.Created.Parsed || f.Created.Raw != "1995/08/14" {
+	if !f.Created.Parsed || f.Created.Raw != "2005/05/30" {
 		t.Errorf("Created = %+v", f.Created)
 	}
-	if !f.Expires.Parsed || f.Expires.Raw != "2026/08/13" {
+	if !f.Expires.Parsed || f.Expires.Raw != "2027/05/31" {
 		t.Errorf("Expires = %+v", f.Expires)
+	}
+	// JPRS's "(JST)" timestamps are rewritten to +09:00 before parsing.
+	if !f.Updated.Parsed || f.Updated.Raw != "2026/06/01 01:05:03 (JST)" {
+		t.Errorf("Updated = %+v", f.Updated)
 	}
 }
 
 func TestParse_DefaultTemplateForUnknownTLD(t *testing.T) {
-	raw := loadFixture(t, "verisign-com-example.txt")
+	raw := loadFixture(t, "verisign-com-google-recorded.txt")
 	f := Parse(raw, "xyz-unregistered-tld")
-	if f.Domain != "EXAMPLE.COM" {
-		t.Errorf("Domain = %q, want EXAMPLE.COM (unknown TLD should fall back to generic kv dialect)", f.Domain)
+	if f.Domain != "GOOGLE.COM" {
+		t.Errorf("Domain = %q, want GOOGLE.COM (unknown TLD should fall back to generic kv dialect)", f.Domain)
 	}
 }
 
 func TestParse_FRSynonymOverride(t *testing.T) {
-	raw := loadFixture(t, "afnic-fr-example.txt")
+	raw := loadFixture(t, "afnic-fr-recorded.txt")
 	f := Parse(raw, "fr")
 
-	if !f.Expires.Parsed || f.Expires.Raw != "2026-08-13T04:00:00Z" {
-		t.Errorf("Expires = %+v, want Parsed with Raw 2026-08-13T04:00:00Z (synonym override for 'Expiry Date' -> expires)", f.Expires)
+	if !f.Expires.Parsed || f.Expires.Raw != "2029-12-31T23:00:00Z" {
+		t.Errorf("Expires = %+v, want Parsed with Raw 2029-12-31T23:00:00Z (synonym override for 'Expiry Date' -> expires)", f.Expires)
+	}
+	// AFNIC lists the domain's own record first, then its contacts' --
+	// each with its own "registrar:" -- so first-occurrence-wins matters.
+	if f.Domain != "nic.fr" || f.Registrar != "Registry Operations" {
+		t.Errorf("Domain/Registrar = %q/%q, want nic.fr/Registry Operations", f.Domain, f.Registrar)
 	}
 }
 

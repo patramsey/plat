@@ -45,7 +45,7 @@ func TestCollect_RegistryAndRegistrarRDAPPlusWHOIS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
 	}
-	registrarFixture, err := os.ReadFile("../../testdata/rdap/registrar-example.json")
+	registrarFixture, err := os.ReadFile("../../testdata/rdap/markmonitor-registrar-google-recorded.json")
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
 	}
@@ -99,8 +99,8 @@ func TestCollect_RegistryAndRegistrarRDAPPlusWHOIS(t *testing.T) {
 		}
 		if s.Meta.Source == "registrar-rdap" && s.Present {
 			gotRegistrarRDAP = true
-			if s.Registrar.Name != "Example Registrar, Inc." {
-				t.Errorf("registrar-rdap Registrar.Name = %q, want %q", s.Registrar.Name, "Example Registrar, Inc.")
+			if s.Registrar.Name != "Markmonitor Inc." {
+				t.Errorf("registrar-rdap Registrar.Name = %q, want %q", s.Registrar.Name, "Markmonitor Inc.")
 			}
 		}
 	}
@@ -113,7 +113,7 @@ func TestCollect_RegistryAndRegistrarRDAPPlusWHOIS(t *testing.T) {
 }
 
 func TestCollect_NoFollowSkipsRegistrarHop(t *testing.T) {
-	registrarFixture, err := os.ReadFile("../../testdata/rdap/registrar-example.json")
+	registrarFixture, err := os.ReadFile("../../testdata/rdap/markmonitor-registrar-google-recorded.json")
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestCollect_WHOISOnlySources(t *testing.T) {
 }
 
 func TestCollect_SourceFilterRDAPOnly(t *testing.T) {
-	registrarFixture, err := os.ReadFile("../../testdata/rdap/registrar-example.json")
+	registrarFixture, err := os.ReadFile("../../testdata/rdap/markmonitor-registrar-google-recorded.json")
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
 	}
@@ -401,7 +401,7 @@ func TestCollect_SourceFilterRegistryOnly(t *testing.T) {
 }
 
 func TestCollect_SourceFilterRegistrarOnly(t *testing.T) {
-	registrarFixture, err := os.ReadFile("../../testdata/rdap/registrar-example.json")
+	registrarFixture, err := os.ReadFile("../../testdata/rdap/markmonitor-registrar-google-recorded.json")
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
 	}
@@ -549,7 +549,7 @@ func TestCollect_Port43FallbackWhenRegistryWHOISGivesNoReferral(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
 	}
-	registrarFixture, err := os.ReadFile("../../testdata/rdap/registrar-example.json")
+	registrarFixture, err := os.ReadFile("../../testdata/rdap/markmonitor-registrar-google-recorded.json")
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
 	}
@@ -561,8 +561,10 @@ func TestCollect_Port43FallbackWhenRegistryWHOISGivesNoReferral(t *testing.T) {
 	registrarSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body := strings.Replace(
 			string(registrarFixture),
-			`"objectClassName"`,
-			fmt.Sprintf(`"port43":%q,"objectClassName"`, registrarWHOISAddr),
+			// The recorded answer already names its real port43 server;
+			// point it at the local listener instead.
+			`"port43":"whois.markmonitor.com"`,
+			fmt.Sprintf(`"port43":%q`, registrarWHOISAddr),
 			1,
 		)
 		w.Header().Set("Content-Type", "application/rdap+json")
@@ -624,7 +626,7 @@ func TestCollect_Port43FallbackSkippedWhenReferralAlreadyFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
 	}
-	registrarFixture, err := os.ReadFile("../../testdata/rdap/registrar-example.json")
+	registrarFixture, err := os.ReadFile("../../testdata/rdap/markmonitor-registrar-google-recorded.json")
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
 	}
