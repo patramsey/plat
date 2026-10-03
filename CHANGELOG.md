@@ -4,7 +4,7 @@ All notable changes to `plat` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project
 follows [Semantic Versioning](https://semver.org/).
 
-## [0.11.0] - 2026-10-02
+## [0.11.0] - 2026-10-03
 
 A second sweep, of RDAP, registrar WHOIS servers, RIR edge cases and
 gTLD registry backends, plus a structural fix for the class of bug the
