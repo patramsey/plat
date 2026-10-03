@@ -81,7 +81,7 @@ package — their retry and connection-handling needs (HTTP client vs. raw
    - Registry RDAP (`GET {bootstrap-url}/domain/{name}`)
    - Registry WHOIS (resolve TLD server via `whois.iana.org`)
    - Registrar RDAP and registrar WHOIS are **dependent second hops** (followed from the registry responses' `related` link / `Registrar WHOIS Server:` referral), not parallel branches.
-4. Each source yields a `SourceRecord` (normalized fields + raw payload + latency + errors) — a source erroring is normal, not fatal.
+4. Each source yields a `SourceRecord` (normalized fields + raw payload + latency + errors) — a source erroring is normal, not fatal. A WHOIS answer is classified before it counts: not found, refused, rate-limited, restricted (a reserved name), *unavailable* (no service for the name), or **unreadable** — parsed to nothing and matched no known wording, which is a failed source, never an empty success (#120).
 5. The merge engine combines sources into one `Record` with provenance and a conflict list.
 6. The renderer selected by flags/TTY detection emits output.
 
@@ -89,24 +89,31 @@ package — their retry and connection-handling needs (HTTP client vs. raw
 
 Every field is a `Field[T]` carrying both its value and the list of sources that supplied it (`registry-rdap | registrar-rdap | registry-whois | registrar-whois`) — this per-field provenance is the core differentiator of the tool, not an afterthought. Dates normalize to UTC RFC 3339 (WHOIS needs a tolerant multi-format parser). Status codes normalize to EPP names across RDAP (RFC 8056) and WHOIS vocabularies. GDPR redaction is modeled explicitly (not treated as a literal contact name) — recognize RDAP remarks/RFC 9537 `redacted` extension signals.
 
+Each source's `model.SourceResult` is OK, NotFound, failed (`Err`), or `Unavailable`: the server answered, but only to say it has no service for this name (a retired WHOIS, an unsupported TLD, a server that refuses every query). `model.Classify` leaves unavailable sources out, so a free `.shop` name is "not registered" on RDAP's 404 alone. Rate limits and restricted names stay failures: the first might have held the record, and the second is information about the name.
+
 ### Merge precedence
 
 Most to least trusted, per field: **registrar RDAP → registry RDAP → registrar WHOIS → registry WHOIS** (RDAP is structured; registrar data is thick where registry data is thin, e.g. .com). Exceptions:
 - A redacted value never beats a populated value regardless of source rank.
-- Timestamp disagreements beyond ~24h clock-skew tolerance become a recorded `Conflict`, keeping the highest-precedence value.
-- Nameserver sets union together; genuinely differing sets (not just case/trailing-dot) are flagged as conflicts.
+- Timestamp disagreements beyond ~24h clock-skew tolerance become a recorded `Conflict`, keeping the highest-precedence value. A date-only value (no time of day) gets 36h, since it names a local day in an unknown zone.
+- Nameserver sets union together; genuinely differing sets (not just case, trailing dot, or Unicode vs punycode) are flagged as conflicts.
+- Values are compared after normalisation, not verbatim: in `comparisonKey`, the domain by its punycode fold, registrar URLs by host and path, phones by digits; nameservers by their punycode fold in `foldNS`. Each normaliser exists because a sweep found sources disagreeing only in formatting; the displayed value is never changed.
 - Disagreements are never silently dropped — they surface in both human and JSON output.
 
 ### Protocol quirks to preserve
 
-- **WHOIS server quirks** (Verisign domain-prefix handling, .jp `/e` suffix, DENIC `-T dn,ace`, etc.) belong in a per-server rules table, not scattered `if` statements.
-- **WHOIS parsing**: generic `key: value` extraction with a synonym table, then per-registry template overrides for irregular formats (.de, .uk indentation, .jp brackets). Templates should be data-driven (embedded YAML) so adding registry coverage is a small PR, not a code change.
-- **RDAP client**: `Accept: application/rdap+json`, follow redirects, distinguish 404 (not found) from network errors, handle 429 + `Retry-After` with one polite retry. Prefer hand-rolling (~300 lines, RFC 9083 structs) over `github.com/openrdap/rdap` to avoid its cache/bootstrap opinions.
+- **WHOIS server quirks** (Verisign domain-prefix handling, .jp `/e` suffix, DENIC `-T dn,ace`, ARIN's `n + ` for IP queries only) belong in the per-server tables in `internal/whois/quirks.go`, not scattered `if` statements. `registryFallback` names a TLD's WHOIS server when IANA lists none (`.uk`). A registrar referral is not followed when it names the registry itself or is not a host.
+- **WHOIS parsing**: generic `key: value` extraction with a synonym table, then per-registry template overrides for irregular formats (.de, .uk indentation, .jp brackets). Templates should be data-driven (embedded YAML) so adding registry coverage is a small PR, not a code change. Single-valued fields keep their **first** occurrence: contact objects that follow the domain reuse its keys.
+- **WHOIS markers** (`notFoundMarkers`, `unsupportedMarkers`, `rateLimitMarkers`, `restrictedMarkers` in `parse.go`) are raw-text substrings, so a marker that also appears in a *registered* answer makes a taken domain look free. Check every new one against registered answers **by queried name**, not by "some field parsed" — a registered answer that parses to nothing (`nic.bo`) is exactly the one that disproves a marker, and missing it shipped the v0.9.0 `.bo` regression (#116). Record that answer as a fixture; `TestParse_NoRegisteredFixtureTripsAMarker` then guards it.
+- **RDAP client**: `Accept: application/rdap+json`, follow redirects, distinguish 404 (not found) from network errors, handle 429 + `Retry-After` with one polite retry (only if the wait fits the deadline). Prefer hand-rolling (~300 lines, RFC 9083 structs) over `github.com/openrdap/rdap` to avoid its cache/bootstrap opinions.
+- **RDAP shapes seen in the wild**: the gTLD profile nests the abuse contact inside the registrar entity (ARIN: inside the registrant); RIPE gives maintainers the `registrant` role (prefer the entity whose vCard `kind` is `org`); AFRINIC puts the org handle in `name`. Twelve servers (`rdap.nic.cat`, `.eus`, `.scot`, …) offer only RSA key exchange — the default client retries once with those suites after a TLS handshake failure and remembers the host; a caller's own `http.Client` never gets the fallback.
 - Reject single-label input, reject private/reserved TLDs (.internal, .local) with a friendly error, handle trailing dots and `xn--` input.
 
 ### Exit codes
 
-`0` any source returned data · `1` domain-not-found on all sources · `2` usage error · `3` total lookup failure.
+`0` any source returned data · `1` domain-not-found on all sources · `2` usage error (including reserved IPs, ASNs and TLDs) · `3` total lookup failure (including unreadable answers and restricted names) · `4` `--diff` found changes.
+
+Changing which inputs get which exit code is **Breaking**, even when it fixes a wrong answer: scripts key on these. It goes under Changed in CHANGELOG.md and forces a minor release.
 
 ## Rendering (Lip Gloss v2)
 
@@ -118,22 +125,28 @@ This is a render-and-exit tool for v1 — **not** an interactive Bubble Tea app 
 
 ## Machine output contract
 
-`-o json` emits the unified `Record` (camelCase, `"schemaVersion": 1`, provenance per field, RFC 3339 timestamps) — treat this schema as a public API; breaking changes bump `schemaVersion`. `--raw` adds embedded raw source payloads. `-o ndjson` for multi-domain invocations. A name that can't be looked up in machine mode reports its error to stderr as JSON (`{error, domain}`); errors about the invocation itself (bad flags, an empty `--file`) name no domain and stay plain text. stdout stays schema-clean.
+`-o json` emits the unified `Record` (camelCase, `"schemaVersion": 1`, provenance per field, RFC 3339 timestamps) — treat this schema as a public API; breaking changes bump `schemaVersion`. Additive fields are omitted unless set (`"unavailable"` on a source), so existing output stays byte-for-byte unchanged. `--raw` adds embedded raw source payloads. `-o ndjson` for multi-domain invocations. A name that can't be looked up in machine mode reports its error to stderr as JSON (`{error, domain}`); errors about the invocation itself (bad flags, an empty `--file`) name no domain and stay plain text. stdout stays schema-clean.
 
 ## Testing approach
 
-- Golden files in `testdata/` (recorded real RDAP JSON + WHOIS blobs) covering ~20 representative domains: thin .com, thick .org, GDPR-redacted .eu/.de, no-RDAP ccTLD, IDN, expired domain, rate-limited response. Parser/merge tests run fully offline against these.
+- Golden files in `testdata/` — about 85 recorded WHOIS answers and 9 RDAP responses — covering thin .com, thick .org, ccTLD dialects, all five RIRs, IDNs, not-found / refused / rate-limited / restricted answers for many registries, and registered answers that parse to nothing. Parser/merge tests run fully offline against these. New recordings are named `*-recorded.txt`.
 - Fixtures are **recordings**, not illustrations. Trim legal preamble;
   never reshape a key, invent a field, or write a fixture to match what
   the parser currently does. A fabricated fixture does not merely fail
   to catch a bug — it asserts the bug is correct. `eurid-eu-example.txt`
   claimed a `Status:` line EURid does not emit, and `templates_test.go`
-  asserted two nameservers from it while real `.eu` returned zero.
+  asserted two nameservers from it while real `.eu` returned zero. The
+  same happened with `.uk` (#85), `.nl` (#96), and a registrar RDAP fake
+  whose top-level abuse entity hid that plat never read nested ones
+  (#133). Keep CRLF where the registry sent it. Where no real answer
+  exists for a scenario, use an inline input labelled synthetic in the
+  test, not a fixture file.
 - `httptest` for mocking RDAP; a small local TCP listener for WHOIS to test referral chasing, timeouts, and per-server quirks.
 - Merge engine gets table-driven tests over precedence, redaction override, and conflict detection.
 - Renderer snapshot tests run with color forced off.
 - Goldens for IP/ASN cover all five RIRs (ARIN, RIPE, APNIC, LACNIC, AFRINIC), whose WHOIS vocabularies genuinely differ. **Every serious bug in the IP and ASN features surfaced only past ARIN** — verify live against multiple RIRs, not just the first one that works.
-- CI enforces a 90% whole-project coverage floor (`go tool cover`, actual ~95%). Codecov's `project` status does not post on this repo, so that floor is the real gate — see the comments in `.github/workflows/ci.yml` and `codecov.yml`, which explain why the two numbers there are not interchangeable.
+- **Live sweeps find what review misses.** Most bugs in v0.9.0–v0.11.0 came from sweeping real registries: for each TLD, `nic.<tld>` plus a name that cannot exist, through `plat --file … -o ndjson --raw`. Bulk stdout stays in input order and stderr errors carry their name, so results align by dropping the errored names. Watch for free names that come back as records. Replay recorded answers through the real parser (a throwaway `zz_*_test.go`, deleted after) to measure a change before shipping it.
+- CI enforces a 90% whole-project coverage floor (`go tool cover`, actual ~96%). Codecov's `project` status does not post on this repo, so that floor is the real gate — see the comments in `.github/workflows/ci.yml` and `codecov.yml`, which explain why the two numbers there are not interchangeable.
 
 ## Demo GIF maintenance
 
