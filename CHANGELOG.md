@@ -4,7 +4,13 @@ All notable changes to `plat` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project
 follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.11.0] - 2026-10-02
+
+A second sweep, of RDAP, registrar WHOIS servers, RIR edge cases and
+gTLD registry backends, plus a structural fix for the class of bug the
+first sweep kept finding: a WHOIS answer plat could not read counted as
+a registered domain. Exit-code changes are treated as breaking, which is
+why this is a minor release.
 
 ### Added
 - `model.SourceResult.Unavailable` (JSON `"unavailable": true`, omitted
@@ -30,17 +36,17 @@ follows [Semantic Versioning](https://semver.org/).
   (GMO Registry: `.shop`, `.tokyo`, ...) exits `1` (not registered)
   instead of `0`. The retirement notice read as a registered WHOIS
   answer, which outranked RDAP's "not found". A WHOIS server with no
-  service for a name -- retired, TLD unsupported, or refusing every query
-  (`.ch`) -- is now *unavailable* rather than failed, and is left out of
-  the outcome; `-v` shows it as "unavailable" with the reason.
+  service for a name -- retired, TLD unsupported, or refusing every
+  query (`.ch`) -- is now *unavailable* rather than failed, and is left
+  out of the outcome; `-v` shows it as "unavailable" with the reason.
 - **Breaking:** A free `.africa` name exits `1` instead of `0`; ZACR's
   "No information was found matching that query" matched no marker.
 
 ### Fixed
 - Registrar URLs and abuse phone numbers that differ only in formatting
   -- `https://www.godaddy.com` vs `http://www.godaddy.com`, a trailing
-  slash or missing scheme, `+1.4806242505` vs `480-624-2505` -- no longer
-  raise a conflict. A different host or number still does.
+  slash or missing scheme, `+1.4806242505` vs `480-624-2505` -- no
+  longer raise a conflict. A different host or number still does.
 - The Web.com-family registrar WHOIS rate limit ("IP Address Has Reached
   Rate Limit", register.com, domain.com) is recognised as a rate limit
   rather than an empty answer.
@@ -613,7 +619,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/patramsey/plat/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/patramsey/plat/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/patramsey/plat/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/patramsey/plat/compare/v0.7.0...v0.8.0

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Shipped and released — latest tag `v0.10.0`. 17 packages, released via
+Shipped and released — latest tag `v0.11.0`. 17 packages, released via
 goreleaser (binaries, checksums, Homebrew tap).
 
 plat is both a CLI and a **published Go library**. Two packages are public
