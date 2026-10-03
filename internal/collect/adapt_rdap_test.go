@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"slices"
 	"testing"
 	"time"
+
+	"github.com/patramsey/plat/internal/merge"
+	"github.com/patramsey/plat/internal/source"
 
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/model"
@@ -119,5 +123,48 @@ func TestFromRDAP_OtherErrorNotFlaggedNotFound(t *testing.T) {
 	sr := FromRDAP(model.SourceRegistrarRDAP, nil, 10*time.Millisecond, errors.New("connection refused"))
 	if sr.Meta.NotFound {
 		t.Error("Meta.NotFound = true, want false for a non-not-found error")
+	}
+}
+
+// RFC 9537 entries map onto the fields plat shows (#134). The handle
+// paths are PIR's real ones; the registrar-field paths are synthetic --
+// no sampled registry redacts them -- and follow the ICANN RDAP Response
+// Profile's JSONPath shapes. Contact redactions (registrant, tech) map
+// to nothing: plat deliberately does not show contacts.
+func TestRedactedField(t *testing.T) {
+	for _, tt := range []struct {
+		name, prePath, want string
+	}{
+		{"Registry Domain ID", "$.handle", model.FieldHandle},
+		{"", "$.handle", model.FieldHandle},
+		{"Registry Domain ID", "", model.FieldHandle},
+		{"Registrar Name", "$.entities[?(@.roles[0]=='registrar')].vcardArray[1][?(@[0]=='fn')][3]", model.FieldRegistrarName},                                                          // synthetic
+		{"Registrar Abuse Contact Email", "$.entities[?(@.roles[0]=='registrar')].entities[?(@.roles[0]=='abuse')].vcardArray[1][?(@[0]=='email')][3]", model.FieldRegistrarAbuseEmail}, // synthetic
+		{"Registrar Abuse Contact Phone", "$.entities[?(@.roles[0]=='registrar')].entities[?(@.roles[0]=='abuse')].vcardArray[1][?(@[0]=='tel')][3]", model.FieldRegistrarAbusePhone},   // synthetic
+		{"Registrant Name", "$.entities[?(@.roles[0]=='registrant')].vcardArray[1][?(@[0]=='fn')][3]", ""},
+		{"Tech Email", "$.entities[?(@.roles[0]=='technical')].vcardArray[1][?(@[0]=='email')][3]", ""},
+		{"Registry Registrant ID", "$.entities[?(@.roles[0]=='registrant')].handle", ""},
+	} {
+		r := rdap.Redaction{PrePath: tt.prePath}
+		r.Name.Type = tt.name
+		if got := redactedField(r); got != tt.want {
+			t.Errorf("redactedField(%q, %q) = %q, want %q", tt.name, tt.prePath, got, tt.want)
+		}
+	}
+}
+
+// PIR's real answer removes the Registry Domain ID under RFC 9537. With
+// no registrar RDAP to outrank it, the record must say so rather than
+// silently showing no handle.
+func TestFromRDAP_RFC9537HandleRedaction(t *testing.T) {
+	d := loadRDAPFixture(t, "pir-org-wikipedia-recorded.json")
+	sr := FromRDAP(model.SourceRegistryRDAP, &rdap.Result{Domain: d}, 0, nil)
+	if !sr.RedactedFields[model.FieldHandle] {
+		t.Errorf("RedactedFields = %v, want handle marked redacted", sr.RedactedFields)
+	}
+	rec := merge.Merge([]source.SourceRecord{sr})
+	want := model.RedactionNotice{Field: model.FieldHandle, Source: model.SourceRegistryRDAP, Reason: "redacted"}
+	if !slices.Contains(rec.Redacted, want) {
+		t.Errorf("Redacted = %+v, want %+v", rec.Redacted, want)
 	}
 }

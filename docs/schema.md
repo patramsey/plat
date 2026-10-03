@@ -87,7 +87,7 @@ pipelines don't need to special-case absence.
   { "field": "expires", "values": { "registry-rdap": "2026-08-13T04:00:00Z", "registry-whois": "2026-08-10" } }
   ```
   Always fully populated regardless of the CLI's `--conflicts` flag, which only affects whether the human/plain renderers print this detail inline — it has no effect on machine output.
-- **`redacted[]`** — one entry per field where a higher-precedence source's value was withheld:
+- **`redacted[]`** — one entry per field where a higher-precedence source's value was withheld — a redaction placeholder in its value, or an RDAP RFC 9537 `redacted` entry naming a field plat shows (the handle, the registrar's name or abuse contact). RFC 9537 entries for registrant and other contacts are not reported, since plat does not show contacts:
   ```json
   { "field": "registrar.name", "source": "registrar-rdap", "reason": "redacted" }
   ```
