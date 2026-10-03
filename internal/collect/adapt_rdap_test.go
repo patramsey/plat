@@ -168,3 +168,42 @@ func TestFromRDAP_RFC9537HandleRedaction(t *testing.T) {
 		t.Errorf("Redacted = %+v, want %+v", rec.Redacted, want)
 	}
 }
+
+// TestApplyRFC9537_ClearsPlaceholders covers the registrar fields no
+// sampled server redacts yet: a "replacementValue" or "emptyValue"
+// leaves a placeholder in the member, which must not survive as data.
+// Synthetic, like the registrar rows in TestRedactedField.
+func TestApplyRFC9537_ClearsPlaceholders(t *testing.T) {
+	sr := source.SourceRecord{RedactedFields: map[string]bool{}}
+	sr.Handle = "REDACTED"
+	sr.Registrar.Name = "REDACTED"
+	sr.Registrar.AbuseEmail = "redacted@example.invalid"
+	sr.Registrar.AbusePhone = "+1.0000000000"
+
+	var list rdap.RedactionList
+	for _, name := range []string{
+		"Registry Domain ID",
+		"Registrar Name",
+		"Registrar Abuse Contact Email",
+		"Registrar Abuse Contact Phone",
+		"Registrant Name",
+	} {
+		var r rdap.Redaction
+		r.Name.Type = name
+		r.Method = "replacementValue"
+		list = append(list, r)
+	}
+	applyRFC9537(&sr, list)
+
+	if sr.Handle != "" || sr.Registrar.Name != "" || sr.Registrar.AbuseEmail != "" || sr.Registrar.AbusePhone != "" {
+		t.Errorf("placeholders survived: handle=%q registrar=%+v", sr.Handle, sr.Registrar)
+	}
+	for _, f := range []string{model.FieldHandle, model.FieldRegistrarName, model.FieldRegistrarAbuseEmail, model.FieldRegistrarAbusePhone} {
+		if !sr.RedactedFields[f] {
+			t.Errorf("RedactedFields[%s] = false, want true", f)
+		}
+	}
+	if len(sr.RedactedFields) != 4 {
+		t.Errorf("RedactedFields = %v, want exactly the four shown fields", sr.RedactedFields)
+	}
+}
