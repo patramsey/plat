@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"slices"
 	"testing"
 	"time"
+
+	"github.com/patramsey/plat/internal/merge"
+	"github.com/patramsey/plat/internal/source"
 
 	"github.com/patramsey/plat/internal/rdap"
 	"github.com/patramsey/plat/model"
@@ -119,5 +123,87 @@ func TestFromRDAP_OtherErrorNotFlaggedNotFound(t *testing.T) {
 	sr := FromRDAP(model.SourceRegistrarRDAP, nil, 10*time.Millisecond, errors.New("connection refused"))
 	if sr.Meta.NotFound {
 		t.Error("Meta.NotFound = true, want false for a non-not-found error")
+	}
+}
+
+// RFC 9537 entries map onto the fields plat shows (#134). The handle
+// paths are PIR's real ones; the registrar-field paths are synthetic --
+// no sampled registry redacts them -- and follow the ICANN RDAP Response
+// Profile's JSONPath shapes. Contact redactions (registrant, tech) map
+// to nothing: plat deliberately does not show contacts.
+func TestRedactedField(t *testing.T) {
+	for _, tt := range []struct {
+		name, prePath, want string
+	}{
+		{"Registry Domain ID", "$.handle", model.FieldHandle},
+		{"", "$.handle", model.FieldHandle},
+		{"Registry Domain ID", "", model.FieldHandle},
+		{"Registrar Name", "$.entities[?(@.roles[0]=='registrar')].vcardArray[1][?(@[0]=='fn')][3]", model.FieldRegistrarName},                                                          // synthetic
+		{"Registrar Abuse Contact Email", "$.entities[?(@.roles[0]=='registrar')].entities[?(@.roles[0]=='abuse')].vcardArray[1][?(@[0]=='email')][3]", model.FieldRegistrarAbuseEmail}, // synthetic
+		{"Registrar Abuse Contact Phone", "$.entities[?(@.roles[0]=='registrar')].entities[?(@.roles[0]=='abuse')].vcardArray[1][?(@[0]=='tel')][3]", model.FieldRegistrarAbusePhone},   // synthetic
+		{"Registrant Name", "$.entities[?(@.roles[0]=='registrant')].vcardArray[1][?(@[0]=='fn')][3]", ""},
+		{"Tech Email", "$.entities[?(@.roles[0]=='technical')].vcardArray[1][?(@[0]=='email')][3]", ""},
+		{"Registry Registrant ID", "$.entities[?(@.roles[0]=='registrant')].handle", ""},
+	} {
+		r := rdap.Redaction{PrePath: tt.prePath}
+		r.Name.Type = tt.name
+		if got := redactedField(r); got != tt.want {
+			t.Errorf("redactedField(%q, %q) = %q, want %q", tt.name, tt.prePath, got, tt.want)
+		}
+	}
+}
+
+// PIR's real answer removes the Registry Domain ID under RFC 9537. With
+// no registrar RDAP to outrank it, the record must say so rather than
+// silently showing no handle.
+func TestFromRDAP_RFC9537HandleRedaction(t *testing.T) {
+	d := loadRDAPFixture(t, "pir-org-wikipedia-recorded.json")
+	sr := FromRDAP(model.SourceRegistryRDAP, &rdap.Result{Domain: d}, 0, nil)
+	if !sr.RedactedFields[model.FieldHandle] {
+		t.Errorf("RedactedFields = %v, want handle marked redacted", sr.RedactedFields)
+	}
+	rec := merge.Merge([]source.SourceRecord{sr})
+	want := model.RedactionNotice{Field: model.FieldHandle, Source: model.SourceRegistryRDAP, Reason: "redacted"}
+	if !slices.Contains(rec.Redacted, want) {
+		t.Errorf("Redacted = %+v, want %+v", rec.Redacted, want)
+	}
+}
+
+// TestApplyRFC9537_ClearsPlaceholders covers the registrar fields no
+// sampled server redacts yet: a "replacementValue" or "emptyValue"
+// leaves a placeholder in the member, which must not survive as data.
+// Synthetic, like the registrar rows in TestRedactedField.
+func TestApplyRFC9537_ClearsPlaceholders(t *testing.T) {
+	sr := source.SourceRecord{RedactedFields: map[string]bool{}}
+	sr.Handle = "REDACTED"
+	sr.Registrar.Name = "REDACTED"
+	sr.Registrar.AbuseEmail = "redacted@example.invalid"
+	sr.Registrar.AbusePhone = "+1.0000000000"
+
+	var list rdap.RedactionList
+	for _, name := range []string{
+		"Registry Domain ID",
+		"Registrar Name",
+		"Registrar Abuse Contact Email",
+		"Registrar Abuse Contact Phone",
+		"Registrant Name",
+	} {
+		var r rdap.Redaction
+		r.Name.Type = name
+		r.Method = "replacementValue"
+		list = append(list, r)
+	}
+	applyRFC9537(&sr, list)
+
+	if sr.Handle != "" || sr.Registrar.Name != "" || sr.Registrar.AbuseEmail != "" || sr.Registrar.AbusePhone != "" {
+		t.Errorf("placeholders survived: handle=%q registrar=%+v", sr.Handle, sr.Registrar)
+	}
+	for _, f := range []string{model.FieldHandle, model.FieldRegistrarName, model.FieldRegistrarAbuseEmail, model.FieldRegistrarAbusePhone} {
+		if !sr.RedactedFields[f] {
+			t.Errorf("RedactedFields[%s] = false, want true", f)
+		}
+	}
+	if len(sr.RedactedFields) != 4 {
+		t.Errorf("RedactedFields = %v, want exactly the four shown fields", sr.RedactedFields)
 	}
 }

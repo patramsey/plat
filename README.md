@@ -306,7 +306,10 @@ even in conflict.
 
 GDPR-style redaction is modeled explicitly, not mistaken for a literal
 contact name — the same handling covers the Registrar Name field itself,
-when a registrar's own identity comes back redacted.
+when a registrar's own identity comes back redacted. RDAP servers that
+declare RFC 9537 redaction are read too: when one withholds a field `plat`
+shows, such as the domain's handle, the record says which source withheld
+it rather than leaving the field silently empty.
 
 **Registrant/admin/tech/billing contact details are deliberately not
 shown**, for two reasons:

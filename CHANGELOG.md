@@ -4,6 +4,15 @@ All notable changes to `plat` are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- RDAP RFC 9537 redaction is read. When a server's `redacted` array
+  withholds a field `plat` shows -- in practice the domain's handle
+  ("Registry Domain ID", PIR and others) -- the record reports it in
+  `redacted[]` instead of the field silently going empty. Contact
+  redactions are not reported, as `plat` does not show contacts.
+
 ## [0.11.0] - 2026-10-03
 
 A second sweep, of RDAP, registrar WHOIS servers, RIR edge cases and

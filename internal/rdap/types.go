@@ -22,6 +22,9 @@ type DomainResponse struct {
 	Links           LinkList     `json:"links"`
 	Entities        EntityList   `json:"entities"`
 	Remarks         RemarkList   `json:"remarks"`
+	// Redacted is the RFC 9537 "redacted" array: which members the
+	// server withheld, and how.
+	Redacted RedactionList `json:"redacted"`
 	// Port43 is RFC 9083's optional pointer to the legacy port-43 WHOIS
 	// server for this object, if the server publishes one. Most registry
 	// RDAP responses leave this null; some registrar RDAP responses (e.g.
@@ -652,4 +655,34 @@ func (a *ASNResponse) RedactionRemarks() []Remark {
 		}
 	}
 	return out
+}
+
+// Redaction is one RFC 9537 entry: a member the server withheld (method
+// "removal", "emptyValue", "partialValue" or "replacementValue"), named
+// by type or description, and located by a JSONPath -- prePath for where
+// it would have been, postPath or replacementPath for what replaced it.
+type Redaction struct {
+	Name struct {
+		Type        string `json:"type"`
+		Description string `json:"description"`
+	} `json:"name"`
+	PrePath         string `json:"prePath"`
+	PostPath        string `json:"postPath"`
+	ReplacementPath string `json:"replacementPath"`
+	PathLang        string `json:"pathLang"`
+	Method          string `json:"method"`
+}
+
+// RedactionList tolerates a malformed "redacted" member, degrading to
+// none rather than failing the whole response, like EntityList.
+type RedactionList []Redaction
+
+func (r *RedactionList) UnmarshalJSON(b []byte) error {
+	var list []Redaction
+	if err := json.Unmarshal(b, &list); err != nil {
+		*r = nil
+		return nil
+	}
+	*r = list
+	return nil
 }
