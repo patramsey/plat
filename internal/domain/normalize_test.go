@@ -451,7 +451,7 @@ func TestNormalizeStillAcceptsValidNames(t *testing.T) {
 		{"example.com.", "example.com"},
 		{"bücher.com", "xn--bcher-kva.com"},
 		{"xn--bcher-kva.com", "xn--bcher-kva.com"},
-		{"a.b.c.example.com", "a.b.c.example.com"},
+		{"a.b.c.example.com", "example.com"}, // reduced: see TestNormalizeRegisteredDomain
 	} {
 		t.Run(tc.input, func(t *testing.T) {
 			got, err := Normalize(tc.input)
@@ -496,6 +496,46 @@ func TestNormalize_NeighboursOfReservedRangesStillAccepted(t *testing.T) {
 		t.Run(input, func(t *testing.T) {
 			if _, err := Normalize(input); err != nil {
 				t.Errorf("Normalize(%q) = %v, want it looked up", input, err)
+			}
+		})
+	}
+}
+
+// A subdomain is looked up as the domain a registry registered, since
+// neither RDAP nor WHOIS holds a record for the subdomain itself: as
+// given, www.google.com came back "not registered".
+func TestNormalizeRegisteredDomain(t *testing.T) {
+	for _, tc := range []struct{ input, want, host string }{
+		{"www.google.com", "google.com", "www.google.com"},
+		{"https://www.example.com/path?q=1", "example.com", "www.example.com"},
+		{"mail.google.co.uk", "google.co.uk", "mail.google.co.uk"},
+		{"a.b.c.nic.uk", "nic.uk", "a.b.c.nic.uk"},
+		{"WWW.Bücher.de.", "xn--bcher-kva.de", "www.xn--bcher-kva.de"},
+		// An IDN public suffix (公司.cn) is matched in its punycode form.
+		{"www.example.公司.cn", "example.xn--55qx5d.cn", "www.example.xn--55qx5d.cn"},
+		// Private-section suffixes are a hosting provider's, not a
+		// registry's: GitHub registered github.io, not foo.github.io.
+		{"foo.github.io", "github.io", "foo.github.io"},
+		{"x.y.compute.amazonaws.com", "amazonaws.com", "x.y.compute.amazonaws.com"},
+		// A TLD missing from the list falls back to the default rule.
+		{"a.b.notarealtld", "b.notarealtld", "a.b.notarealtld"},
+		// Already registered domains, and public suffixes themselves, are
+		// left alone.
+		{"google.com", "google.com", ""},
+		{"google.co.uk", "google.co.uk", ""},
+		{"github.io", "github.io", ""},
+		{"co.uk", "co.uk", ""},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			got, err := Normalize(tc.input)
+			if err != nil {
+				t.Fatalf("Normalize(%q) errored: %v", tc.input, err)
+			}
+			if got.Name.Punycode != tc.want || got.Host != tc.host {
+				t.Errorf("Normalize(%q) = %q (host %q), want %q (host %q)", tc.input, got.Name.Punycode, got.Host, tc.want, tc.host)
+			}
+			if got.Input != tc.input {
+				t.Errorf("Input = %q, want the original %q", got.Input, tc.input)
 			}
 		})
 	}

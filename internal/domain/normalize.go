@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"golang.org/x/net/idna"
+	"golang.org/x/net/publicsuffix"
 )
 
 // ErrSingleLabel is returned when the input has no dot at all (e.g.
@@ -81,13 +82,18 @@ type Query struct {
 	IP    netip.Addr // KindIPv4 / KindIPv6
 	ASN   uint32     // KindASN
 	Input string     // the original input, for error messages
+	// Host is the full hostname given when Name is its registered domain
+	// instead ("www.google.com" for google.com), and "" when nothing was
+	// dropped. KindDomain only.
+	Host string
 }
 
 // Normalize lowercases, strips a trailing dot, reduces a pasted URL down to
 // its bare host, and classifies the input as either an IP address or a
-// domain name. Domain input is further converted from IDN to punycode, its
-// TLD extracted, and single-label or reserved/private TLD input rejected
-// with a friendly error.
+// domain name. Domain input is further converted from IDN to punycode,
+// reduced to its registered domain (see registeredDomain), its TLD
+// extracted, and single-label or reserved/private TLD input rejected with
+// a friendly error.
 func Normalize(input string) (Query, error) {
 	s := strings.ToLower(strings.TrimSpace(input))
 	// Classified before stripURLParts as well as after: that helper reads
@@ -144,12 +150,44 @@ func Normalize(input string) (Query, error) {
 		return Query{}, fmt.Errorf("domain: %q is a reserved/private TLD and cannot be looked up", tld)
 	}
 
+	var host string
+	if reg := registeredDomain(punycode); reg != punycode {
+		host, punycode = punycode, reg
+	}
+
 	unicodeName, err := idna.ToUnicode(punycode)
 	if err != nil {
 		unicodeName = punycode
 	}
 
-	return Query{Kind: KindDomain, Name: Name{Punycode: punycode, Unicode: unicodeName, TLD: tld}, Input: input}, nil
+	return Query{Kind: KindDomain, Name: Name{Punycode: punycode, Unicode: unicodeName, TLD: tld}, Input: input, Host: host}, nil
+}
+
+// registeredDomain reduces a hostname to the domain a registry actually
+// registered: www.google.com to google.com, mail.google.co.uk to
+// google.co.uk. Neither RDAP nor WHOIS holds a record for a subdomain, so
+// looking one up as given answered "not registered" for a name pasted
+// straight out of a browser -- confidently, and wrongly.
+//
+// The Public Suffix List says where registrations happen. Only its ICANN
+// section counts: a private-section rule (github.io, blogspot.com) marks
+// where a hosting provider hands out subdomains, and foo.github.io is
+// registered by nobody but GitHub, as github.io. A TLD missing from the
+// list falls to the default "*" rule, which also reports a private,
+// single-label suffix -- the TLD itself -- so the walk stops there.
+//
+// A name that is itself a public suffix (co.uk) is returned unchanged.
+func registeredDomain(name string) string {
+	suffix, icann := publicsuffix.PublicSuffix(name)
+	for !icann && strings.Contains(suffix, ".") {
+		_, rest, _ := strings.Cut(suffix, ".")
+		suffix, icann = publicsuffix.PublicSuffix(rest)
+	}
+	prefix, ok := strings.CutSuffix(name, "."+suffix)
+	if !ok {
+		return name
+	}
+	return prefix[strings.LastIndex(prefix, ".")+1:] + "." + suffix
 }
 
 // parseIPInput reports whether s names an IP address -- bare, in the

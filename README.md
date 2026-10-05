@@ -104,6 +104,13 @@ injected via `-ldflags` at release build time.
 # text when piped
 plat example.com
 
+# A URL or a subdomain is looked up as its registered domain -- the name
+# a registry actually holds a record for -- with a note on stderr saying
+# so. Hosting providers' subdomains (foo.github.io) resolve to the
+# provider's own domain (github.io).
+plat https://www.example.com/path      # looks up example.com
+plat mail.example.co.uk                # looks up example.co.uk
+
 # Multiple domains in one invocation
 plat example.com example.org
 

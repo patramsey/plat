@@ -13,6 +13,18 @@ follows [Semantic Versioning](https://semver.org/).
   `redacted[]` instead of the field silently going empty. Contact
   redactions are not reported, as `plat` does not show contacts.
 
+### Changed
+- **Breaking:** A subdomain is looked up as its registered domain, per
+  the Public Suffix List: `plat www.google.com` (or a pasted
+  `https://www.google.com/...`) looks up `google.com`, and
+  `mail.google.co.uk` looks up `google.co.uk`. Neither RDAP nor WHOIS
+  holds records for subdomains, so these used to report "is not
+  registered" and exit `1`; they now return the domain's record and
+  exit `0`. Human and plain output note the substitution on stderr. A
+  hosting provider's subdomain resolves to the provider's own domain
+  (`foo.github.io` to `github.io`). The library's `Lookup` does the
+  same; `Result.Input` keeps the name as given.
+
 ## [0.11.0] - 2026-10-03
 
 A second sweep, of RDAP, registrar WHOIS servers, RIR edge cases and
