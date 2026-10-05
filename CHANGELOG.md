@@ -6,6 +6,14 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-04
+
+Input handling: a hostname or URL is looked up as the domain a registry
+actually holds, a mistyped TLD is named, and RDAP servers' RFC 9537
+redactions are read. Looking up a subdomain now exits `0` instead of
+`1`, and exit-code changes are treated as breaking, so this is a minor
+release.
+
 ### Added
 - RDAP RFC 9537 redaction is read. When a server's `redacted` array
   withholds a field `plat` shows -- in practice the domain's handle
@@ -650,7 +658,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/patramsey/plat/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/patramsey/plat/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/patramsey/plat/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/patramsey/plat/compare/v0.8.0...v0.9.0
