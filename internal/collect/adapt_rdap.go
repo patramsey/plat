@@ -2,6 +2,7 @@ package collect
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/patramsey/plat/internal/rdap"
@@ -84,6 +85,8 @@ func FromRDAP(src model.SourceID, result *rdap.Result, latency time.Duration, fe
 		sr.Registrar.AbusePhone = abuseEntity.VCardArray.Tel
 	}
 
+	applyRFC9537(&sr, d.Redacted)
+
 	for _, rem := range d.RedactionRemarks() {
 		sr.Redactions = append(sr.Redactions, model.RedactionNotice{
 			Field:  "unknown",
@@ -93,4 +96,55 @@ func FromRDAP(src model.SourceID, result *rdap.Result, latency time.Duration, fe
 	}
 
 	return sr
+}
+
+// redactedField maps an RFC 9537 redaction onto the field plat shows that
+// it withheld, or "" when plat shows no such field. Registries redact
+// the Registry Domain ID ($.handle) and, overwhelmingly, contact data --
+// which plat deliberately does not show, so those map to nothing. The
+// registrar-name and abuse paths follow the ICANN RDAP Response Profile;
+// no sampled registry redacts them, but README promises a redacted
+// registrar identity is modelled. Abuse paths are matched before the
+// registrar's own fn, since both sit inside the registrar entity (#134).
+func redactedField(r rdap.Redaction) string {
+	name := strings.ToLower(strings.TrimSpace(r.Name.Type + " " + r.Name.Description))
+	path := strings.ToLower(r.PrePath + " " + r.PostPath + " " + r.ReplacementPath)
+	registrar := strings.Contains(path, "roles[0]=='registrar'")
+	switch {
+	case strings.TrimSpace(r.PrePath) == "$.handle" || name == "registry domain id":
+		return model.FieldHandle
+	case registrar && strings.Contains(path, "'abuse'") && strings.Contains(path, "'email'"),
+		name == "registrar abuse contact email":
+		return model.FieldRegistrarAbuseEmail
+	case registrar && strings.Contains(path, "'abuse'") && strings.Contains(path, "'tel'"),
+		name == "registrar abuse contact phone":
+		return model.FieldRegistrarAbusePhone
+	case registrar && !strings.Contains(path, "'abuse'") && strings.Contains(path, "'fn'"),
+		name == "registrar name":
+		return model.FieldRegistrarName
+	}
+	return ""
+}
+
+// applyRFC9537 marks each field the response's RFC 9537 entries withheld
+// as redacted, and clears any placeholder a "replacementValue" or
+// "emptyValue" left in it, so the merge reports the redaction instead of
+// showing the placeholder as data.
+func applyRFC9537(sr *source.SourceRecord, redacted rdap.RedactionList) {
+	for _, r := range redacted {
+		switch f := redactedField(r); f {
+		case model.FieldHandle:
+			sr.Handle = ""
+			sr.RedactedFields[f] = true
+		case model.FieldRegistrarName:
+			sr.Registrar.Name = ""
+			sr.RedactedFields[f] = true
+		case model.FieldRegistrarAbuseEmail:
+			sr.Registrar.AbuseEmail = ""
+			sr.RedactedFields[f] = true
+		case model.FieldRegistrarAbusePhone:
+			sr.Registrar.AbusePhone = ""
+			sr.RedactedFields[f] = true
+		}
+	}
 }

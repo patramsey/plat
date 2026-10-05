@@ -1064,3 +1064,35 @@ func TestDomain_AbuseContactNestedInRegistrar(t *testing.T) {
 		})
 	}
 }
+
+// PIR declares RFC 9537 ("redacted" in rdapConformance) and removes the
+// Registry Domain ID. plat decoded none of it (#134).
+func TestDomain_RFC9537RedactedArray(t *testing.T) {
+	b, err := os.ReadFile("../../testdata/rdap/pir-org-wikipedia-recorded.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var d DomainResponse
+	if err := json.Unmarshal(b, &d); err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Redacted) != 1 {
+		t.Fatalf("Redacted = %+v, want PIR's one entry", d.Redacted)
+	}
+	r := d.Redacted[0]
+	if r.Name.Type != "Registry Domain ID" || r.PrePath != "$.handle" || r.Method != "removal" {
+		t.Errorf("Redacted[0] = %+v, want Registry Domain ID / $.handle / removal", r)
+	}
+}
+
+// A malformed "redacted" member degrades to none rather than failing the
+// whole response, like EntityList.
+func TestDomain_MalformedRedactedIsIgnored(t *testing.T) {
+	var d DomainResponse
+	if err := json.Unmarshal([]byte(`{"objectClassName":"domain","ldhName":"X.ORG","redacted":"nonsense"}`), &d); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if len(d.Redacted) != 0 {
+		t.Errorf("Redacted = %+v, want none", d.Redacted)
+	}
+}
