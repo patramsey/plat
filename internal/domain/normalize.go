@@ -15,7 +15,7 @@ import (
 
 // ErrSingleLabel is returned when the input has no dot at all (e.g.
 // "localhost"), which can never be a registrable domain.
-var ErrSingleLabel = errors.New("domain: single-label input is not a valid domain")
+var ErrSingleLabel = errors.New("single-label input is not a valid domain")
 
 // ErrEmptyLabel is returned when a name contains a zero-length label
 // ("a..com", ".com"). idna.Lookup.ToASCII accepts these without error --
@@ -23,7 +23,7 @@ var ErrSingleLabel = errors.New("domain: single-label input is not a valid domai
 // waves through as a two-label name, so plat would look up .com instead of
 // the name it was given. The check therefore has to happen here, after the
 // split, rather than being left to idna.
-var ErrEmptyLabel = errors.New("domain: domain name contains an empty label")
+var ErrEmptyLabel = errors.New("domain name contains an empty label")
 
 // ErrReservedIP is returned when input names a reserved, private, or
 // otherwise special-purpose IP address (RFC 1918/4193 private space,
@@ -32,20 +32,20 @@ var ErrEmptyLabel = errors.New("domain: domain name contains an empty label")
 // ownership data -- no RIR allocates them to an organization -- so
 // there is nothing for RDAP/WHOIS to return. This is the IP counterpart
 // of reservedTLDs' rejection of .local/.internal/etc for domains.
-var ErrReservedIP = errors.New("domain: reserved/private IP address cannot be looked up")
+var ErrReservedIP = errors.New("reserved IP address")
 
 // ErrReservedASN is returned for an IANA special-purpose autonomous
 // system number -- reserved, AS_TRANS, documentation, or private use. No
 // RIR allocates these to an organization, so, like a reserved IP, there
 // is no registration data to look up. It is the ASN counterpart of
 // ErrReservedIP.
-var ErrReservedASN = errors.New("domain: reserved ASN cannot be looked up")
+var ErrReservedASN = errors.New("reserved ASN")
 
 // ErrASNOutOfRange is returned for "AS" followed by a number too large
 // for the 32-bit ASN space. The input is unmistakably an ASN attempt, so
 // it must not fall through to the domain path and be reported as a
 // single-label domain.
-var ErrASNOutOfRange = errors.New("domain: ASN out of range")
+var ErrASNOutOfRange = errors.New("ASN out of range")
 
 var reservedTLDs = map[string]bool{
 	"local":    true,
@@ -105,7 +105,7 @@ func Normalize(input string) (Query, error) {
 	}
 	s = stripURLParts(s)
 	if s == "" {
-		return Query{}, fmt.Errorf("domain: empty input")
+		return Query{}, errors.New("empty input")
 	}
 	// Catches the forms only stripURLParts can surface: a pasted URL
 	// ("https://8.8.8.8/x") and the bracketed IPv6 host form.
@@ -133,7 +133,7 @@ func Normalize(input string) (Query, error) {
 	// literal trailing '.' in the input already was.
 	punycode, err := idna.Lookup.ToASCII(s)
 	if err != nil {
-		return Query{}, fmt.Errorf("domain: invalid domain name %q: %w", input, err)
+		return Query{}, fmt.Errorf("invalid domain name %q: %w", input, err)
 	}
 	punycode = strings.TrimSuffix(punycode, ".")
 
@@ -147,7 +147,7 @@ func Normalize(input string) (Query, error) {
 
 	tld := labels[len(labels)-1]
 	if reservedTLDs[tld] {
-		return Query{}, fmt.Errorf("domain: %q is a reserved/private TLD and cannot be looked up", tld)
+		return Query{}, fmt.Errorf("%q is a reserved/private TLD and cannot be looked up", tld)
 	}
 
 	var host string

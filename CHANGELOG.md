@@ -25,6 +25,16 @@ follows [Semantic Versioning](https://semver.org/).
   (`foo.github.io` to `github.io`). The library's `Lookup` does the
   same; `Result.Input` keeps the name as given.
 
+### Fixed
+- A name under a TLD that does not exist now says so, with the likely
+  intended TLD: `exmaple.comm` reports ".comm is not a known top-level
+  domain (did you mean .com?)" instead of "no RDAP or WHOIS server is
+  listed for this name". A real TLD with no server, such as `.gr`,
+  keeps the old message. The exit code is unchanged (`3`).
+- Input errors no longer begin with a stray "domain:", which also
+  appeared on IP and ASN errors: `plat 10.0.0.1` now reads
+  "reserved IP address: "10.0.0.1" is a private-use address ...".
+
 ## [0.11.0] - 2026-10-03
 
 A second sweep, of RDAP, registrar WHOIS servers, RIR edge cases and
