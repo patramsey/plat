@@ -846,8 +846,34 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, client *plat
 		}
 		return 0
 	}
-	reportLookupError(stderr, format, q.Name.Punycode, lookupOutcomeError(code, record.Sources, len(ui.NotQueried) > 0), record.Sources, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
+	outcome := lookupOutcomeError(code, record.Sources, len(ui.NotQueried) > 0)
+	// Nothing to query and no flag to blame: either a real TLD with no
+	// server (.gr) or a typo. Only the typo gets the TLD named -- checked
+	// after the fact, since the compiled-in list can lag a new TLD.
+	if len(record.Sources) == 0 && len(ui.NotQueried) == 0 && !domain.KnownTLD(q.Name.TLD) {
+		outcome = unknownTLDError(q.Name.TLD)
+	}
+	reportLookupError(stderr, format, q.Name.Punycode, outcome, record.Sources, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 	return code
+}
+
+// unknownTLDError reports a name whose TLD does not exist, with the known
+// TLDs one typo away: "lookup failed -- .comm is not a known top-level
+// domain (did you mean .com?)".
+func unknownTLDError(tld string) error {
+	msg := "lookup failed -- ." + tld + " is not a known top-level domain"
+	suggestions := domain.SuggestTLDs(tld)
+	for i, s := range suggestions {
+		suggestions[i] = "." + s
+	}
+	switch n := len(suggestions); n {
+	case 0:
+	case 1:
+		msg += " (did you mean " + suggestions[0] + "?)"
+	default:
+		msg += " (did you mean " + strings.Join(suggestions[:n-1], ", ") + " or " + suggestions[n-1] + "?)"
+	}
+	return errors.New(msg)
 }
 
 // lookupOneIP is lookupOne's KindIPv4/KindIPv6 branch: the IP counterpart

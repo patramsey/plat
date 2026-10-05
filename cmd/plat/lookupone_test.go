@@ -1332,3 +1332,43 @@ func TestLookupOne_SubdomainLooksUpRegisteredDomain(t *testing.T) {
 		})
 	}
 }
+
+// A name under a TLD that does not exist has nothing to query; the error
+// names the TLD and the likely intended one, instead of saying no server
+// is listed as it does for a real server-less TLD such as .gr.
+func TestLookupOne_UnknownTLD(t *testing.T) {
+	ianaAddr := startFakeWHOISListener(t, func(string) string {
+		return "% This query returned 0 objects.\n"
+	})
+	resolver := bootstrap.NewResolver(map[string]string{})
+	var stdout, stderr bytes.Buffer
+	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	client := newTestClient(t, resolver, opts, nil)
+
+	code := lookupOne(context.Background(), &stdout, &stderr, client, "exmaple.comm", opts, render.FormatPlain, uiConfig{})
+	if code != 3 {
+		t.Errorf("exit code = %d, want 3", code)
+	}
+	want := "plat: exmaple.comm: lookup failed -- .comm is not a known top-level domain (did you mean .com?)"
+	if !strings.Contains(stderr.String(), want) {
+		t.Errorf("stderr = %q, want it to contain %q", stderr.String(), want)
+	}
+
+	stderr.Reset()
+	lookupOne(context.Background(), &stdout, &stderr, client, "example.gr", opts, render.FormatPlain, uiConfig{})
+	if !strings.Contains(stderr.String(), "no RDAP or WHOIS server is listed") {
+		t.Errorf("a real TLD with no server lost its own message: %q", stderr.String())
+	}
+}
+
+func TestUnknownTLDError(t *testing.T) {
+	for tld, want := range map[string]string{
+		"notarealtld": "lookup failed -- .notarealtld is not a known top-level domain",
+		"comm":        "lookup failed -- .comm is not a known top-level domain (did you mean .com?)",
+		"cmo":         "lookup failed -- .cmo is not a known top-level domain (did you mean .com, .co or .mo?)",
+	} {
+		if got := unknownTLDError(tld).Error(); got != want {
+			t.Errorf("unknownTLDError(%q) = %q, want %q", tld, got, want)
+		}
+	}
+}
