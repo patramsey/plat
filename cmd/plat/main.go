@@ -609,6 +609,9 @@ func lookupOne(ctx context.Context, stdout, stderr io.Writer, client *plat.Clien
 		reportLookupError(stderr, format, input, err, nil, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 		return 2
 	}
+	if q.Host != "" {
+		noteRegisteredDomain(stderr, format, q, ui)
+	}
 
 	// The --diff snapshot is loaded and validated here -- before any
 	// network call -- rather than after the lookup succeeds. The
@@ -634,6 +637,23 @@ func lookupOne(ctx context.Context, stdout, stderr io.Writer, client *plat.Clien
 	default:
 		return lookupOneDomain(ctx, stdout, stderr, client, q, opts, format, ui, prior)
 	}
+}
+
+// noteRegisteredDomain says, on stderr, that a subdomain is being looked
+// up as its registered domain, so a record (or an error) naming
+// google.com is not a surprise after typing www.google.com. Machine
+// formats get no note: their stderr carries only JSON errors, and the
+// record's own "domain" field already says which name was looked up.
+func noteRegisteredDomain(stderr io.Writer, format render.Format, q domain.Query, ui uiConfig) {
+	if render.IsMachine(format) {
+		return
+	}
+	msg := fmt.Sprintf("plat: %s: looking up %s, the registered domain", q.Host, q.Name.Punycode)
+	if format == render.FormatHuman && !ui.NoColor {
+		_, _ = lipgloss.Fprintln(stderr, human.NewTheme(ui.Dark).Muted.Render(msg))
+		return
+	}
+	_, _ = fmt.Fprintln(stderr, msg)
 }
 
 // diffObjectType and diffQueryName report what --diff's snapshot

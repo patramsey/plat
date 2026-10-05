@@ -1284,3 +1284,51 @@ func TestLookupOne_ASN_RenderErrorPath_ExitCode3(t *testing.T) {
 		t.Errorf("stderr missing ASN in render-failure message, got:\n%s", stderr.String())
 	}
 }
+
+// A subdomain is looked up as its registered domain, and every
+// non-machine format says so on stderr; JSON's stderr stays JSON-only.
+func TestLookupOne_SubdomainLooksUpRegisteredDomain(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		format   render.Format
+		wantNote bool
+	}{
+		{"plain", render.FormatPlain, true},
+		{"human", render.FormatHuman, true},
+		{"json", render.FormatJSON, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotPath string
+			rdapSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.Path
+				w.WriteHeader(http.StatusNotFound)
+			}))
+			defer rdapSrv.Close()
+			var gotQuery string
+			registryWHOISAddr := startFakeWHOISListener(t, func(query string) string {
+				gotQuery = query
+				return "No match for domain.\n"
+			})
+			ianaAddr := startFakeWHOISListener(t, func(string) string {
+				return "refer: " + registryWHOISAddr + "\n"
+			})
+			resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
+
+			var stdout, stderr bytes.Buffer
+			opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+			client := newTestClient(t, resolver, opts, nil)
+			code := lookupOne(context.Background(), &stdout, &stderr, client, "https://www.example.com/x", opts, tc.format, uiConfig{})
+
+			if code != 1 {
+				t.Errorf("exit code = %d, want 1\nstderr: %s", code, stderr.String())
+			}
+			if gotPath != "/domain/example.com" || gotQuery != "example.com" {
+				t.Errorf("queried RDAP %q and WHOIS %q, want example.com on both", gotPath, gotQuery)
+			}
+			note := "plat: www.example.com: looking up example.com, the registered domain"
+			if got := strings.Contains(stderr.String(), note); got != tc.wantNote {
+				t.Errorf("note on stderr = %v, want %v\nstderr: %s", got, tc.wantNote, stderr.String())
+			}
+		})
+	}
+}

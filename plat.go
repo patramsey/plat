@@ -193,6 +193,10 @@ type Result struct {
 
 // Lookup classifies input as a domain, IP address, or ASN, queries the
 // relevant RDAP and WHOIS sources concurrently, and merges the answers.
+// A URL or subdomain is looked up as its registered domain, per the
+// Public Suffix List's ICANN section ("https://www.example.co.uk/x" as
+// example.co.uk): the record's Domain names what was looked up, and the
+// Result's Input keeps what was asked.
 //
 // A source failing is normal and is not an error: as long as one source
 // returned data, Lookup returns a Result with nil error, and the
