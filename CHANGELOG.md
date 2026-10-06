@@ -6,6 +6,11 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-10-06
+
+Removes a false nameserver conflict reported on every `.pl` lookup, and
+reads registration dates `.il`, `.pl` and `.mq` were sending.
+
 ### Fixed
 - Every `.pl` lookup reported a nameserver conflict: WHOIS yielded only
   the first of a domain's nameservers, because NASK lists the rest on
@@ -668,7 +673,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/patramsey/plat/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/patramsey/plat/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/patramsey/plat/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/patramsey/plat/compare/v0.9.0...v0.10.0
