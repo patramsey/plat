@@ -27,11 +27,18 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.26"
-      - run: go test -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./... ./...
+      - id: test
+        run: go test -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./... ./...
+      # A failed upload fails the job. With fail_ci_if_error false, a
+      # Codecov outage (the uploader download failing, October 2026) let
+      # the step pass with nothing uploaded, so `codecov/patch` never
+      # posted and three PRs merged without the patch gate, unnoticed.
+      # A red job during an outage is the price; re-run it once Codecov
+      # recovers.
       - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: coverage.out
-          fail_ci_if_error: false
+          fail_ci_if_error: true
 
       # The whole-project floor is enforced here rather than by Codecov's
       # `project` status, which has never actually posted on this repo --
@@ -43,7 +50,9 @@ jobs:
       # repository. `codecov/patch` does post and still guards new lines.
       #
       # Runs after the upload so a floor breach is still recorded in
-      # Codecov rather than skipping the report entirely.
+      # Codecov rather than skipping the report entirely -- and, by its
+      # `if`, even when the upload failed, so an outage does not also
+      # hide the floor.
       #
       # This floor is measured with `go tool cover`, which reports a few
       # points higher than Codecov for the same profile (Codecov counts
@@ -52,6 +61,7 @@ jobs:
       # writing -- so compare this step's output against itself over
       # time, not against the Codecov dashboard.
       - name: Enforce total coverage floor
+        if: ${{ !cancelled() && steps.test.outcome == 'success' }}
         run: |
           total=$(go tool cover -func=coverage.out | awk '/^total:/ {print $3}' | tr -d '%')
           echo "total coverage: ${total}% (floor: ${COVERAGE_FLOOR}%)"
