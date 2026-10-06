@@ -35,6 +35,8 @@ var templateManifest = []struct {
 	{tld: "bo", fixture: "nicbo-bo-registered-recorded.txt", wantDomain: "nic.bo", wantNSCount: 0},
 	{tld: "lu", fixture: "dnslu-lu-registered-recorded.txt", wantDomain: "nic.lu", wantNSCount: 2},
 	{tld: "il", fixture: "isoc-il-recorded.txt", wantDomain: "isoc.org.il", wantNSCount: 1},
+	{tld: "pl", fixture: "nask-pl-google-recorded.txt", wantDomain: "google.pl", wantNSCount: 4},
+	{tld: "mq", fixture: "jwhois-mq-registered-recorded.txt", wantDomain: "nic.mq", wantNSCount: 2},
 }
 
 func TestTemplateManifest_EveryRegisteredTemplateHasAFixture(t *testing.T) {

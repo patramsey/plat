@@ -208,9 +208,10 @@ object-type implementations — the parser vocabulary half landed; the fetch
 trio, `presentSorted`×3, `status`×3, and the two adapters were deliberately
 left alone, since none had ever caused a bug.
 
-One known gap carried forward: `.pl` recovers only the first of its usually
-four nameservers. It has no `templates.yaml` entry, so the generic `kv`
-tokenizer does not follow its multi-line continuation lines. Left unfixed
-deliberately — that tokenizer also serves `.com`, `.org`, `.nl` and `.fr` —
-and pinned by a test that documents the gap rather than asserting it is
-correct.
+The `.pl` nameserver gap once noted here is closed: `.pl` recovered only
+the first of its nameservers, which made every `.pl` lookup report a
+conflict against registry RDAP. The fix is scoped to `.pl` through its
+`templates.yaml` entry (`continuationLines`), leaving the generic `kv`
+tokenizer that `.com`, `.org`, `.nl` and `.fr` share untouched. Prefer
+that pattern -- a per-template option over a change to a shared
+tokenizer -- for the next registry quirk too.
