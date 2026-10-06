@@ -81,3 +81,26 @@ il:
   format: kv
   # ISOC-IL answers a name with no record with its terms of use alone.
   commentOnlyIsNotFound: true
+  synonyms:
+    assigned: created
+    validity: expires
+  # Day-first: "assigned: 05-06-1999" is the "19990605 (Assigned)" audit
+  # entry. Scoped here, where it cannot misread another registry's
+  # month-first date.
+  dateLayouts: ["02-01-2006"]
+pl:
+  format: kv
+  # NASK lists the second and later nameservers on indented lines with
+  # no key, some carrying IPv6 glue whose colons the kv tokenizer would
+  # otherwise split on.
+  continuationLines: true
+  synonyms:
+    # "option created" and "option expiration date" are a registration
+    # option's dates, not the domain's, and stay unmapped.
+    last modified: updated
+mq:
+  format: kv
+  synonyms:
+    # JWhoisServer: the domain block's "changed:" comes before any
+    # contact block's, so the first one wins.
+    changed: updated

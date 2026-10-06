@@ -6,6 +6,16 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Every `.pl` lookup reported a nameserver conflict: WHOIS yielded only
+  the first of a domain's nameservers, because NASK lists the rest on
+  indented lines with no key, and registry RDAP listed them all. All of
+  them are now read, and the conflict is gone.
+- Registration dates that were in a registry's WHOIS answer but came out
+  empty or unparsed: `.il` creation and expiry (`assigned:`,
+  `validity:`, written day-first), `.pl` creation, last-modified and
+  renewal (`2002.09.19 13:00:00`), and `.mq`'s last change.
+
 ## [0.12.0] - 2026-10-04
 
 Input handling: a hostname or URL is looked up as the domain a registry

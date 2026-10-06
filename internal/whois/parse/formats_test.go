@@ -3,6 +3,7 @@ package parse
 import (
 	"slices"
 	"testing"
+	"time"
 )
 
 // WHOIS-only ccTLDs whose registered answers parsed to an empty record:
@@ -67,5 +68,56 @@ func TestParse_ILCommentOnlyAnswerIsNotFound(t *testing.T) {
 func TestParse_LURateLimit(t *testing.T) {
 	if f := Parse(loadFixture(t, "dnslu-lu-ratelimited-recorded.txt"), "lu"); !f.RateLimited {
 		t.Error("RateLimited = false for .lu's \"Maximum query rate reached\"")
+	}
+}
+
+// Registries whose dates were in the answer but came out empty: keys no
+// synonym mapped (.il, .pl's "last modified", .mq's "changed"), and
+// formats no layout matched (.il day-first, .pl dotted with a time).
+func TestParse_RegistryDates(t *testing.T) {
+	for _, tt := range []struct {
+		fixture, tld              string
+		created, updated, expires string // RFC 3339 date-times, "" for absent
+	}{
+		{fixture: "isoc-il-recorded.txt", tld: "il",
+			created: "1996-01-11T00:00:00Z", expires: "2029-01-11T00:00:00Z"},
+		{fixture: "nask-pl-google-recorded.txt", tld: "pl",
+			created: "2002-09-19T13:00:00Z", updated: "2026-08-17T12:47:01Z", expires: "2027-09-18T14:00:00Z"},
+		// "renewal date: not defined" stays unparsed rather than inventing one.
+		{fixture: "nask-pl-recorded.txt", tld: "pl",
+			created: "1998-01-26T12:00:00Z", updated: "2015-04-20T11:41:34Z"},
+		{fixture: "jwhois-mq-registered-recorded.txt", tld: "mq",
+			updated: "2022-02-22T00:00:00Z"},
+	} {
+		t.Run(tt.fixture, func(t *testing.T) {
+			f := Parse(loadFixture(t, tt.fixture), tt.tld)
+			for _, c := range []struct {
+				name string
+				got  Date
+				want string
+			}{{"Created", f.Created, tt.created}, {"Updated", f.Updated, tt.updated}, {"Expires", f.Expires, tt.expires}} {
+				got := ""
+				if c.got.Parsed {
+					got = c.got.Time.Format(time.RFC3339)
+				}
+				if got != c.want {
+					t.Errorf("%s = %q (raw %q), want %q", c.name, got, c.got.Raw, c.want)
+				}
+			}
+		})
+	}
+}
+
+// A template's dateLayouts apply to that TLD only: ".il"'s day-first
+// layout must not read another registry's "11-01-2029" at all, since
+// for a month-first registry it would be the wrong day.
+func TestParse_TemplateDateLayoutsAreScoped(t *testing.T) {
+	raw := "domain: example.zz\nexpires: 11-01-2029\n"
+	if f := Parse(raw, ""); f.Expires.Parsed {
+		t.Errorf("Expires parsed as %v without the .il template; the day-first layout leaked", f.Expires.Time)
+	}
+	f := Parse(raw, "il")
+	if want := time.Date(2029, 1, 11, 0, 0, 0, 0, time.UTC); !f.Expires.Parsed || !f.Expires.Time.Equal(want) {
+		t.Errorf("Expires under .il = %v (parsed %v), want %v", f.Expires.Time, f.Expires.Parsed, want)
 	}
 }

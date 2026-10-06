@@ -496,19 +496,22 @@ func TestParse_StripsGlueAddressesFromNameservers(t *testing.T) {
 		},
 		{
 			// NASK's "nameservers:" value spans four lines, but only the
-			// first carries the "nameservers:" key -- the other three are
-			// bare continuation lines with no key of their own, and the
-			// two of those with bracketed IPv6 glue contain a colon that
-			// the default kv tokenizer mistakes for its own key/value
-			// separator, so they land in Unmapped instead of
-			// Nameservers. bilbo.nask.org.pl is the only nameserver the
-			// current tokenizer actually recovers from this dialect; this
-			// pins that real (still-limited) behavior rather than the
-			// four hosts the raw response lists.
+			// first carries the key -- the other three are indented bare
+			// hosts, two with bracketed IPv6 glue whose colons the kv
+			// tokenizer would split on. The .pl template's
+			// continuationLines reads them as further values. Before it,
+			// only bilbo.nask.org.pl was recovered, and every .pl lookup
+			// reported a nameserver conflict against registry RDAP.
 			name:    "nask bracketed glue, multi-line value",
 			fixture: "nask-pl-recorded.txt",
 			tld:     "pl",
-			want:    []string{"bilbo.nask.org.pl"},
+			want:    []string{"bilbo.nask.org.pl", "eomer.nask.net.pl", "frodo.nask.net.pl", "kirdan.nask.net.pl"},
+		},
+		{
+			name:    "nask multi-line value, no glue",
+			fixture: "nask-pl-google-recorded.txt",
+			tld:     "pl",
+			want:    []string{"ns1.google.com", "ns2.google.com", "ns3.google.com", "ns4.google.com"},
 		},
 	}
 	for _, tt := range tests {

@@ -37,6 +37,8 @@ var dateLayouts = []string{
 	"02.01.2006",
 	// CZ.NIC ("07.10.1996 02:00:00").
 	"02.01.2006 15:04:05",
+	// NASK, .pl ("1998.01.26 12:00:00").
+	"2006.01.02 15:04:05",
 	"January 2, 2006",
 	"Mon Jan 02 2006",
 	// DNS Belgium, with an unpadded day ("Mon Jan 1 1996").
@@ -105,6 +107,19 @@ func ParseDate(s string) Date {
 		}
 	}
 	return d
+}
+
+// parseDateWith is ParseDate trying a template's own layouts first. They
+// are exact, unambiguous only for that registry, so no case or suffix
+// handling is applied to them.
+func parseDateWith(s string, layouts []string) Date {
+	raw := strings.TrimSpace(s)
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, raw); err == nil {
+			return Date{Raw: raw, Time: t.UTC(), Parsed: true}
+		}
+	}
+	return ParseDate(s)
 }
 
 // titleCaseWords upper-cases the first letter of each run of letters and

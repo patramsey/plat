@@ -22,6 +22,14 @@ type Template struct {
 	// with no not-found wording to match. An answer with no content line
 	// outside comments then means NotFound.
 	CommentOnlyIsNotFound bool `yaml:"commentOnlyIsNotFound"`
+	// DateLayouts are Go time layouts tried before the global ones, for a
+	// registry whose date format is ambiguous anywhere else: ISOC-IL's
+	// day-first "11-01-2029" would misread as November 1 if a
+	// month-first registry ever needed the same shape.
+	DateLayouts []string `yaml:"dateLayouts"`
+	// ContinuationLines makes the kv tokenizer read an indented line as
+	// another value for the key above it (see tokenizeKV).
+	ContinuationLines bool `yaml:"continuationLines"`
 }
 
 var templates map[string]Template

@@ -268,9 +268,21 @@ var unsupportedMarkers = []string{
 // tokenizeKV handles the default "Key: value" dialect used by most
 // registries (thin .com-style, thick .org-style, IANA's own format).
 // Lines starting with "%" or "#" are comments and skipped.
-func tokenizeKV(raw string) []kvPair {
+//
+// With continued set, an indented line following a key is another value
+// for that key, read whole: NASK (.pl) writes a nameserver list as one
+// "nameservers:" line and then indented bare hosts. It is a template
+// option rather than the default because .com-style answers indent
+// lines that are not continuations.
+func tokenizeKV(raw string, continued bool) []kvPair {
 	var out []kvPair
 	for _, line := range strings.Split(raw, "\n") {
+		if continued && len(out) > 0 && (strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")) {
+			if v := strings.TrimSpace(line); v != "" {
+				out = append(out, kvPair{out[len(out)-1].key, v})
+				continue
+			}
+		}
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "%") || strings.HasPrefix(line, "#") {
 			continue
@@ -491,7 +503,7 @@ func Parse(raw, tld string) Fields {
 	case "indent":
 		pairs = tokenizeIndent(raw)
 	default:
-		pairs = tokenizeKV(raw)
+		pairs = tokenizeKV(raw, tmpl.ContinuationLines)
 	}
 
 	synonyms := defaultSynonyms
@@ -607,15 +619,15 @@ func Parse(raw, tld string) Fields {
 			}
 		case fCreated:
 			if f.Created.Raw == "" {
-				f.Created = ParseDate(p.val)
+				f.Created = parseDateWith(p.val, tmpl.DateLayouts)
 			}
 		case fUpdated:
 			if f.Updated.Raw == "" {
-				f.Updated = ParseDate(p.val)
+				f.Updated = parseDateWith(p.val, tmpl.DateLayouts)
 			}
 		case fExpires:
 			if f.Expires.Raw == "" {
-				f.Expires = ParseDate(p.val)
+				f.Expires = parseDateWith(p.val, tmpl.DateLayouts)
 			}
 		}
 	}
