@@ -14,6 +14,10 @@ follows [Semantic Versioning](https://semver.org/).
 - `.gg` and `.je` lookups had no creation date: Island Networks writes
   it as a sentence ("Registered on 24th April 1997 at ..."), which is
   now read (#146).
+- Every `.cz` lookup reported a registrar conflict: CZ.NIC's WHOIS gives
+  the registrar's handle (`REG-SEZNAM`), which was read as its name and
+  disagreed with RDAP's (`Seznam.cz, a.s.`). The handle is no longer
+  read as a name.
 
 ## [0.12.1] - 2026-10-06
 

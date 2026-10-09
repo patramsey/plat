@@ -654,6 +654,16 @@ func TestParse_UKNoRegistrarListedIsAbsent(t *testing.T) {
 	}
 }
 
+// CZ.NIC's "registrar:" is a handle (REG-SEZNAM), which RDAP does not
+// give as a name, so every .cz lookup reported a registrar conflict.
+func TestParse_CZRegistrarHandleIsNotAName(t *testing.T) {
+	for _, fixture := range []string{"cznic-cz-recorded.txt", "cznic-cz-seznam-recorded.txt"} {
+		if f := Parse(loadFixture(t, fixture), "cz"); f.Registrar != "" {
+			t.Errorf("%s: Registrar = %q, want none", fixture, f.Registrar)
+		}
+	}
+}
+
 // In these registries' responses the domain's own object comes first and
 // contact, nsset and keyset objects follow with the same keys. Assigning
 // on every match let the last object win: seznam.cz reported the
@@ -669,7 +679,9 @@ func TestParse_MultiObjectResponseKeepsTheDomainsOwnValues(t *testing.T) {
 		created, updated, expires date
 	}{
 		{
-			fixture: "cznic-cz-seznam-recorded.txt", tld: "cz", registrar: "REG-SEZNAM",
+			// .cz's registrar line is a handle and is not read at all;
+			// see TestParse_CZRegistrarHandleIsNotAName.
+			fixture: "cznic-cz-seznam-recorded.txt", tld: "cz",
 			created: date{"07.10.1996 02:00:00", true},
 			updated: date{"05.09.2022 14:21:11", true},
 			expires: date{"29.10.2027", true},

@@ -29,6 +29,10 @@ cz:
     # lines in its response belong to contact and nsset objects.
     registered: created
     changed: updated
+    # "registrar: REG-SEZNAM" is the registrar's handle, not its name;
+    # read as a name, it disagreed with RDAP's "Seznam.cz, a.s." on every
+    # lookup.
+    registrar: ""
   # "registered: 30.10.1997 01:00:00" is RDAP's 00:00Z; in summer,
   # "21.07.2000 15:21:00" is 13:21Z.
   timezone: Europe/Prague
