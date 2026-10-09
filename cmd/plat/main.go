@@ -1174,15 +1174,20 @@ func reportLookupError(stderr io.Writer, format render.Format, domainName string
 		_ = machine.EncodeError(stderr, domainName, err)
 		return
 	}
+	// A blank name has nothing to prefix: "plat: : empty input" (#149).
+	msg := fmt.Sprintf("plat: %s: %s", domainName, err)
+	if strings.TrimSpace(domainName) == "" {
+		msg = fmt.Sprintf("plat: %s", err)
+	}
 	if format == render.FormatHuman && !ui.NoColor {
 		th := human.NewTheme(ui.Dark)
 		style := th.Err
 		if deriveOutcome(sources) == 1 {
 			style = th.OK
 		}
-		_, _ = lipgloss.Fprintln(stderr, style.Render(fmt.Sprintf("plat: %s: %s", domainName, err)))
+		_, _ = lipgloss.Fprintln(stderr, style.Render(msg))
 	} else {
-		_, _ = fmt.Fprintln(stderr, "plat:", domainName+":", err)
+		_, _ = fmt.Fprintln(stderr, msg)
 	}
 	if !verbose || len(sources) == 0 {
 		return

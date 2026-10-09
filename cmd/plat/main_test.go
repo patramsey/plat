@@ -20,6 +20,7 @@ import (
 	"github.com/patramsey/plat/internal/source"
 
 	"github.com/charmbracelet/colorprofile"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/patramsey/plat"
 	"github.com/patramsey/plat/internal/bootstrap"
@@ -700,6 +701,19 @@ func TestReportLookupError_HumanFormatPrintsPlainLine(t *testing.T) {
 	out := stderr.String()
 	if !strings.HasPrefix(out, "plat: example.com: boom") {
 		t.Errorf("expected a plain \"plat: domain: err\" line, got: %q", out)
+	}
+}
+
+// A blank name is not repeated as a prefix ("plat: : empty input", #149).
+func TestReportLookupError_BlankNameHasNoPrefix(t *testing.T) {
+	for _, format := range []render.Format{render.FormatPlain, render.FormatHuman} {
+		for _, name := range []string{"", "   "} {
+			var stderr bytes.Buffer
+			reportLookupError(&stderr, format, name, errors.New("empty input"), nil, false, uiConfig{}, nil, "")
+			if got := ansi.Strip(stderr.String()); got != "plat: empty input\n" {
+				t.Errorf("format %v, name %q: got %q, want %q", format, name, got, "plat: empty input\n")
+			}
+		}
 	}
 }
 

@@ -11,3 +11,9 @@ const RestrictedReason = "registry restricts this name (reserved or not availabl
 // restricted wording: an answer plat could not read, rather than a
 // registered domain with no data (see #120).
 const UnrecognisedReason = "unrecognised answer: no fields could be read, and no known not-found, refusal or rate-limit wording matched"
+
+// EmptyReason replaces UnrecognisedReason when the answer was empty or
+// only whitespace: there was no wording to match, and nothing for -v or
+// --raw to show, so the problem is the server's rather than a gap in the
+// parser (#148).
+const EmptyReason = "empty answer: the WHOIS server replied with nothing"

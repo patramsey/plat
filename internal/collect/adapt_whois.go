@@ -95,7 +95,7 @@ func fromHop(src model.SourceID, hop whois.Hop) source.SourceRecord {
 		// wordings reported free names as registered (#113); it is a
 		// failed source instead, with the raw answer kept (#120).
 		meta.OK = false
-		meta.Err = source.UnrecognisedReason
+		meta.Err = unreadableReason(hop.Raw)
 		return source.SourceRecord{Meta: meta}
 	}
 	meta.OK = !f.NotFound
@@ -149,6 +149,16 @@ func firstUnmapped(m map[string][]string, key string) (string, bool) {
 		return "", false
 	}
 	return vals[0], true
+}
+
+// unreadableReason is the error for a WHOIS answer nothing could be read
+// from: source.EmptyReason when it was empty, so it is not reported as
+// wording plat failed to recognise.
+func unreadableReason(raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return source.EmptyReason
+	}
+	return source.UnrecognisedReason
 }
 
 // parsedAnything reports whether a WHOIS answer yielded any domain field.
