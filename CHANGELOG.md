@@ -6,6 +6,15 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- `.pl` and `.cz` WHOIS times were read as UTC, but both registries
+  write local time with no offset, so a WHOIS-only answer's dates were
+  an hour or two late (#145). They are now read in Europe/Warsaw and
+  Europe/Prague and match registry RDAP. A bare date is unchanged.
+- `.gg` and `.je` lookups had no creation date: Island Networks writes
+  it as a sentence ("Registered on 24th April 1997 at ..."), which is
+  now read (#146).
+
 ## [0.12.1] - 2026-10-06
 
 Removes a false nameserver conflict reported on every `.pl` lookup, and

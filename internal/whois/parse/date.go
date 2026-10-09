@@ -72,6 +72,14 @@ var ticketSuffix = regexp.MustCompile(`\s+#\d+$`)
 // any case: "aug", "Aug", "AUG"). It never errors — an unrecognized format
 // leaves Parsed false with Raw preserved.
 func ParseDate(s string) Date {
+	return parseDateIn(s, time.UTC)
+}
+
+// parseDateIn is ParseDate reading a time of day with no zone as local
+// time in loc. A bare date stays midnight UTC whatever loc is: it names a
+// day, and the merge already allows a local day's spread (dateOnlySkew).
+// A value that carries its own zone or offset keeps it.
+func parseDateIn(s string, loc *time.Location) Date {
 	raw := strings.TrimSpace(s)
 	d := Date{Raw: raw}
 	if raw == "" {
@@ -86,7 +94,7 @@ func ParseDate(s string) Date {
 	candidates := []string{parseable, titleCaseWords(parseable)}
 	for _, cand := range candidates {
 		for _, layout := range dateLayouts {
-			if t, err := time.Parse(layout, cand); err == nil {
+			if t, err := time.ParseInLocation(layout, cand, zoneFor(layout, loc)); err == nil {
 				d.Time = t.UTC()
 				d.Parsed = true
 				return d
@@ -109,17 +117,31 @@ func ParseDate(s string) Date {
 	return d
 }
 
-// parseDateWith is ParseDate trying a template's own layouts first. They
-// are exact, unambiguous only for that registry, so no case or suffix
-// handling is applied to them.
-func parseDateWith(s string, layouts []string) Date {
+// parseDateWith is ParseDate for a value from tmpl's registry: its own
+// layouts are tried first, and a zone-less time of day is read in its
+// time zone. Its layouts are exact, unambiguous only for that registry,
+// so no case or suffix handling is applied to them.
+func parseDateWith(s string, tmpl Template) Date {
+	loc := tmpl.location
+	if loc == nil {
+		loc = time.UTC
+	}
 	raw := strings.TrimSpace(s)
-	for _, layout := range layouts {
-		if t, err := time.Parse(layout, raw); err == nil {
+	for _, layout := range tmpl.DateLayouts {
+		if t, err := time.ParseInLocation(layout, raw, zoneFor(layout, loc)); err == nil {
 			return Date{Raw: raw, Time: t.UTC(), Parsed: true}
 		}
 	}
-	return ParseDate(s)
+	return parseDateIn(s, loc)
+}
+
+// zoneFor is the location to read layout in: loc when the layout has a
+// time of day, UTC for a bare date.
+func zoneFor(layout string, loc *time.Location) *time.Location {
+	if strings.Contains(layout, "15:04") {
+		return loc
+	}
+	return time.UTC
 }
 
 // titleCaseWords upper-cases the first letter of each run of letters and

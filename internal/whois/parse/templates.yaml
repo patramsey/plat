@@ -29,6 +29,9 @@ cz:
     # lines in its response belong to contact and nsset objects.
     registered: created
     changed: updated
+  # "registered: 30.10.1997 01:00:00" is RDAP's 00:00Z; in summer,
+  # "21.07.2000 15:21:00" is 13:21Z.
+  timezone: Europe/Prague
 br:
   format: kv
   synonyms:
@@ -61,11 +64,21 @@ at:
   format: kv
   synonyms:
     changed: updated
-gg:
+gg: &cidr
   # Island Networks (.gg, .je): indented sections like Nominet's.
   format: indent
-je:
-  format: indent
+  synonyms:
+    # The creation date is a sentence, the first line under "Relevant
+    # dates:" ("Registered on 24th April 1997 at 00:00:00.000"); the
+    # second is the yearly fee date, never read since created keeps its
+    # first value.
+    relevant dates: created
+  dateLayouts:
+    - "Registered on 2st January 2006 at 15:04:05.000"
+    - "Registered on 2nd January 2006 at 15:04:05.000"
+    - "Registered on 2rd January 2006 at 15:04:05.000"
+    - "Registered on 2th January 2006 at 15:04:05.000"
+je: *cidr
 bo:
   format: kv
   synonyms:
@@ -98,6 +111,8 @@ pl:
     # "option created" and "option expiration date" are a registration
     # option's dates, not the domain's, and stay unmapped.
     last modified: updated
+  # "created: 2002.09.19 13:00:00" is RDAP's 11:00Z.
+  timezone: Europe/Warsaw
 mq:
   format: kv
   synonyms:

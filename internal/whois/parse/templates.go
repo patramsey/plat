@@ -2,7 +2,11 @@ package parse
 
 import (
 	_ "embed"
+	"fmt"
 	"strings"
+	"time"
+	// Template time zones must not depend on the machine's tz database.
+	_ "time/tzdata"
 
 	"gopkg.in/yaml.v3"
 )
@@ -30,6 +34,12 @@ type Template struct {
 	// ContinuationLines makes the kv tokenizer read an indented line as
 	// another value for the key above it (see tokenizeKV).
 	ContinuationLines bool `yaml:"continuationLines"`
+	// Timezone is the IANA zone a registry writes its times of day in
+	// when it gives no offset: NASK's "2002.09.19 13:00:00" is 11:00 UTC.
+	// Unset means UTC. A bare date is never shifted (see parseDateIn).
+	Timezone string `yaml:"timezone"`
+
+	location *time.Location
 }
 
 var templates map[string]Template
@@ -38,6 +48,25 @@ func init() {
 	if err := yaml.Unmarshal(templatesYAML, &templates); err != nil {
 		panic("parse: embedded templates.yaml is invalid: " + err.Error())
 	}
+	if err := loadTimezones(templates); err != nil {
+		panic("parse: embedded templates.yaml: " + err.Error())
+	}
+}
+
+// loadTimezones resolves each template's Timezone into its location.
+func loadTimezones(ts map[string]Template) error {
+	for tld, tmpl := range ts {
+		if tmpl.Timezone == "" {
+			continue
+		}
+		loc, err := time.LoadLocation(tmpl.Timezone)
+		if err != nil {
+			return fmt.Errorf("%s: %w", tld, err)
+		}
+		tmpl.location = loc
+		ts[tld] = tmpl
+	}
+	return nil
 }
 
 // templateFor returns the template registered for tld, or the zero

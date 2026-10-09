@@ -92,10 +92,12 @@ step 4).
 - **A layout the generic `key: value` reader can't follow** (indented
   sections, `[bracketed]` keys): give the TLD a `format:` in
   `templates.yaml`. Every `templates.yaml` entry is data, not code.
-  Two more options there: `continuationLines` for values carried on
-  indented lines with no key (`.pl`'s nameservers), and `dateLayouts`
+  Three more options there: `continuationLines` for values carried on
+  indented lines with no key (`.pl`'s nameservers), `dateLayouts`
   for a date format that would be ambiguous anywhere else (`.il`'s
-  day-first dates).
+  day-first dates), and `timezone` for a registry that writes local
+  time with no offset (`.pl`, `.cz`) -- confirm the zone against the
+  same name's registry RDAP before setting it.
 - **The server needs a different query** (a prefix, a flag, a suffix):
   add a row to the table in `internal/whois/quirks.go`.
 - **IANA lists no WHOIS server but the registry runs one**: add it to

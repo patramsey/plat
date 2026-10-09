@@ -619,15 +619,15 @@ func Parse(raw, tld string) Fields {
 			}
 		case fCreated:
 			if f.Created.Raw == "" {
-				f.Created = parseDateWith(p.val, tmpl.DateLayouts)
+				f.Created = parseDateWith(p.val, tmpl)
 			}
 		case fUpdated:
 			if f.Updated.Raw == "" {
-				f.Updated = parseDateWith(p.val, tmpl.DateLayouts)
+				f.Updated = parseDateWith(p.val, tmpl)
 			}
 		case fExpires:
 			if f.Expires.Raw == "" {
-				f.Expires = parseDateWith(p.val, tmpl.DateLayouts)
+				f.Expires = parseDateWith(p.val, tmpl)
 			}
 		}
 	}
