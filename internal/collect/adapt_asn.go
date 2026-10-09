@@ -157,7 +157,7 @@ func fromASNHop(meta model.SourceResult, hop whois.Hop) source.ASNSourceRecord {
 		// not an empty success (#120). ARIN's multi-match summary (#95)
 		// was this shape.
 		meta.OK = false
-		meta.Err = source.UnrecognisedReason
+		meta.Err = unreadableReason(hop.Raw)
 		return source.ASNSourceRecord{Meta: meta}
 	}
 	meta.OK = true

@@ -18,6 +18,11 @@ follows [Semantic Versioning](https://semver.org/).
   the registrar's handle (`REG-SEZNAM`), which was read as its name and
   disagreed with RDAP's (`Seznam.cz, a.s.`). The handle is no longer
   read as a name.
+- An empty WHOIS reply was reported as an "unrecognised answer", and the
+  lookup's headline pointed at `-v` and `--raw`, which had nothing to
+  show. The source now says the reply was empty (#148).
+- `plat ''` printed `plat: : empty input`; it now prints
+  `plat: empty input` (#149).
 
 ## [0.12.1] - 2026-10-06
 

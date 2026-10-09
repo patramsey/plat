@@ -267,6 +267,23 @@ func TestFromHop_UnrecognisedAnswerIsAFailedSource(t *testing.T) {
 	}
 }
 
+// An empty reply has no wording to recognise and nothing for --raw to
+// show; its reason says it was empty (#148). Same for IPs and ASNs.
+func TestUnreadable_EmptyAnswerSaysSo(t *testing.T) {
+	for _, raw := range []string{"", " \r\n\n"} {
+		hop := whois.Hop{Raw: raw, IPFields: &parse.IPFields{}, ASNFields: &parse.ASNFields{}}
+		for name, sr := range map[string]model.SourceResult{
+			"domain": fromHop(model.SourceRegistryWHOIS, hop).Meta,
+			"ip":     fromIPHop(model.SourceResult{Source: model.SourceRegistryWHOIS}, hop).Meta,
+			"asn":    fromASNHop(model.SourceResult{Source: model.SourceRegistryWHOIS}, hop).Meta,
+		} {
+			if sr.OK || sr.NotFound || sr.Err != source.EmptyReason {
+				t.Errorf("%s, raw %q: Meta = %+v, want a failed source with the empty reason", name, raw, sr)
+			}
+		}
+	}
+}
+
 // Anything parsed -- even one field -- is still an answer plat read.
 func TestFromHop_AnyParsedFieldIsStillASuccess(t *testing.T) {
 	for name, f := range map[string]parse.Fields{
