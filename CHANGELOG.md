@@ -6,6 +6,12 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-10-09
+
+Removes a false registrar conflict reported on every `.cz` lookup, reads
+`.pl` and `.cz` WHOIS times in their registries' time zones, and reads
+`.gg`/`.je` creation dates.
+
 ### Fixed
 - `.pl` and `.cz` WHOIS times were read as UTC, but both registries
   write local time with no offset, so a WHOIS-only answer's dates were
@@ -691,7 +697,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.12.2...HEAD
+[0.12.2]: https://github.com/patramsey/plat/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/patramsey/plat/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/patramsey/plat/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/patramsey/plat/compare/v0.10.0...v0.11.0
