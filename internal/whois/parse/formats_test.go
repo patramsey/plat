@@ -73,7 +73,9 @@ func TestParse_LURateLimit(t *testing.T) {
 
 // Registries whose dates were in the answer but came out empty: keys no
 // synonym mapped (.il, .pl's "last modified", .mq's "changed"), and
-// formats no layout matched (.il day-first, .pl dotted with a time).
+// formats no layout matched (.il day-first, .pl dotted with a time, .gg's
+// sentence). .pl and .cz write local time with no zone; each expected
+// value below is the one their registry RDAP gives.
 func TestParse_RegistryDates(t *testing.T) {
 	for _, tt := range []struct {
 		fixture, tld              string
@@ -82,10 +84,17 @@ func TestParse_RegistryDates(t *testing.T) {
 		{fixture: "isoc-il-recorded.txt", tld: "il",
 			created: "1996-01-11T00:00:00Z", expires: "2029-01-11T00:00:00Z"},
 		{fixture: "nask-pl-google-recorded.txt", tld: "pl",
-			created: "2002-09-19T13:00:00Z", updated: "2026-08-17T12:47:01Z", expires: "2027-09-18T14:00:00Z"},
+			created: "2002-09-19T11:00:00Z", updated: "2026-08-17T10:47:01Z", expires: "2027-09-18T12:00:00Z"},
 		// "renewal date: not defined" stays unparsed rather than inventing one.
 		{fixture: "nask-pl-recorded.txt", tld: "pl",
-			created: "1998-01-26T12:00:00Z", updated: "2015-04-20T11:41:34Z"},
+			created: "1998-01-26T11:00:00Z", updated: "2015-04-20T09:41:34Z"},
+		// Winter (CET) and summer (CEST); the bare expiry date is not shifted.
+		{fixture: "cznic-cz-recorded.txt", tld: "cz",
+			created: "1997-10-30T00:00:00Z", updated: "2020-11-17T13:25:52Z", expires: "2027-03-15T00:00:00Z"},
+		{fixture: "cznic-cz-seznam-recorded.txt", tld: "cz",
+			created: "1996-10-07T00:00:00Z", updated: "2022-09-05T12:21:11Z", expires: "2027-10-29T00:00:00Z"},
+		{fixture: "cidr-gg-recorded.txt", tld: "gg", created: "1997-04-24T00:00:00Z"},
+		{fixture: "cidr-je-recorded.txt", tld: "je", created: "1997-04-24T00:00:00Z"},
 		{fixture: "jwhois-mq-registered-recorded.txt", tld: "mq",
 			updated: "2022-02-22T00:00:00Z"},
 	} {
@@ -105,6 +114,39 @@ func TestParse_RegistryDates(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// .gg/.je write the day as an ordinal; every suffix must parse.
+// Synthetic: the recordings only have "24th".
+func TestParse_CIDROrdinalDates(t *testing.T) {
+	for in, want := range map[string]string{
+		"1st May 2001": "2001-05-01", "2nd May 2001": "2001-05-02", "3rd May 2001": "2001-05-03",
+		"11th May 2001": "2001-05-11", "22nd May 2001": "2001-05-22", "31st May 2001": "2001-05-31",
+	} {
+		raw := "Relevant dates:\n     Registered on " + in + " at 00:00:00.000\n"
+		f := Parse(raw, "gg")
+		if got := f.Created.Time.Format("2006-01-02"); !f.Created.Parsed || got != want {
+			t.Errorf("%q: Created = %s (parsed %v), want %s", in, got, f.Created.Parsed, want)
+		}
+	}
+}
+
+// A template's time zone applies only to a time of day with no offset of
+// its own. Synthetic.
+func TestParse_TemplateTimezone(t *testing.T) {
+	f := Parse("domain: example.pl\ncreated: 2020-07-01T10:00:00Z\n", "pl")
+	if want := "2020-07-01T10:00:00Z"; f.Created.Time.Format(time.RFC3339) != want {
+		t.Errorf("Created = %s, want %s: an explicit zone was overridden", f.Created.Time.Format(time.RFC3339), want)
+	}
+	if f := Parse("domain: example.zz\ncreated: 2002.09.19 13:00:00\n", ""); f.Created.Time.Hour() != 13 {
+		t.Errorf("Created hour = %d without a template, want 13 (UTC)", f.Created.Time.Hour())
+	}
+}
+
+func TestLoadTimezones_RejectsUnknownZone(t *testing.T) {
+	if err := loadTimezones(map[string]Template{"zz": {Timezone: "Europe/Nowhere"}}); err == nil {
+		t.Error("loadTimezones accepted Europe/Nowhere")
 	}
 }
 
