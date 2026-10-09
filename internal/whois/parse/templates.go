@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	// Template time zones must not depend on the machine's tz database.
-	_ "time/tzdata"
+	_ "time/tzdata" // template time zones must not depend on the machine's tz database
 
 	"gopkg.in/yaml.v3"
 )
