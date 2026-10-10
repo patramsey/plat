@@ -1,0 +1,37 @@
+% Recorded live from whois.nic.aw, query "nic.aw", 2026-10-10.
+Domain name: nic.aw
+Status:      active
+
+Registrar:
+   SETAR N.V.
+   Administration Building
+   Seroe Blanco 29A
+   Oranjestad
+   Aruba
+
+DNSSEC:      yes
+
+Domain nameservers:
+   ns3.sidn.nl
+   ns1.sidn.nl
+   ns2.sidn.nl
+
+Creation Date: 2014-02-25
+
+Updated Date: 2026-05-12
+
+Record maintained by: AW Domain Registry
+
+Copyright notice: No part of this publication may be reproduced,
+published, stored in a retrieval system, or transmitted, in any form
+or by any means, electronic, mechanical, recording, or otherwise,
+without prior permission of Setar. These restrictions apply equally to
+registrars, except in that reproductions and publications are
+permitted insofar as they are reasonable, necessary and solely in the
+context of the registration activities referred to in the General
+Terms and Conditions for Registrars. Any use of this material for
+advertising, targeting commercial offers or similar activities is
+explicitly forbidden and liable to result in legal action. Anyone who
+is aware or suspects that such activities are taking place is asked to
+inform Setar. (c) Setar Copyright Act, protection of authors' rights
+(Section 10, subsection 1, clause 1).
