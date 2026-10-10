@@ -1,0 +1,48 @@
+% Recorded live from whois.marnet.mk, query "nic.mk", 2026-10-10.
+% Domain Information over Whois protocol
+%
+% MARnet whois proxy server
+% Timestamp: Sat Oct 10 2026 20:00:57
+
+domain:       nic.mk
+registrant:   MARCOM-R7100
+admin-c:      MARCOM-C7747
+nsset:        MARCOM-NS74273279
+registrar:    MARCOM-REG
+registered:   07.05.2008 14:00:00
+changed:      25.02.2026 13:53:54
+expire:       07.05.2027
+
+contact:      MARCOM-R7100
+org:          Szonet-EU Domain Regisztracios Iroda
+name:         Ferenc Junger
+address:      DATA REDACTED
+address:      DATA REDACTED
+address:      DATA REDACTED
+address:      HU
+phone:        DATA REDACTED
+e-mail:       info@szonet.net
+registrar:    MARCOM-REG
+created:      DATA REDACTED
+
+contact:      MARCOM-C7747
+name:         Junger Ferenc
+address:      DATA REDACTED
+address:      DATA REDACTED
+address:      DATA REDACTED
+address:      DATA REDACTED
+address:      HU
+phone:        DATA REDACTED
+e-mail:       info@szonet.net
+registrar:    MARCOM-REG
+created:      DATA REDACTED
+
+nsset:        MARCOM-NS74273279
+nserver:      ns4.com-domain.com 
+nserver:      ns3.com-domain.com 
+nserver:      ns0.com-domain.com 
+tech-c:       MARCOM-C7747
+registrar:    MARCOM-REG
+created:      01.09.2020 12:36:21
+
+

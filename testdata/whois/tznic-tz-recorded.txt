@@ -1,0 +1,33 @@
+% Recorded live from whois.tznic.or.tz, query "nic.tz", 2026-10-10.
+%  https://karibu.tz/media/WHOIS_TERMS_TOU.pdf
+% 
+% Whoisd Server Version: 3.15.0
+% Timestamp: Sat Oct 10 21:00:59 2026
+
+domain:       nic.tz
+registrant:   ADMIN-TZREGISTRY
+admin-c:      ADMIN-TZREGISTRY
+nsset:        NS-KARIBU
+registrar:    REG-TZNIC
+registered:   28.01.2015 15:14:03
+changed:      25.06.2025 15:11:49
+expire:       28.01.2030
+
+contact:      ADMIN-TZREGISTRY
+registrar:    REG-TZNIC
+created:      23.05.2022 12:59:22
+
+nsset:        NS-KARIBU
+nserver:      b.ns.tznic.or.tz (196.216.162.70, 2001:43f8:e0:1::70)
+nserver:      ns3.tznic.or.tz 
+tech-c:       MNT-TZNIC
+registrar:    REG-TZNIC
+created:      18.07.2016 12:03:51
+changed:      06.10.2022 19:00:27
+
+contact:      MNT-TZNIC
+registrar:    REG-TZNIC
+created:      21.07.2009 15:28:07
+changed:      04.02.2015 16:46:11
+
+

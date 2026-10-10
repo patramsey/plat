@@ -153,6 +153,21 @@ func TestRedactedField(t *testing.T) {
 	}
 }
 
+// The registrar's name, from two registries whose vCards made it disagree
+// with their own WHOIS: .si repeats "fn" with the literal "org" second,
+// and .uz names a person in "fn" and the registrar in "org".
+func TestFromRDAP_RegistrarName(t *testing.T) {
+	for fixture, want := range map[string]string{
+		"arnes-si-recorded.json":     "Arnes",
+		"uzinfocom-uz-recorded.json": "ЕИ UZINFOCOM Администрация",
+	} {
+		sr := FromRDAP(model.SourceRegistryRDAP, &rdap.Result{Domain: loadRDAPFixture(t, fixture)}, 0, nil)
+		if sr.Registrar.Name != want {
+			t.Errorf("%s: Registrar.Name = %q, want %q", fixture, sr.Registrar.Name, want)
+		}
+	}
+}
+
 // PIR's real answer removes the Registry Domain ID under RFC 9537. With
 // no registrar RDAP to outrank it, the record must say so rather than
 // silently showing no handle.

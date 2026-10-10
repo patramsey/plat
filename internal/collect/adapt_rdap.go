@@ -74,10 +74,16 @@ func FromRDAP(src model.SourceID, result *rdap.Result, latency time.Duration, fe
 	}
 
 	if regEntity, ok := d.RegistrarEntity(); ok {
-		if source.IsRedactedPlaceholder(regEntity.VCardArray.FullName) {
+		// A registrar is an organisation, so its card's "org" is its name
+		// when given: .uz's "fn" is a person at the registrar.
+		name := regEntity.VCardArray.Org
+		if name == "" {
+			name = regEntity.VCardArray.FullName
+		}
+		if source.IsRedactedPlaceholder(name) {
 			sr.RedactedFields[model.FieldRegistrarName] = true
 		} else {
-			sr.Registrar.Name = regEntity.VCardArray.FullName
+			sr.Registrar.Name = name
 		}
 	}
 	if abuseEntity, ok := d.AbuseEntity(); ok {

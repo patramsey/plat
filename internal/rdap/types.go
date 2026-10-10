@@ -294,8 +294,14 @@ func (e *EntityList) UnmarshalJSON(b []byte) error {
 // last reported the fax as the abuse phone. Kind is the vCard "kind"
 // ("org", "individual", "group"), which is how RegistrantEntity tells an
 // organization from a maintainer that shares its role.
+//
+// FullName is the first "fn": .si's registry repeats the property, and
+// its second value is the literal "org". Org is the first "org" given as
+// a plain string; .uz's registrar card names a person in "fn" and the
+// company in "org".
 type VCardArray struct {
 	FullName string
+	Org      string
 	Email    string
 	Tel      string
 	Kind     string
@@ -326,7 +332,13 @@ func (v *VCardArray) UnmarshalJSON(b []byte) error {
 		}
 		switch strings.ToLower(name) {
 		case "fn":
-			v.FullName = value
+			if v.FullName == "" {
+				v.FullName = value
+			}
+		case "org":
+			if v.Org == "" {
+				v.Org = value
+			}
 		case "email":
 			v.Email = value
 		case "kind":

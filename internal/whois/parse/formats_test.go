@@ -94,6 +94,31 @@ func TestParse_RegistryDates(t *testing.T) {
 		{fixture: "cznic-cz-seznam-recorded.txt", tld: "cz",
 			created: "1996-10-07T00:00:00Z", updated: "2022-09-05T12:21:11Z", expires: "2027-10-29T00:00:00Z"},
 		{fixture: "cidr-gg-recorded.txt", tld: "gg", created: "1997-04-24T00:00:00Z"},
+		// FRED and NIC Argentina: "registered:" is the domain's creation;
+		// the "created:" lines after it are contacts', and were read as
+		// the domain's. .cr and .tz write local time (checked against
+		// their RDAP), the others are read as UTC.
+		{fixture: "nicar-ar-recorded.txt", tld: "ar",
+			created: "1998-05-29T00:00:00Z", updated: "2023-07-17T17:23:05Z", expires: "2100-12-31T00:00:00Z"},
+		{fixture: "nic-cr-recorded.txt", tld: "cr",
+			created: "1996-01-01T00:00:00Z", updated: "2024-03-16T21:44:06Z", expires: "2035-01-01T00:00:00Z"},
+		{fixture: "nic-ls-recorded.txt", tld: "ls",
+			created: "2017-04-24T19:08:24Z", updated: "2019-09-20T16:14:52Z", expires: "2029-04-24T00:00:00Z"},
+		{fixture: "marnet-mk-recorded.txt", tld: "mk",
+			created: "2008-05-07T14:00:00Z", updated: "2026-02-25T13:53:54Z", expires: "2027-05-07T00:00:00Z"},
+		{fixture: "nic-mw-recorded.txt", tld: "mw",
+			created: "2014-09-17T11:26:09Z", updated: "2019-09-30T13:53:30Z", expires: "2027-12-17T00:00:00Z"},
+		{fixture: "tznic-tz-recorded.txt", tld: "tz",
+			created: "2015-01-28T12:14:03Z", updated: "2025-06-25T12:11:49Z", expires: "2030-01-28T00:00:00Z"},
+		{fixture: "nic-ve-recorded.txt", tld: "ve",
+			created: "2019-08-08T18:04:00Z", updated: "2026-07-07T14:39:42Z", expires: "2034-12-31T00:00:00Z"},
+		// Offsets written after a space (.ee) or as hours alone (.ua).
+		{fixture: "tld-ee-recorded.txt", tld: "ee",
+			created: "2010-07-04T01:21:15Z", updated: "2025-10-16T10:22:04Z", expires: "2030-11-30T00:00:00Z"},
+		{fixture: "hostmaster-ua-recorded.txt", tld: "ua",
+			created: "2007-10-04T10:40:19Z", updated: "2026-09-29T11:28:52Z", expires: "2031-10-04T10:40:18Z"},
+		{fixture: "nicat-at-registered-recorded.txt", tld: "at",
+			created: "2000-08-25T20:16:35Z", updated: "2020-04-27T16:03:40Z"},
 		{fixture: "cidr-je-recorded.txt", tld: "je", created: "1997-04-24T00:00:00Z"},
 		{fixture: "jwhois-mq-registered-recorded.txt", tld: "mq",
 			updated: "2022-02-22T00:00:00Z"},

@@ -1,0 +1,63 @@
+% Recorded live from whois.nic.cr, query "nic.cr", 2026-10-10.
+% Domain Information over Whois protocol
+% 
+% Whoisd Server Version: 3.15.0
+% Timestamp: Sat Oct 10 18:00:55 2026
+
+domain:       nic.cr
+registrant:   CN_1633
+nsset:        NS_NIC_CR
+keyset:       KS_NIC_CR
+registrar:    NIC-REG1
+registered:   31.12.1995 18:00:00
+changed:      16.03.2024 15:44:06
+expire:       01.01.2035
+
+contact:      CN_1633
+org:          Academia Nacional de Ciencias
+name:         María Laura Arias Echandi
+address:      Cámara de Industrias, 100 m sur
+address:      San Jose
+address:      00000
+address:      San Jose
+address:      CR
+phone:        +506.40205000
+e-mail:       manager@nic.cr
+registrar:    NIC-REG1
+created:      14.03.2024 10:09:13
+changed:      31.07.2026 10:33:02
+
+nsset:        NS_NIC_CR
+nserver:      a.lactld.org 
+nserver:      ca1.nic.cr (185.159.197.100, 2620:10a:80aa::100)
+nserver:      ca2.nic.cr (185.159.198.100, 2620:10a:80ab::100)
+nserver:      de.nic.cr (194.0.11.107, 2001:678:e:107::53)
+nserver:      dns.nic.cr (200.107.82.100, 2001:13c7:7004:1::d100)
+nserver:      p.nic.cr (204.61.216.89, 2001:500:14:6089:ad::1)
+tech-c:       CN_9905
+registrar:    NIC-REG1
+created:      14.03.2024 12:55:41
+changed:      05.11.2024 03:47:45
+
+contact:      CN_9905
+org:          NIC Costa Rica
+name:         Equipo tecnico
+address:      Barrio Francisco Peralta Calle 27 A entre Avenidas 8 y 10.
+address:      San José
+address:      13672050
+address:      San José
+address:      CR
+phone:        +506.22806453
+e-mail:       ti@nic.cr
+registrar:    NIC-REG1
+created:      23.08.2024 05:51:52
+changed:      23.08.2024 05:51:54
+
+keyset:       KS_NIC_CR
+dnskey:       257 3 13 hZnkCPWFZgPl1Mn86jPqf6Pib5o4cGuIPtcrbxm8G5Mcd0FukiM7TB8saILY9fZWi0cCVtrh0R23Lw80RDJEHA==
+tech-c:       CN_9905
+registrar:    NIC-REG1
+created:      14.03.2024 13:54:36
+changed:      05.11.2024 04:37:51
+
+

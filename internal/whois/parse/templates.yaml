@@ -24,9 +24,12 @@ nl:
   format: indent
 cz:
   format: kv
-  synonyms:
-    # CZ.NIC calls the domain's creation "registered"; the "created"
-    # lines in its response belong to contact and nsset objects.
+  # FRED, CZ.NIC's registry software, which .cr .ls .mk .mw .tz and .ve
+  # also run.
+  synonyms: &fred
+    # The domain's creation is "registered"; the "created" lines in the
+    # answer belong to the contact and nsset objects after it, and read
+    # as the domain's they gave every one of these TLDs a wrong date.
     registered: created
     changed: updated
     # "registrar: REG-SEZNAM" is the registrar's handle, not its name;
@@ -36,6 +39,48 @@ cz:
   # "registered: 30.10.1997 01:00:00" is RDAP's 00:00Z; in summer,
   # "21.07.2000 15:21:00" is 13:21Z.
   timezone: Europe/Prague
+cr:
+  format: kv
+  synonyms: *fred
+  # "registered: 31.12.1995 18:00:00" is RDAP's 1996-01-01T00:00Z.
+  timezone: America/Costa_Rica
+ls:
+  format: kv
+  synonyms: *fred
+mk:
+  format: kv
+  synonyms: *fred
+mw:
+  format: kv
+  synonyms: *fred
+tz:
+  format: kv
+  synonyms: *fred
+  # "registered: 28.01.2015 15:14:03" is RDAP's 12:14:03Z.
+  timezone: Africa/Dar_es_Salaam
+ve:
+  format: kv
+  synonyms: *fred
+ar:
+  # NIC Argentina: the same shape as FRED, in UTC ("registered:
+  # 1998-05-29 00:00:00" is RDAP's 00:00Z). "nicar" is a handle, as in
+  # RDAP, which gives no name.
+  format: kv
+  synonyms: *fred
+ee:
+  format: kv
+  synonyms:
+    # The domain's block comes first ("Domain:" then "name: nic.ee"), and
+    # contacts' "name:" and "changed:" lines follow.
+    name: domain
+    registered: created
+    changed: updated
+ua:
+  format: kv
+  synonyms:
+    # "registrar: ua.nic" is the handle RDAP gives for "NIC.UA LLC".
+    registrar: ""
+    modified: updated
 br:
   format: kv
   synonyms:
@@ -68,6 +113,7 @@ at:
   format: kv
   synonyms:
     changed: updated
+    registered: created
 gg: &cidr
   # Island Networks (.gg, .je): indented sections like Nominet's.
   format: indent

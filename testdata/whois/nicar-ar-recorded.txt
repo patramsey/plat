@@ -1,0 +1,36 @@
+% Recorded live from whois.nic.ar, query "nic.ar", 2026-10-10.
+% La información a la que estás accediendo se provee exclusivamente para
+% fines relacionados con operaciones sobre nombres de dominios y DNS,
+% quedando absolutamente prohibido su uso para otros fines.
+%
+% La DIRECCIÓN NACIONAL DEL REGISTRO DE DOMINIOS DE INTERNET es depositaria
+% de la información que los usuarios declaran con la sola finalidad de
+% registrar nombres de dominio en ‘.ar’, para ser publicada en el sitio web
+% de NIC Argentina.
+%
+% La información personal que consta en la base de datos generada a partir
+% del sistema de registro de nombres de dominios se encuentra amparada por
+% la Ley N° 25326 “Protección de Datos Personales” y el Decreto
+% Reglamentario 1558/01.
+
+domain:		nic.ar
+registrant:	30710551665
+registrar:	nicar
+registered:	1998-05-29 00:00:00
+changed:	2023-07-17 17:23:05.989470
+expire:		2100-12-31 00:00:00
+
+contact:	30710551665
+name:		SECRETARIA LEGAL Y TECNICA
+registrar:	nicar
+created:	2013-08-19 00:00:00
+changed:	2024-04-18 15:16:11.362047
+
+nserver:	ns5.rdns.ar ()
+nserver:	ns6.rdns.ar ()
+nserver:	ns1.rdns.ar ()
+nserver:	ns2.rdns.ar ()
+registrar:	nicar
+created:	2019-07-12 17:36:57.685138
+
+

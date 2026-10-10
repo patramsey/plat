@@ -1,0 +1,44 @@
+% Recorded live from whois.nic.ls, query "nic.ls", 2026-10-10.
+% Domain Information over Whois protocol
+% 
+% Whoisd Server Version: 3.10.2
+% Timestamp: Sat Oct 10 20:00:38 2026
+
+domain:       nic.ls
+registrant:   ADMIN-LSNIC
+admin-c:      ADMIN-LSNIC
+nsset:        NIC-NSSET
+registrar:    REG-LS
+registered:   24.04.2017 19:08:24
+expire:       24.04.2029
+
+contact:      ADMIN-LSNIC
+address:      30 princess Margaret rd
+address:      Maseru
+address:      15896
+address:      LS
+registrar:    REG-LS
+created:      24.03.2017 12:11:38
+changed:      20.09.2019 16:14:52
+
+nsset:        NIC-NSSET
+nserver:      ns1.nic.ls (196.43.249.1)
+nserver:      ns2.nic.ls (196.11.175.1)
+tech-c:       TECH-LSNIC
+registrar:    REG-LS
+created:      24.04.2017 19:03:42
+changed:      05.11.2025 11:55:02
+
+contact:      TECH-LSNIC
+address:      30 princess Margaret rd
+address:      Maseru
+address:      15896
+address:      LS
+registrar:    REG-LS
+created:      24.03.2017 12:12:27
+changed:      20.09.2019 16:16:12
+
+
+>>> Terms: Data provided for information purposes only.
+>>> Rate limited; bulk access prohibited.
+

@@ -37,6 +37,15 @@ var templateManifest = []struct {
 	{tld: "il", fixture: "isoc-il-recorded.txt", wantDomain: "isoc.org.il", wantNSCount: 1},
 	{tld: "pl", fixture: "nask-pl-google-recorded.txt", wantDomain: "google.pl", wantNSCount: 4},
 	{tld: "mq", fixture: "jwhois-mq-registered-recorded.txt", wantDomain: "nic.mq", wantNSCount: 2},
+	{tld: "ar", fixture: "nicar-ar-recorded.txt", wantDomain: "nic.ar", wantNSCount: 4},
+	{tld: "cr", fixture: "nic-cr-recorded.txt", wantDomain: "nic.cr", wantNSCount: 6},
+	{tld: "ls", fixture: "nic-ls-recorded.txt", wantDomain: "nic.ls", wantNSCount: 2},
+	{tld: "mk", fixture: "marnet-mk-recorded.txt", wantDomain: "nic.mk", wantNSCount: 3},
+	{tld: "mw", fixture: "nic-mw-recorded.txt", wantDomain: "nic.mw", wantNSCount: 4},
+	{tld: "tz", fixture: "tznic-tz-recorded.txt", wantDomain: "nic.tz", wantNSCount: 2},
+	{tld: "ve", fixture: "nic-ve-recorded.txt", wantDomain: "nic.ve", wantNSCount: 4},
+	{tld: "ee", fixture: "tld-ee-recorded.txt", wantDomain: "nic.ee", wantNSCount: 3},
+	{tld: "ua", fixture: "hostmaster-ua-recorded.txt", wantDomain: "nic.ua", wantNSCount: 2},
 }
 
 func TestTemplateManifest_EveryRegisteredTemplateHasAFixture(t *testing.T) {
