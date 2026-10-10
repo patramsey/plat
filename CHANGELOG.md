@@ -6,6 +6,13 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Breaking (exit code):** a free `.nl` or `.aw` name looked up over
+  WHOIS alone -- `.aw` has no RDAP, and `.nl` falls back to WHOIS when
+  its RDAP times out -- exited 3 ("the registry's answer could not be
+  read") and now exits 1 ("is not registered"). Both registries answer
+  a free name with `<name> is free`, which plat did not recognise.
+
 ### Fixed
 - Wrong creation dates on `.ar`, `.cr`, `.ls`, `.mk`, `.mw`, `.tz` and
   `.ve`: these registries call the domain's creation `registered:`, and

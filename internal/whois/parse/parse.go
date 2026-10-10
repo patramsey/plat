@@ -240,8 +240,12 @@ func hasContentLine(raw string) bool {
 // substring. JWhoisServer (.tg .tn .gf .mq) reports a missing object as
 // "NO OBJECT FOUND!" followed by the object and its type; only a missing
 // object of type domain means the queried domain is free.
+//
+// SIDN's software (.nl, .aw) answers a free name with one line, "<name>
+// is free". Matched as that whole line: "is free" alone could be prose.
 var notFoundPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`no object found!\s*\n\s*object:[ .]*\S+\s*\n\s*type:[ .]*domain\b`),
+	regexp.MustCompile(`(?m)^\S+ is free$`),
 }
 
 // unsupportedMarkers flag a registry WHOIS service flatly refusing a
