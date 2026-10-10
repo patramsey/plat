@@ -1,0 +1,40 @@
+% Recorded live from whois.nic.kz, query "nic.kz", 2026-10-10.
+Whois Server for the .kz and .xn--80ao21a top level domains.
+This server is maintained by the KazNIC, the ccTLD manager for the Republic of Kazakhstan.
+
+Domain Name............: nic.kz
+
+Registrant
+Name...................: KazNIC
+Organization Name......: KazNIC
+Street Address.........: Ilyashev str. 47/2
+City...................: Semey
+State..................: VKO
+Postal Code............: 071400
+Country................: KZ
+
+Administrative Contact
+Name...................: Gussev, Pavel M.
+Organization Name......: KazNIC
+Phone Number...........: +77222600006
+Fax Number.............: +77222604740
+Email Address..........: pg@nic.kz
+
+Name Server list
+
+Name Server............: ns.nic.kz
+IP Address.............: 194.0.21.5, 2001:678:98:1::5
+
+Name Server............: ns.relcom.kz
+IP Address.............: 80.241.0.65
+
+Name Server............: ns1.nic.kz
+IP Address.............: 185.79.212.7, 2a01:7640:9000::7
+
+Domain created.........: 1999-08-17 21:34:57 (GMT+0:00)
+Last modified..........: 2022-12-05 17:28:31 (GMT+0:00)
+
+Domain status..........: ok - Normal state.
+
+Registrar created......: KAZNIC
+Current Registrar......: KAZNIC

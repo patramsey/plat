@@ -524,10 +524,10 @@ func TestRenderRecord_DispatchesFormatHumanToStyledRenderer(t *testing.T) {
 	var humanBuf, plainBuf bytes.Buffer
 	ui := uiConfig{Dark: false, Width: 80}
 
-	if err := renderRecord(&humanBuf, render.FormatHuman, rec, false, false, false, false, ui); err != nil {
+	if err := renderRecord(&humanBuf, render.FormatHuman, rec, "", false, false, false, false, ui); err != nil {
 		t.Fatalf("unexpected error rendering FormatHuman: %v", err)
 	}
-	if err := renderRecord(&plainBuf, render.FormatPlain, rec, false, false, false, false, ui); err != nil {
+	if err := renderRecord(&plainBuf, render.FormatPlain, rec, "", false, false, false, false, ui); err != nil {
 		t.Fatalf("unexpected error rendering FormatPlain: %v", err)
 	}
 	if humanBuf.String() == plainBuf.String() {
@@ -558,10 +558,10 @@ func TestRenderRecord_VerboseGatesSourcesBlockButNotConflicts(t *testing.T) {
 
 	for _, format := range []render.Format{render.FormatHuman, render.FormatPlain} {
 		var quietBuf, verboseBuf bytes.Buffer
-		if err := renderRecord(&quietBuf, format, rec, false, false, true, false, ui); err != nil {
+		if err := renderRecord(&quietBuf, format, rec, "", false, false, true, false, ui); err != nil {
 			t.Fatalf("format %v: unexpected error rendering non-verbose: %v", format, err)
 		}
-		if err := renderRecord(&verboseBuf, format, rec, false, true, true, false, ui); err != nil {
+		if err := renderRecord(&verboseBuf, format, rec, "", false, true, true, false, ui); err != nil {
 			t.Fatalf("format %v: unexpected error rendering verbose: %v", format, err)
 		}
 
@@ -602,10 +602,10 @@ func TestRenderRecord_ShowConflictsGatesConflictDetailBlock(t *testing.T) {
 
 	for _, format := range []render.Format{render.FormatHuman, render.FormatPlain} {
 		var hiddenBuf, shownBuf bytes.Buffer
-		if err := renderRecord(&hiddenBuf, format, rec, false, false, false, false, ui); err != nil {
+		if err := renderRecord(&hiddenBuf, format, rec, "", false, false, false, false, ui); err != nil {
 			t.Fatalf("format %v: unexpected error rendering with conflicts hidden: %v", format, err)
 		}
-		if err := renderRecord(&shownBuf, format, rec, false, false, true, false, ui); err != nil {
+		if err := renderRecord(&shownBuf, format, rec, "", false, false, true, false, ui); err != nil {
 			t.Fatalf("format %v: unexpected error rendering with conflicts shown: %v", format, err)
 		}
 
@@ -660,7 +660,7 @@ func TestRenderRecord_DispatchesJSONAndNDJSON(t *testing.T) {
 	ui := uiConfig{}
 
 	var jsonBuf bytes.Buffer
-	if err := renderRecord(&jsonBuf, render.FormatJSON, rec, false, false, false, false, ui); err != nil {
+	if err := renderRecord(&jsonBuf, render.FormatJSON, rec, "", false, false, false, false, ui); err != nil {
 		t.Fatalf("unexpected error rendering FormatJSON: %v", err)
 	}
 	if !strings.Contains(jsonBuf.String(), `"schemaVersion":1`) {
@@ -671,7 +671,7 @@ func TestRenderRecord_DispatchesJSONAndNDJSON(t *testing.T) {
 	}
 
 	var ndjsonBuf bytes.Buffer
-	if err := renderRecord(&ndjsonBuf, render.FormatNDJSON, rec, false, false, false, false, ui); err != nil {
+	if err := renderRecord(&ndjsonBuf, render.FormatNDJSON, rec, "", false, false, false, false, ui); err != nil {
 		t.Fatalf("unexpected error rendering FormatNDJSON: %v", err)
 	}
 	if !strings.Contains(ndjsonBuf.String(), `"domain"`) {
@@ -948,7 +948,7 @@ func TestRenderRecord_Quiet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			if err := renderRecord(&buf, tt.format, rec, false, false, false, true, ui); err != nil {
+			if err := renderRecord(&buf, tt.format, rec, "", false, false, false, true, ui); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			got := strings.TrimRight(buf.String(), "\n")
@@ -967,7 +967,7 @@ func TestRenderRecord_QuietIgnoredForMachineFormats(t *testing.T) {
 	}
 	ui := uiConfig{Dark: false, Width: 80}
 	var buf bytes.Buffer
-	if err := renderRecord(&buf, render.FormatJSON, rec, false, false, false, true, ui); err != nil {
+	if err := renderRecord(&buf, render.FormatJSON, rec, "", false, false, false, true, ui); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !json.Valid(buf.Bytes()) {
@@ -2246,5 +2246,18 @@ func TestRunLookupPool_StdoutWriteErrorIsReturned(t *testing.T) {
 	err = runLookupPool(context.Background(), failingWriter{}, &stderr, []string{"example.com"}, opts, render.FormatPlain, uiConfig{}, client)
 	if err == nil || !strings.Contains(err.Error(), "stdout closed") {
 		t.Errorf("err = %v, want the stdout write error", err)
+	}
+}
+
+// A record no source named the domain in (.cl's WHOIS-only answer) still
+// leads its quiet line with the name that was looked up.
+func TestRenderRecord_QuietFallsBackToQueriedName(t *testing.T) {
+	rec := model.Record{Nameservers: model.Field[[]string]{Value: []string{"a.nic.cl"}, Sources: []model.SourceID{model.SourceRegistryWHOIS}}}
+	var buf bytes.Buffer
+	if err := renderRecord(&buf, render.FormatPlain, rec, "nic.cl", false, false, false, true, uiConfig{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(buf.String(), "nic.cl") {
+		t.Errorf("quiet line = %q, want it to start with the queried name", buf.String())
 	}
 }
