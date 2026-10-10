@@ -269,15 +269,30 @@ var unsupportedMarkers = []string{
 // registries (thin .com-style, thick .org-style, IANA's own format).
 // Lines starting with "%" or "#" are comments and skipped.
 //
-// With continued set, an indented line following a key is another value
-// for that key, read whole: NASK (.pl) writes a nameserver list as one
-// "nameservers:" line and then indented bare hosts. It is a template
-// option rather than the default because .com-style answers indent
-// lines that are not continuations.
-func tokenizeKV(raw string, continued bool) []kvPair {
+// Three template options change the reading, each for registries whose
+// answers would be misread by the others' rules:
+//
+//   - ContinuationLines: an indented line following a key is another
+//     value for that key, read whole. NASK (.pl) writes a nameserver list
+//     as one "nameservers:" line and then indented bare hosts; .com-style
+//     answers indent lines that are not continuations.
+//   - HeaderBlocks: a key with no value heads a block, and every line
+//     after it up to a blank line is a value for that key, read whole.
+//     .bg, .bn and .sm list nameservers under "Name Servers:" that way.
+//   - PaddedValues: a value's leading run of dots is alignment padding
+//     (JWhoisServer on .tg: "Activation:.........2023-03-02").
+func tokenizeKV(raw string, tmpl Template) []kvPair {
 	var out []kvPair
+	block := ""
 	for _, line := range strings.Split(raw, "\n") {
-		if continued && len(out) > 0 && (strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")) {
+		if block != "" {
+			if v := strings.TrimSpace(line); v != "" {
+				out = append(out, kvPair{block, v})
+				continue
+			}
+			block = ""
+		}
+		if tmpl.ContinuationLines && len(out) > 0 && (strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")) {
 			if v := strings.TrimSpace(line); v != "" {
 				out = append(out, kvPair{out[len(out)-1].key, v})
 				continue
@@ -300,7 +315,13 @@ func tokenizeKV(raw string, continued bool) []kvPair {
 		// A real field label never legitimately ends in a literal period.
 		key := strings.ToLower(strings.TrimRight(strings.TrimSpace(line[:idx]), "."))
 		val := strings.TrimSpace(line[idx+1:])
+		if tmpl.PaddedValues {
+			val = strings.TrimLeft(val, ".")
+		}
 		if val == "" {
+			if tmpl.HeaderBlocks {
+				block = key
+			}
 			continue
 		}
 		out = append(out, kvPair{key, val})
@@ -503,7 +524,7 @@ func Parse(raw, tld string) Fields {
 	case "indent":
 		pairs = tokenizeIndent(raw)
 	default:
-		pairs = tokenizeKV(raw, tmpl.ContinuationLines)
+		pairs = tokenizeKV(raw, tmpl)
 	}
 
 	synonyms := defaultSynonyms
@@ -577,8 +598,10 @@ func Parse(raw, tld string) Fields {
 		// let the last contact's values replace the domain's own.
 		switch canon {
 		case fDomain:
+			// A domain has no spaces; .bg follows it with its other form
+			// in parentheses ("nic.bg (nic.bg)").
 			if f.Domain == "" {
-				f.Domain = p.val
+				f.Domain = firstToken(p.val)
 			}
 		case fRegistrar:
 			if f.Registrar == "" {

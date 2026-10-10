@@ -1,0 +1,106 @@
+% Recorded live from whois.nic.tg, query "nic.tg", 2026-10-10.
+This is JWhoisServer serving ccTLD tg
+Java Whois Server 0.4.1.3    (c) 2006 - 2015 Klaus Zerwes zero-sys.net
+All rights reserved.
+Copyright "NICTogo2 - http://www.nic.tg"
+
+Domain:.............nic.tg
+Registrar:..........NETMASTER SARL
+Activation:.........2023-03-02
+Expiration:.........2030-06-26
+Status:.............Activ&eacute;
+Contact Type:.......[PRIVEE]
+Last Name:..........[PRIVEE]
+First Name:.........[PRIVEE]
+Address:............[PRIVEE]
+Tel:................[PRIVEE]
+Fax:................[PRIVEE]
+e-mail:.............[PRIVEE]
+Name Server (DB):...ns1.nic.tg
+Name Server (DB):...ns2.nic.tg
+
+----------------------------------------
+
+Domain:.............nic.tg
+Registrar:..........NETMASTER SARL
+Activation:.........2023-03-02
+Expiration:.........2030-06-26
+Status:.............Activ&eacute;
+Contact Type:.......[PRIVEE]
+Last Name:..........[PRIVEE]
+First Name:.........[PRIVEE]
+Address:............[PRIVEE]
+Tel:................[PRIVEE]
+Fax:................[PRIVEE]
+e-mail:.............[PRIVEE]
+Name Server (DB):...ns1.nic.tg
+Name Server (DB):...ns2.nic.tg
+
+----------------------------------------
+
+Domain:.............nic.tg
+Registrar:..........NETMASTER SARL
+Activation:.........2023-03-02
+Expiration:.........2030-06-26
+Status:.............Activ&eacute;
+Contact Type:.......[PRIVEE]
+Last Name:..........[PRIVEE]
+First Name:.........[PRIVEE]
+Address:............[PRIVEE]
+Tel:................[PRIVEE]
+Fax:................[PRIVEE]
+e-mail:.............[PRIVEE]
+Name Server (DB):...ns1.nic.tg
+Name Server (DB):...ns2.nic.tg
+
+----------------------------------------
+
+Domain:.............nic.tg
+Registrar:..........NETMASTER SARL
+Activation:.........2023-03-02
+Expiration:.........2030-06-26
+Status:.............Activ&eacute;
+Contact Type:.......[PRIVEE]
+Last Name:..........[PRIVEE]
+First Name:.........[PRIVEE]
+Address:............[PRIVEE]
+Tel:................[PRIVEE]
+Fax:................[PRIVEE]
+e-mail:.............[PRIVEE]
+Name Server (DB):...ns1.nic.tg
+Name Server (DB):...ns2.nic.tg
+
+----------------------------------------
+
+Domain:.............nic.tg
+Registrar:..........NETMASTER SARL
+Activation:.........2023-03-02
+Expiration:.........2030-06-26
+Status:.............Activ&eacute;
+Contact Type:.......[PRIVEE]
+Last Name:..........[PRIVEE]
+First Name:.........[PRIVEE]
+Address:............[PRIVEE]
+Tel:................[PRIVEE]
+Fax:................[PRIVEE]
+e-mail:.............[PRIVEE]
+Name Server (DB):...ns1.nic.tg
+Name Server (DB):...ns2.nic.tg
+
+----------------------------------------
+
+Domain:.............nic.tg
+Registrar:..........NETMASTER SARL
+Activation:.........2023-03-02
+Expiration:.........2030-06-26
+Status:.............Activ&eacute;
+Contact Type:.......[PRIVEE]
+Last Name:..........[PRIVEE]
+First Name:.........[PRIVEE]
+Address:............[PRIVEE]
+Tel:................[PRIVEE]
+Fax:................[PRIVEE]
+e-mail:.............[PRIVEE]
+Name Server (DB):...ns1.nic.tg
+Name Server (DB):...ns2.nic.tg
+

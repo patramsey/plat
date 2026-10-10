@@ -6,6 +6,21 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Data that WHOIS-only registries send but plat did not read, found by
+  a sweep of every country-code TLD:
+  - nameservers on `.aw`, `.bg`, `.bn`, `.dk`, `.rs`, `.sm`, `.sn` and
+    `.tg`;
+  - creation, update and expiry dates on `.am`, `.cl`, `.dk`, `.kz`,
+    `.lt`, `.sn` and `.tg`;
+  - the registrar on `.aw` and `.kz`, and the domain on `.sn`.
+- `.tg` values came out with their alignment dots
+  (`.............nic.tg`), and `.bg`'s domain with its other form
+  appended (`nic.bg (nic.bg)`).
+- `plat -q` printed a line starting `: ` for a record no source named the
+  domain in (`.cl`, whose WHOIS never echoes it); it now starts with the
+  name looked up.
+
 ## [0.12.2] - 2026-10-09
 
 Removes a false registrar conflict reported on every `.cz` lookup, reads

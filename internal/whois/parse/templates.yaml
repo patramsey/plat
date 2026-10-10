@@ -123,3 +123,73 @@ mq:
     # JWhoisServer: the domain block's "changed:" comes before any
     # contact block's, so the first one wins.
     changed: updated
+# From the 2026-10-10 ccTLD sweep: data these WHOIS-only registries send
+# that plat did not read.
+aw:
+  # SIDN's software, as .nl: indented sections.
+  format: indent
+bg:
+  format: kv
+  # "NAME SERVER INFORMATION:" then one host per line, some with glue.
+  headerBlocks: true
+  synonyms:
+    name server information: nameservers
+bn:
+  format: kv
+  # "Name Servers:" then one host per line.
+  headerBlocks: true
+sm:
+  format: kv
+  # "DNS Servers:" then one host per line. "Registration date:
+  # 07/03/2000" stays unparsed: day- or month-first, nothing says which.
+  headerBlocks: true
+  synonyms:
+    dns servers: nameservers
+rs:
+  format: kv
+  synonyms:
+    # "DNS: a.nic.rs - 91.199.17.59"
+    dns: nameservers
+sn:
+  format: kv
+  synonyms:
+    nom de domaine: domain
+    serveur de noms: nameservers
+    # The domain's comes first; contacts' follow.
+    dernière modification: updated
+dk:
+  format: kv
+  synonyms:
+    registered: created
+    # "Hostname:" appears only under "Nameservers".
+    hostname: nameservers
+lt:
+  format: kv
+  synonyms:
+    registered: created
+am:
+  format: kv
+  synonyms:
+    registered: created
+    last modified: updated
+kz:
+  format: kv
+  synonyms:
+    current registrar: registrar
+    last modified: updated
+  dateLayouts: ["2006-01-02 15:04:05 (GMT+0:00)"]
+cl:
+  format: kv
+  # NIC Chile labels every time CLST (UTC-3), winter dates included; read
+  # as the label says, "2030-02-08 21:00:00 CLST" is midnight UTC. A
+  # time labelled anything else stays unparsed.
+  dateLayouts: ["2006-01-02 15:04:05 CLST"]
+  timezone: Etc/GMT+3
+tg:
+  format: kv
+  # JWhoisServer pads values with dots: "Activation:.........2023-03-02".
+  paddedValues: true
+  synonyms:
+    activation: created
+    expiration: expires
+    name server (db): nameservers

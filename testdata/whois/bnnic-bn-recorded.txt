@@ -1,0 +1,57 @@
+% Recorded live from whois.bnnic.bn, query "nic.bn", 2026-10-10.
+
+----------------------------------------------------------------------  
+ BNNIC WHOIS Server
+---------------------------------------------------------------------- 
+
+The following data is provided for information purposes only.
+
+Registrar:   IMAGINE SDN BHD
+
+    Domain Name:		NIC.BN 
+    Creation Date:		20-Mar-2024 13:16:16
+    Modified Date:		02-Mar-2026 14:08:42
+    Expiration Date:		20-Mar-2027 13:16:16
+    Domain Status:		ok
+
+
+    Registrant:
+
+        Name:           ITENANCE ENTERPRISE (BNC1806T)
+        Email:          osverton@gmail.com
+        
+        
+
+
+    Administrative Contact:
+          
+        Name:           ITENANCE ENTERPRISE (BNC1806T)
+        Email:          osverton@gmail.com
+        
+        
+
+
+    Technical Contact:
+        
+        Name:           NETSER GROUP HOLDINGS LIMITED (BNC1960T)
+        Email:          whois@netser.com
+       
+        
+
+
+    Name Servers:
+        DILBERT.NS.CLOUDFLARE.COM  
+        ELAINE.NS.CLOUDFLARE.COM  
+
+
+
+
+
+
+
+
+
+
+
+
+
