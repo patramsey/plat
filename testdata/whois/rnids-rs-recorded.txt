@@ -1,0 +1,47 @@
+% Recorded live from whois.rnids.rs, query "nic.rs", 2026-10-10.
+
+% The data in the Whois database are provided by RNIDS
+% for information purposes only and to assist persons in obtaining
+% information about or related to a domain name registration record. 
+% Data in the database are created by registrants and we do not guarantee 
+% their accuracy. We reserve the right to remove access 
+% for entities abusing the data, without notice.
+% All timestamps are given in Serbian local time. 
+%
+Domain name: nic.rs
+Domain status: Active https://www.rnids.rs/en/domain-name-status-codes#Active
+Registration date: 10.03.2008 12:00:00
+Modification date: 17.03.2025 14:55:15
+Expiration date: 10.03.2108 12:00:00
+Confirmed: 10.03.2008 12:00:00
+Registrar: RNIDS
+
+
+Registrant: RNIDS
+Address: Žorža Klemansoa 18a, Beograd, Serbia
+Postal Code: 11000
+ID Number: 17680544
+Tax ID: 104852190
+
+Administrative contact: RNIDS
+Address: Žorža Klemansoa 18a, Beograd, Serbia
+Postal Code: 11000
+ID Number: 17680544
+Tax ID: 104852190
+
+Technical contact: RNIDS
+Address: Žorža Klemansoa 18a, Beograd, Serbia
+Postal Code: 11000
+ID Number: 17680544
+Tax ID: 104852190
+
+
+DNS: a.nic.rs - 91.199.17.59
+DNS: h.nic.rs - 91.199.17.60
+DNS: c.nic.rs - 45.142.220.81
+DNS: l.nic.rs - 194.146.106.114
+
+
+DNSSEC signed: yes
+
+Whois Timestamp: 10.10.2026 20:05:46

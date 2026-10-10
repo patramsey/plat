@@ -92,8 +92,11 @@ step 4).
 - **A layout the generic `key: value` reader can't follow** (indented
   sections, `[bracketed]` keys): give the TLD a `format:` in
   `templates.yaml`. Every `templates.yaml` entry is data, not code.
-  Three more options there: `continuationLines` for values carried on
-  indented lines with no key (`.pl`'s nameservers), `dateLayouts`
+  More options there: `continuationLines` for values carried on
+  indented lines with no key (`.pl`'s nameservers), `headerBlocks` for
+  a list under a key with no value, running to the next blank line
+  (`.bg`, `.bn`, `.sm`), `paddedValues` for values padded with leading
+  dots (`.tg`), `dateLayouts`
   for a date format that would be ambiguous anywhere else (`.il`'s
   day-first dates), and `timezone` for a registry that writes local
   time with no offset (`.pl`, `.cz`) -- confirm the zone against the

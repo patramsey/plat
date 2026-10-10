@@ -840,7 +840,7 @@ func lookupOneDomain(ctx context.Context, stdout, stderr io.Writer, client *plat
 			}
 			return dcode
 		}
-		if err := renderRecord(stdout, format, record, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
+		if err := renderRecord(stdout, format, record, q.Name.Unicode, opts.Raw, opts.Verbose, opts.ShowConflicts, opts.Quiet, ui); err != nil {
 			reportLookupError(stderr, format, q.Name.Punycode, err, record.Sources, opts.Verbose, ui, ui.NotQueried, ui.NotQueriedReason)
 			return 3
 		}
@@ -1040,14 +1040,19 @@ func lookupOutcomeError(code int, sources []model.SourceResult, filtered bool) e
 	return fmt.Errorf("lookup inconclusive -- %d of %d sources failed, so non-existence can't be confirmed (checked: %s)", failed, len(usable), checked)
 }
 
-func renderRecord(w io.Writer, format render.Format, record model.Record, raw, verbose, showConflicts, quiet bool, ui uiConfig) error {
+// name is the queried name, which the quiet line falls back to when no
+// source echoed the domain (.cl's WHOIS never does).
+func renderRecord(w io.Writer, format render.Format, record model.Record, name string, raw, verbose, showConflicts, quiet bool, ui uiConfig) error {
 	if quiet && !render.IsMachine(format) {
+		if record.Domain.Value != "" {
+			name = record.Domain.Value
+		}
 		summary := human.QuietSummary(record)
 		if summary == "" {
-			_, err := fmt.Fprintln(w, record.Domain.Value)
+			_, err := fmt.Fprintln(w, name)
 			return err
 		}
-		_, err := fmt.Fprintf(w, "%s: %s\n", record.Domain.Value, summary)
+		_, err := fmt.Fprintf(w, "%s: %s\n", name, summary)
 		return err
 	}
 	switch format {

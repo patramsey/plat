@@ -1,0 +1,80 @@
+% Recorded live from whois.nic.sn, query "nic.sn", 2026-10-10.
+============================================================================
+Whois du Registre .SN
+Les informations fournies par ce service ne sont qu'à titre informatif.
+
+Les données collectées via le formulaire d'enregistrement sont traitées exclusivement à des fins liées au traitement des domaines conformément à la RFC 3912 par le NIC Sénégal.
+
+En application des dispositions de la loi n°2008-12 du 25 janvier 2008 portant sur la protection des données à caractère personnel, vous pouvez exercer vos droits d'accès, d'opposition, de rectification et de suppression auprès du NIC Sénégal - abuse(at)nic.sn.
+============================================================================
+
+Domain ID:                     DOM000000000002-SN
+Nom de domaine:                nic.sn
+Date de création:              1998-01-01T00:00:00Z
+Dernière modification:         2026-07-27T12:31:46.863588Z
+Date d'expiration:             2026-12-31T00:00:00Z
+Registrar:                     Registry Operations
+Statut:                        actif
+
+[TECH_C]
+ID Contact:                    NICS100
+Type:                          Organisation
+Nom:                           Network Information Center Sénégal
+Adresse:                       Cité Universitaire UCAD 3,Université Cheikh Anta Diop
+Code postal:                   00000
+Ville:                         Dakar
+Pays:                          SN
+Téléphone:                     +221.338219190
+Fax:                           +221.338219190
+Courriel:                      nic@nic.sn
+Dernière modification:         2018-12-24T16:21:47Z
+
+[BILLING_C]
+ID Contact:                    NICS100
+Type:                          Organisation
+Nom:                           Network Information Center Sénégal
+Adresse:                       Cité Universitaire UCAD 3,Université Cheikh Anta Diop
+Code postal:                   00000
+Ville:                         Dakar
+Pays:                          SN
+Téléphone:                     +221.338219190
+Fax:                           +221.338219190
+Courriel:                      nic@nic.sn
+Dernière modification:         2018-12-24T16:21:47Z
+
+[HOLDER]
+ID Contact:                    NICS100
+Type:                          Organisation
+Nom:                           Network Information Center Sénégal
+Adresse:                       Cité Universitaire UCAD 3,Université Cheikh Anta Diop
+Code postal:                   00000
+Ville:                         Dakar
+Pays:                          SN
+Téléphone:                     +221.338219190
+Fax:                           +221.338219190
+Courriel:                      nic@nic.sn
+Dernière modification:         2018-12-24T16:21:47Z
+
+[ADMIN_C]
+ID Contact:                    NICS100
+Type:                          Organisation
+Nom:                           Network Information Center Sénégal
+Adresse:                       Cité Universitaire UCAD 3,Université Cheikh Anta Diop
+Code postal:                   00000
+Ville:                         Dakar
+Pays:                          SN
+Téléphone:                     +221.338219190
+Fax:                           +221.338219190
+Courriel:                      nic@nic.sn
+Dernière modification:         2018-12-24T16:21:47Z
+
+Serveur de noms:               ns.nic.sn
+Serveur de noms:               ns1.nic.fr
+Serveur de noms:               ns2.nic.fr
+Serveur de noms:               ns3.nic.fr
+Serveur de noms:               ns7.ext.nic.fr
+
+DNSSEC:                        signedDelegation
+
+>>> Last update of WHOIS database: 2026-10-10T18:05:48.726335Z <<<
+

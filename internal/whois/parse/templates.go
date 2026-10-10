@@ -33,6 +33,11 @@ type Template struct {
 	// ContinuationLines makes the kv tokenizer read an indented line as
 	// another value for the key above it (see tokenizeKV).
 	ContinuationLines bool `yaml:"continuationLines"`
+	// HeaderBlocks makes a key with no value head a list that runs to the
+	// next blank line, and PaddedValues strips a value's leading dots
+	// (see tokenizeKV).
+	HeaderBlocks bool `yaml:"headerBlocks"`
+	PaddedValues bool `yaml:"paddedValues"`
 	// Timezone is the IANA zone a registry writes its times of day in
 	// when it gives no offset: NASK's "2002.09.19 13:00:00" is 11:00 UTC.
 	// Unset means UTC. A bare date is never shifted (see parseDateIn).

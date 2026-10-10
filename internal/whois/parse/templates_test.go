@@ -46,6 +46,18 @@ var templateManifest = []struct {
 	{tld: "ve", fixture: "nic-ve-recorded.txt", wantDomain: "nic.ve", wantNSCount: 4},
 	{tld: "ee", fixture: "tld-ee-recorded.txt", wantDomain: "nic.ee", wantNSCount: 3},
 	{tld: "ua", fixture: "hostmaster-ua-recorded.txt", wantDomain: "nic.ua", wantNSCount: 2},
+	{tld: "aw", fixture: "setar-aw-recorded.txt", wantDomain: "nic.aw", wantNSCount: 3},
+	{tld: "bg", fixture: "register-bg-recorded.txt", wantDomain: "nic.bg", wantNSCount: 7},
+	{tld: "bn", fixture: "bnnic-bn-recorded.txt", wantDomain: "NIC.BN", wantNSCount: 2},
+	{tld: "sm", fixture: "nic-sm-recorded.txt", wantDomain: "nic.sm", wantNSCount: 2},
+	{tld: "rs", fixture: "rnids-rs-recorded.txt", wantDomain: "nic.rs", wantNSCount: 4},
+	{tld: "sn", fixture: "nic-sn-recorded.txt", wantDomain: "nic.sn", wantNSCount: 5},
+	{tld: "dk", fixture: "punktum-dk-recorded.txt", wantDomain: "nic.dk", wantNSCount: 6},
+	{tld: "lt", fixture: "domreg-lt-recorded.txt", wantDomain: "nic.lt", wantNSCount: 3},
+	{tld: "am", fixture: "amnic-am-recorded.txt", wantDomain: "nic.am", wantNSCount: 0},
+	{tld: "kz", fixture: "kaznic-kz-recorded.txt", wantDomain: "nic.kz", wantNSCount: 3},
+	{tld: "cl", fixture: "nic-cl-recorded.txt", wantDomain: "", wantNSCount: 4},
+	{tld: "tg", fixture: "jwhois-tg-recorded.txt", wantDomain: "nic.tg", wantNSCount: 2},
 }
 
 func TestTemplateManifest_EveryRegisteredTemplateHasAFixture(t *testing.T) {
