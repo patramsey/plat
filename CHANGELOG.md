@@ -6,6 +6,14 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-10
+
+Fixes from a sweep of every country-code TLD: wrong creation dates on
+seven registries, false registrar and phone conflicts, and nameservers
+and dates that a dozen WHOIS-only registries send but plat did not
+read. A minor release because a free `.nl` or `.aw` name looked up
+over WHOIS now exits 1 instead of 3.
+
 ### Changed
 - **Breaking (exit code):** a free `.nl` or `.aw` name looked up over
   WHOIS alone -- `.aw` has no RDAP, and `.nl` falls back to WHOIS when
@@ -734,7 +742,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.12.2...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/patramsey/plat/compare/v0.12.2...v0.13.0
 [0.12.2]: https://github.com/patramsey/plat/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/patramsey/plat/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/patramsey/plat/compare/v0.11.0...v0.12.0
