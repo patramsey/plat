@@ -36,6 +36,9 @@ func TestParse_CCTLDNotFoundWordings(t *testing.T) {
 		"twnic-tw-notfound-recorded.txt",    // No Found
 		"ws-notfound-recorded.txt",          // The queried object does not exist: <name>.
 		"nicbo-bo-notfound-recorded.txt",    // .bo footer and nothing else (#116)
+		// From the 2026-10-10 sweep: "<name> is free".
+		"sidn-nl-notfound-recorded.txt",
+		"setar-aw-notfound-recorded.txt",
 	} {
 		t.Run(fixture, func(t *testing.T) {
 			f := Parse(loadFixture(t, fixture), "")
