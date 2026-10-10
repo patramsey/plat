@@ -241,9 +241,13 @@ func normalizeURL(s string) string {
 // written with no "+" and no leading 0 ("480-624-2505") is taken as North
 // American and gains its country code; a national number with a leading
 // 0 cannot be matched without knowing its country, so it stays distinct
-// (#123).
+// (#123). An international number's "(0)", the trunk prefix dialled
+// only from inside the country ("+61 (0)8 6102 7988", .cx), is dropped.
 func normalizePhone(s string) string {
 	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "+") {
+		s = strings.Replace(s, "(0)", "", 1)
+	}
 	var digits strings.Builder
 	for _, r := range s {
 		if r >= '0' && r <= '9' {

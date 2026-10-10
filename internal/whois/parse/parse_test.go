@@ -654,11 +654,17 @@ func TestParse_UKNoRegistrarListedIsAbsent(t *testing.T) {
 	}
 }
 
-// CZ.NIC's "registrar:" is a handle (REG-SEZNAM), which RDAP does not
-// give as a name, so every .cz lookup reported a registrar conflict.
-func TestParse_CZRegistrarHandleIsNotAName(t *testing.T) {
-	for _, fixture := range []string{"cznic-cz-recorded.txt", "cznic-cz-seznam-recorded.txt"} {
-		if f := Parse(loadFixture(t, fixture), "cz"); f.Registrar != "" {
+// A "registrar:" line that is a handle (REG-SEZNAM, ua.nic), which RDAP
+// gives as a handle or beside a name, so every .cz and .ua lookup
+// reported a registrar conflict. FRED's other registries and NIC
+// Argentina write the same.
+func TestParse_RegistrarHandleIsNotAName(t *testing.T) {
+	for fixture, tld := range map[string]string{
+		"cznic-cz-recorded.txt": "cz", "cznic-cz-seznam-recorded.txt": "cz",
+		"hostmaster-ua-recorded.txt": "ua", "nic-cr-recorded.txt": "cr", "tznic-tz-recorded.txt": "tz",
+		"nicar-ar-recorded.txt": "ar",
+	} {
+		if f := Parse(loadFixture(t, fixture), tld); f.Registrar != "" {
 			t.Errorf("%s: Registrar = %q, want none", fixture, f.Registrar)
 		}
 	}
@@ -680,7 +686,7 @@ func TestParse_MultiObjectResponseKeepsTheDomainsOwnValues(t *testing.T) {
 	}{
 		{
 			// .cz's registrar line is a handle and is not read at all;
-			// see TestParse_CZRegistrarHandleIsNotAName.
+			// see TestParse_RegistrarHandleIsNotAName.
 			fixture: "cznic-cz-seznam-recorded.txt", tld: "cz",
 			created: date{"07.10.1996 02:00:00", true},
 			updated: date{"05.09.2022 14:21:11", true},

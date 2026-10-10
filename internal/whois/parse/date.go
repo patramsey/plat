@@ -49,6 +49,10 @@ var dateLayouts = []string{
 	// requires "+00:00", so time.Parse rejects it and no other layout
 	// matches.
 	"2006-01-02T15:04:05-0700",
+	// An offset after a space (.ee, "2010-07-04 04:21:15 +03:00") or
+	// hours only (.ua, "2007-10-04 13:40:19+03"). Both name their zone.
+	"2006-01-02 15:04:05 -07:00",
+	"2006-01-02 15:04:05-07",
 	// .kr, spaces and a trailing dot ("1996. 07. 20.").
 	"2006. 01. 02.",
 	// The rewritten form of a JPRS "(JST)"-suffixed timestamp; see

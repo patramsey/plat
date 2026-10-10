@@ -6,6 +6,23 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Wrong creation dates on `.ar`, `.cr`, `.ls`, `.mk`, `.mw`, `.tz` and
+  `.ve`: these registries call the domain's creation `registered:`, and
+  plat read the `created:` line of a contact listed after it instead
+  (`nic.cr` showed 2024 rather than 1995; `nic.mk` showed `DATA
+  REDACTED`). Their last-updated dates are now read too, `.cr` and `.tz`
+  times in local time, and `.at` and `.ee` creation dates, which were
+  missing.
+- `.ee` and `.ua` dates with an offset written as `+03:00` after a space
+  or as `+03` were not parsed.
+- False registrar conflicts on `.ua` (WHOIS gives the registrar's handle,
+  like `.cz`), `.si` (the registry's RDAP repeats `fn`, and its second
+  value is the word `org`) and `.uz` (RDAP's `fn` is a person, its `org`
+  the registrar). A registrar's RDAP name is now its `org` when given.
+- A false abuse-phone conflict when one source writes the trunk prefix:
+  `+61 (0)8 6102 7988` and `+61.861027988` are one number.
+
 ## [0.12.2] - 2026-10-09
 
 Removes a false registrar conflict reported on every `.cz` lookup, reads

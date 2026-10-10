@@ -1,0 +1,79 @@
+% Recorded live from whois.nic.mw, query "nic.mw", 2026-10-10.
+% Domain Information over Whois protocol
+% 
+% Whoisd Server Version: 3.9.0
+% Timestamp: Sat Oct 10 20:00:58 2026
+
+domain:       nic.mw
+registrant:   NIC-MW-REG
+admin-c:      SDNP-ORG-MW-ADMINI
+admin-c:      SDNP-ORG-MW-BILLING
+nsset:        NIC-MW-NS
+registrar:    mw_system_reg
+registered:   17.09.2014 11:26:09
+changed:      30.09.2019 13:53:30
+expire:       17.12.2027
+
+contact:      NIC-MW-REG
+org:          P/Bag 303 Blantyre 3
+name:         Malawi SDNP
+address:      --
+address:      -
+address:      -
+address:      MW
+e-mail:       mwsdnptech@sdnp.org.mw
+registrar:    mw_system_reg
+created:      10.12.2014 10:25:24
+
+contact:      SDNP-ORG-MW-ADMINI
+org:          MALAWI SDNP
+name:         Dr. Paulos B. Nyirenda
+address:      street
+address:      Blantyre
+address:      Box 31762 BT3
+address:      MW
+phone:        +265.1874979
+fax-no:       +265.1873944
+e-mail:       paulos@sdnp.org.mw
+registrar:    mw_system_reg
+created:      17.09.2014 11:12:42
+changed:      17.09.2014 11:14:13
+
+contact:      SDNP-ORG-MW-BILLING
+org:          MALAWI SDNP
+name:         SDNP Accontant
+address:      street
+address:      Blantyre
+address:      Box 31762 BT3
+address:      MW
+phone:        +265.1874979
+fax-no:       +265.1873944
+e-mail:       accountant@sdnp.org.mw
+registrar:    mw_system_reg
+created:      17.09.2014 10:54:53
+changed:      08.06.2017 19:28:04
+
+nsset:        NIC-MW-NS
+nserver:      chambo.sdnp.org.mw 
+nserver:      domwe.sdn.mw 
+nserver:      domwe.nic.mw 
+nserver:      rip.psg.com 
+tech-c:       SDNP-ORG-MW-TECH
+registrar:    mw_system_reg
+created:      30.09.2019 13:51:36
+
+contact:      SDNP-ORG-MW-TECH
+org:          MALAWI SDNP
+name:         SDNP Information Specialist
+address:      street
+address:      Blantyre
+address:      Box 31762 BT3
+address:      MW
+phone:        +265.1874979
+fax-no:       +265.1873944
+e-mail:       mwsdnptech@sdnp.org.mw
+registrar:    mw_system_reg
+created:      17.09.2014 10:55:41
+changed:      06.12.2019 13:22:28
+
+

@@ -1164,6 +1164,7 @@ func TestComparisonKey_URLAndPhoneFormatting(t *testing.T) {
 		{model.FieldRegistrarAbusePhone, "+1.6502620100", "+16502620100"},
 		{model.FieldRegistrarAbusePhone, "+44.2074218250", "+442074218250"},
 		{model.FieldOrgAbusePhone, "+1-650-253-0000", "+1.6502530000"},
+		{model.FieldRegistrarAbusePhone, "+61.861027988", "+61 (0)8 6102 7988"},
 	}
 	for _, c := range same {
 		if comparisonKey(c.field, c.a) != comparisonKey(c.field, c.b) {
@@ -1177,6 +1178,7 @@ func TestComparisonKey_URLAndPhoneFormatting(t *testing.T) {
 		{model.FieldRegistrarAbusePhone, "+1.4153197517", "+1.6503198930"},
 		{model.FieldRegistrarAbusePhone, "+1.7203101849", "7202492374"},
 		{model.FieldRegistrarAbusePhone, "+44.2074218250", "02074218250"},
+		{model.FieldRegistrarAbusePhone, "+44.2074218250", "(0)2074218250"},
 	}
 	for _, c := range differ {
 		if comparisonKey(c.field, c.a) == comparisonKey(c.field, c.b) {
