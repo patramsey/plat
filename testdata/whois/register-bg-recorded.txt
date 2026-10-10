@@ -1,0 +1,22 @@
+% Recorded live from whois.register.bg, query "nic.bg", 2026-10-10.
+DOMAIN NAME: nic.bg (nic.bg)
+registration status: busy, active
+
+NAME SERVER INFORMATION:
+ns.digsys.bg 
+ns2.digsys.bg 
+a.nic.bg 192.92.129.99 2a02:6a80::192:92:129:99 
+b.nic.bg 193.68.3.232 2a02:6a80::193:68:3:232 
+c.nic.bg 193.68.99.99 2a02:6a80::193:68:99:99 
+d.nic.bg 194.0.32.1 2001:678:3c::1 
+e.nic.bg 185.143.80.1 2a02:6a80:530e::1 
+
+DNSSEC: active
+
+According to REGULATION (EU) 2016/679 OF THE EUROPEAN PARLIAMENT AND
+OF THE COUNCIL (GDPR) personal data is not published.
+
+If you would like to contact the persons responsible for the domain
+name, please, use the online WHOIS contact form from the "Info / Whois" menu
+at www.register.bg.
+
