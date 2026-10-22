@@ -6,6 +6,13 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- Release binaries are now built with the latest Go 1.27 patch release.
+  v0.13.0 was built with go1.26.8, which predates the `crypto/tls`,
+  `net/http` and `crypto/x509` security fixes in go1.26.9 and go1.26.10;
+  the release workflow used whichever Go the build machine had cached.
+  The module still requires only Go 1.26.
+
 ## [0.13.0] - 2026-10-10
 
 Fixes from a sweep of every country-code TLD: wrong creation dates on
