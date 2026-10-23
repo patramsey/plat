@@ -6,6 +6,12 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-10-22
+
+Rebuilds the release binaries with Go 1.27.3: v0.13.0's were built with
+a Go release missing current TLS and certificate-verification security
+fixes. No change to plat's behaviour.
+
 ### Security
 - Release binaries are now built with the latest Go 1.27 patch release.
   v0.13.0 was built with go1.26.8, which predates the `crypto/tls`,
@@ -749,7 +755,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/patramsey/plat/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/patramsey/plat/compare/v0.12.2...v0.13.0
 [0.12.2]: https://github.com/patramsey/plat/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/patramsey/plat/compare/v0.12.0...v0.12.1
