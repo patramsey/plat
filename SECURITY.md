@@ -2,9 +2,8 @@
 
 ## Supported Versions
 
-`plat` is pre-1.0 (currently in the `0.1.x` series). Only the latest
-released version is supported — there's no parallel maintenance of older
-minor versions at this stage.
+`plat` is pre-1.0. Only the latest release is supported: fixes ship in a
+new release rather than being backported to older ones.
 
 ## Reporting a Vulnerability
 

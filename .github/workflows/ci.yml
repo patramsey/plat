@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+# lint, test and every build job are required checks in the "protect main"
+# ruleset, matched by job name (as is vulncheck.yml's govulncheck).
+# Renaming, removing or adding one means updating the ruleset in the same
+# change, or every PR waits on a check that never reports.
 jobs:
   lint:
     runs-on: ubuntu-latest
