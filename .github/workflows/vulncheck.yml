@@ -1,0 +1,30 @@
+name: Vulncheck
+
+# Separate from ci.yml so the weekly run doesn't repeat lint, test and the
+# build matrix. The schedule is the point: a vulnerability is published
+# against code that hasn't changed, and a PR-only check would not see it
+# until the next PR.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # check-latest: govulncheck reports standard-library vulnerabilities
+      # for the Go running it, so a stale cached patch would report those
+      # rather than plat's own.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27"
+          check-latest: true
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
