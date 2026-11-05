@@ -29,7 +29,8 @@ go test -race ./...
 All of these must be clean. CI runs the same checks (`lint`, `test -race`,
 and a 6-platform `build` matrix) on every pull request, and fails if
 whole-project coverage drops below 90%. A separate `govulncheck` job runs
-on every pull request and weekly. Codecov also checks that the
+on every pull request and weekly. All of these must pass before a PR
+can merge. Codecov also checks that the
 lines a PR changes are at least 90% covered.
 
 Live/integration tests that hit real WHOIS/RDAP infrastructure are opt-in
