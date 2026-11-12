@@ -6,6 +6,14 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-12
+
+Fixes a server-side request forgery in referral chasing
+(GHSA-8q76-8r67-p8g8): a WHOIS or RDAP answer could make plat connect to
+any host and port the machine running it can reach. Upgrade if you embed
+plat in a service. Adds `Options.Dial`, so embedders can control every
+WHOIS connection.
+
 ### Security
 - WHOIS referrals and the registrar RDAP link could make plat connect to
   any host and port reachable from the machine running it
@@ -801,7 +809,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.13.2...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/patramsey/plat/compare/v0.13.2...v0.14.0
 [0.13.2]: https://github.com/patramsey/plat/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/patramsey/plat/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/patramsey/plat/compare/v0.12.2...v0.13.0
