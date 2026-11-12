@@ -56,6 +56,32 @@ type Options struct {
 	// New performs to load RDAP base URLs. nil means http.DefaultClient.
 	// Exposed so an embedding library can route plat's every outbound request
 	// through a caller-supplied transport, for a proxy or for instrumentation.
+	//
+	// A caller's client keeps its own TLS policy, so it does not get the
+	// fallback plat's default client uses for the twelve RDAP servers that
+	// offer only RSA key exchange (rdap.nic.cat, rdap.nic.eus, and others),
+	// which Go leaves out of its defaults. With such a client, those
+	// lookups lose registry RDAP: the source fails its handshake, and the
+	// lookup succeeds on WHOIS alone with no error, so the loss shows only
+	// in the record's Sources. To reach them, add the RSA suites after Go's
+	// defaults in the transport's TLS config:
+	//
+	//	var suites []uint16
+	//	for _, s := range tls.CipherSuites() {
+	//		suites = append(suites, s.ID)
+	//	}
+	//	cfg.CipherSuites = append(suites,
+	//		tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+	//		tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+	//		tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+	//		tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+	//	)
+	//
+	// Unlike plat's own fallback, which uses these suites only for a host
+	// that has failed without them, this offers them to every server the
+	// client reaches. They come last in its preference order, and TLS 1.3
+	// connections ignore them, but in TLS 1.2 the server makes the final
+	// choice of suite.
 	HTTPClient *http.Client
 	// Resolver supplies RDAP base URLs. nil means load IANA's published
 	// bootstrap data, which is what almost every caller wants. Set it to
