@@ -418,7 +418,11 @@ if err != nil {
 }
 
 res, err := c.Lookup(ctx, "example.com")
-if err != nil {
+switch {
+case errors.Is(err, plat.ErrNotFound):
+	fmt.Println("not registered") // an answer, not a failure
+	return
+case err != nil:
 	log.Fatal(err)
 }
 
@@ -431,6 +435,12 @@ only useful if kept around. Every field on the result types is a
 `Field[T]` carrying both the merged value and which sources supplied it,
 same as the CLI's output; a source failing is normal, not an error, as
 long as at least one source returns data.
+
+If you pass your own `Options.HTTPClient` (for a proxy or tracing), it
+keeps its own TLS policy and so misses the fallback plat uses for the
+twelve RDAP servers that offer only RSA key exchange (`rdap.nic.cat` and
+others): those lookups quietly fall back to WHOIS. The field's
+documentation shows the TLS setting that reaches them.
 
 `Record`, `IPRecord`, `ASNRecord`, `Field[T]`, and the other data types
 are defined in [`github.com/patramsey/plat/model`](https://pkg.go.dev/github.com/patramsey/plat/model)
