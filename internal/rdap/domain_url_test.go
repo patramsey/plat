@@ -2,6 +2,7 @@ package rdap
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,7 +21,9 @@ func TestDomainURL_HappyPath(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := &Client{}
+	// A caller's own client: plat's default refuses a registrar link to
+	// loopback, which is where httptest listens.
+	c := &Client{HTTP: srv.Client()}
 	result, err := c.DomainURL(context.Background(), srv.URL+"/rdap/domain/EXAMPLE.COM")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -38,10 +41,10 @@ func TestDomainURL_NotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := &Client{}
+	c := &Client{HTTP: srv.Client()}
 	_, err := c.DomainURL(context.Background(), srv.URL+"/rdap/domain/nonexistent.example.com")
-	if err == nil {
-		t.Fatal("expected an error")
+	if !errors.Is(err, ErrDomainNotFound) {
+		t.Fatalf("err = %v, want ErrDomainNotFound", err)
 	}
 }
 

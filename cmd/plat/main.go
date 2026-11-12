@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/netip"
 	"os"
 	"runtime"
@@ -350,6 +351,11 @@ type lookupOptions struct {
 	// the per-server WHOIS pacing limiter and IANA referral cache the pool
 	// used to carry here now live on that client.
 	whoisIANAServer string
+	// whoisDial is plat.Options.Dial for this package's tests: their
+	// answers refer to names a fake dialer maps onto local listeners,
+	// since plat refuses a referral by port or to a loopback address.
+	// Unexported and nil outside those tests.
+	whoisDial func(ctx context.Context, network, addr string) (net.Conn, error)
 	// SuppressSpinner disables the three per-name spinners in lookupOne's
 	// domain/IP/ASN branches. Set by runLookupPool when it is driving its
 	// own progress counter over the same stderr line -- without this, a
@@ -459,6 +465,7 @@ func runLookup(ctx context.Context, stdout, stderr io.Writer, domains []string, 
 		NoFollow:           opts.NoFollow,
 		RefreshBootstrap:   opts.RefreshBootstrap,
 		WHOISIANAServer:    opts.whoisIANAServer,
+		Dial:               opts.whoisDial,
 		DisableWHOISPacing: len(domains) == 1,
 	})
 	// plat.New's only failure mode is loading the IANA RDAP bootstrap

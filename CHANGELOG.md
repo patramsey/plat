@@ -6,6 +6,37 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- WHOIS referrals and the registrar RDAP link could make plat connect to
+  any host and port reachable from the machine running it
+  ([GHSA-8q76-8r67-p8g8](https://github.com/patramsey/plat/security/advisories/GHSA-8q76-8r67-p8g8)).
+  A WHOIS answer names the next server to query, and plat dialled it as
+  given, `host:port` included, so whoever wrote the answer -- a registry,
+  a registrar, or anyone on the path of plaintext WHOIS -- chose where it
+  connected, and parts of the reply came back in the result. Now:
+  - a referral (IANA's `refer:`, a registry's `Registrar WHOIS Server:`,
+    RDAP's `port43`) is followed only on port 43;
+  - with plat's own dialer and HTTP client, a referral that resolves to a
+    loopback, private, link-local or other non-public address is refused.
+    That covers WHOIS, the registrar RDAP link and its redirects, and,
+    when RDAP servers come from IANA's bootstrap data, every RDAP request,
+    so a registry cannot redirect plat onto your network either;
+  - servers you configure (`Options.WHOISIANAServer`, an
+    `Options.Resolver` mirror) are not restricted.
+
+  No real referral is affected. The WHOIS server IANA lists for every
+  country-code TLD (183 servers) and every RDAP server in IANA's
+  bootstrap data (384 hosts) is on port 43 or HTTPS and resolves only to
+  public addresses. A refused referral shows in `-v` as a failed source
+  with the reason.
+
+### Added
+- `Options.Dial` opens every WHOIS connection, as `Options.HTTPClient`
+  already does for RDAP, so a program embedding plat can route WHOIS
+  through a proxy or apply its own address policy. A caller's `Dial` or
+  `HTTPClient` replaces plat's non-public-address check; the port-43 rule
+  applies either way.
+
 ## [0.13.2] - 2026-11-11
 
 Rebuilds the release binaries with Go 1.27.4. No change to plat's

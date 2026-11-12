@@ -48,7 +48,7 @@ func CollectASN(ctx context.Context, asn uint32, baseURL, whoisIANAServer string
 }
 
 func collectASNRDAP(ctx context.Context, asn uint32, baseURL string, opts Options) []source.ASNSourceRecord {
-	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient}
+	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient, GuardAll: opts.GuardRDAP}
 	start := time.Now()
 	result, err := rdapClient.ASN(ctx, baseURL, asn)
 
@@ -80,7 +80,7 @@ func collectASNWHOIS(ctx context.Context, asn uint32, whoisIANAServer string, op
 	// ChainTimeout rather than a context.WithTimeout wrap here: a pacing
 	// wait must not be charged against the same budget as the actual
 	// network hops.
-	whoisClient := &whois.Client{Timeout: timeout, ChainTimeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter}
+	whoisClient := &whois.Client{Timeout: timeout, ChainTimeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter, Dial: opts.Dial}
 	result, _ := whoisClient.LookupASN(ctx, asn)
 	return fromASNWHOIS(result)
 }

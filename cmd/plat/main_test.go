@@ -1504,7 +1504,7 @@ func TestRunLookupPool_BoundsRealLookupOneConcurrency(t *testing.T) {
 	}
 
 	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
-	opts := lookupOptions{NoFollow: true, Concurrency: concurrency}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, NoFollow: true, Concurrency: concurrency}
 	sources := []model.SourceID{model.SourceRegistryRDAP}
 	client := newTestClient(t, resolver, opts, sources)
 	var stdout, stderr bytes.Buffer
@@ -1558,7 +1558,7 @@ func twoNameRDAPFixtureClient(t *testing.T, opts lookupOptions) (*plat.Client, [
 // the actual line structure, which does discriminate (see task-9-report.md
 // for the captured before/after run).
 func TestQuietMultiNameIsNotDoubleSpaced(t *testing.T) {
-	opts := lookupOptions{NoFollow: true, Concurrency: 2, Quiet: true}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, NoFollow: true, Concurrency: 2, Quiet: true}
 	client, domains := twoNameRDAPFixtureClient(t, opts)
 
 	var stdout, stderr bytes.Buffer
@@ -1585,7 +1585,7 @@ func TestQuietMultiNameIsNotDoubleSpaced(t *testing.T) {
 // even after the production fix -- there was nothing between two empty
 // buffers to separate.
 func TestNonQuietMultiNameKeepsItsSeparator(t *testing.T) {
-	opts := lookupOptions{NoFollow: true, Concurrency: 2}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, NoFollow: true, Concurrency: 2}
 	client, domains := twoNameRDAPFixtureClient(t, opts)
 
 	var stdout, stderr bytes.Buffer
@@ -1609,7 +1609,7 @@ func TestRunLookup_ConcurrencyMustBeAtLeastOne(t *testing.T) {
 	for _, c := range []int{0, -1, -5} {
 		t.Run(fmt.Sprintf("concurrency=%d", c), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			err := runLookup(context.Background(), &stdout, &stderr, []string{"example.com"}, lookupOptions{Concurrency: c}, uiConfig{})
+			err := runLookup(context.Background(), &stdout, &stderr, []string{"example.com"}, lookupOptions{whoisDial: fakeWHOIS.Dial, Concurrency: c}, uiConfig{})
 			var uErr usageError
 			if !errors.As(err, &uErr) {
 				t.Fatalf("runLookup with --concurrency %d returned %v (%T), want a usageError", c, err, err)
@@ -1636,7 +1636,7 @@ func TestRunLookup_ConcurrencyMustBeAtLeastOne(t *testing.T) {
 // 0 or negative.
 func TestRunLookup_ConcurrencyOneIsValid(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	err := runLookup(context.Background(), &stdout, &stderr, []string{"also-bad"}, lookupOptions{Concurrency: 1, Timeout: 10 * time.Millisecond}, uiConfig{})
+	err := runLookup(context.Background(), &stdout, &stderr, []string{"also-bad"}, lookupOptions{whoisDial: fakeWHOIS.Dial, Concurrency: 1, Timeout: 10 * time.Millisecond}, uiConfig{})
 	var uErr usageError
 	if errors.As(err, &uErr) && strings.Contains(uErr.Error(), "--concurrency") {
 		t.Errorf("runLookup with --concurrency 1 was rejected as a usage error: %v", err)
@@ -1723,7 +1723,7 @@ func TestRunLookup_EndToEnd_EmitsInInputOrder(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial,
 		whoisIANAServer: ianaAddr,
 		NoFollow:        true,
 		Concurrency:     2, // must be >= 2 for the two lookups to genuinely overlap
@@ -1772,7 +1772,7 @@ func TestRunLookup_FileAndPositionalAreSourceIndependent(t *testing.T) {
 		return "refer: " + registryAddr + "\n"
 	})
 
-	baseOpts := lookupOptions{
+	baseOpts := lookupOptions{whoisDial: fakeWHOIS.Dial,
 		whoisIANAServer: ianaAddr,
 		NoFollow:        true,
 		SourceFilter:    "whois",
@@ -1853,7 +1853,7 @@ func TestRunLookupPool_FailingNameDoesNotAbortSurvivors(t *testing.T) {
 	resolver := bootstrap.NewResolver(map[string]string{})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true, Concurrency: 2}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr, NoFollow: true, Concurrency: 2}
 	client := newTestClient(t, resolver, opts, nil)
 	err := runLookupPool(context.Background(), &stdout, &stderr, []string{"also-bad", "good.com"}, opts, render.FormatPlain, uiConfig{}, client)
 
@@ -1886,7 +1886,7 @@ func TestRunLookup_FileDashReadsFromStdin(t *testing.T) {
 	t.Cleanup(func() { stdin = old })
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	err := runLookup(context.Background(), &stdoutBuf, &stderrBuf, nil, lookupOptions{
+	err := runLookup(context.Background(), &stdoutBuf, &stderrBuf, nil, lookupOptions{whoisDial: fakeWHOIS.Dial,
 		FilePath:        "-",
 		whoisIANAServer: ianaAddr,
 		NoFollow:        true,
@@ -1931,7 +1931,7 @@ func TestRunLookup_FileDashReadsFromStdin(t *testing.T) {
 func TestRunLookup_CounterBranch_ConcurrentWithErrorDoesNotRace(t *testing.T) {
 	resolver := bootstrap.NewResolver(map[string]string{})
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{Concurrency: 2}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, Concurrency: 2}
 
 	client := newTestClient(t, resolver, opts, nil)
 	err := runLookupPool(context.Background(), &stdout, &stderr,
@@ -1977,7 +1977,7 @@ func TestRunLookupPool_PreservesColorForAColorTerminal(t *testing.T) {
 	// Concurrency must be set: runLookupPool does g.SetLimit(opts.Concurrency)
 	// and a limit of 0 blocks forever. runLookup rejects 0 before it ever
 	// reaches here, but a direct pool call bypasses that guard.
-	opts := lookupOptions{NoFollow: true, Concurrency: 1}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, NoFollow: true, Concurrency: 1}
 	sources := []model.SourceID{model.SourceRegistryRDAP}
 	client := newTestClient(t, bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL}), opts, sources)
 
@@ -2062,7 +2062,7 @@ func TestRunLookup_WHOISPacingFollowsDomainCount(t *testing.T) {
 		defer cancel()
 
 		var stdout, stderr bytes.Buffer
-		opts := lookupOptions{
+		opts := lookupOptions{whoisDial: fakeWHOIS.Dial,
 			whoisIANAServer: ianaAddr,
 			SourceFilter:    "whois", // no RDAP: real bootstrap coverage for a fake TLD must never matter
 			NoFollow:        true,
@@ -2159,7 +2159,7 @@ func TestRunLookupPool_NoColorFlagStripsANSIOnAColorTerminal(t *testing.T) {
 	}))
 	defer rdapSrv.Close()
 
-	opts := lookupOptions{NoFollow: true, Concurrency: 1, NoColor: true}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, NoFollow: true, Concurrency: 1, NoColor: true}
 	client := newTestClient(t, bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL}), opts, []model.SourceID{model.SourceRegistryRDAP})
 
 	ui := applyNoColor(uiConfig{Profile: colorprofile.TrueColor, Width: 80}, opts.NoColor)
@@ -2197,7 +2197,7 @@ func TestRunLookupPool_FailedNamesLeaveNoBlankLines(t *testing.T) {
 	}))
 	defer rdapSrv.Close()
 
-	opts := lookupOptions{NoFollow: true, Concurrency: 1}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, NoFollow: true, Concurrency: 1}
 	client := newTestClient(t, bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL}), opts, []model.SourceID{model.SourceRegistryRDAP})
 
 	for _, names := range [][]string{
@@ -2239,7 +2239,7 @@ func TestRunLookupPool_StdoutWriteErrorIsReturned(t *testing.T) {
 	}))
 	defer rdapSrv.Close()
 
-	opts := lookupOptions{NoFollow: true, Concurrency: 1}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, NoFollow: true, Concurrency: 1}
 	client := newTestClient(t, bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL}), opts, []model.SourceID{model.SourceRegistryRDAP})
 
 	var stderr bytes.Buffer

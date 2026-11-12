@@ -3,6 +3,7 @@ package plat
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -54,8 +55,19 @@ type Options struct {
 	DisableWHOISPacing bool
 	// HTTPClient is used for RDAP requests and the IANA bootstrap fetch that
 	// New performs to load RDAP base URLs. nil means http.DefaultClient.
-	// Exposed so an embedding library can route plat's every outbound request
-	// through a caller-supplied transport, for a proxy or for instrumentation.
+	// Exposed so an embedding library can route plat's RDAP requests through
+	// a caller-supplied transport, for a proxy or for instrumentation; Dial
+	// does the same for WHOIS.
+	//
+	// plat's default client refuses to follow a registry's link to the
+	// registrar's RDAP server, or a redirect from it, to a loopback,
+	// private or link-local address: the registry's answer, not the
+	// caller, chose that URL. With RDAP servers from IANA's bootstrap
+	// data (Resolver nil), every RDAP connection is checked the same way,
+	// so a registry cannot redirect plat there either; a caller's Resolver
+	// may name a private mirror, so its servers are not. A caller's client is used as given, so a
+	// program that embeds plat in a server and supplies one should apply
+	// its own address policy in the client's transport.
 	HTTPClient *http.Client
 	// Resolver supplies RDAP base URLs. nil means load IANA's published
 	// bootstrap data, which is what almost every caller wants. Set it to
@@ -70,6 +82,19 @@ type Options struct {
 	// TLD's registry WHOIS server. Empty means whois.iana.org. Set it to
 	// use an internal mirror.
 	WHOISIANAServer string
+	// Dial opens every WHOIS connection, in the shape of
+	// net.Dialer.DialContext. nil means plat's own dialer.
+	//
+	// Each WHOIS answer names the next server to query: IANA names the
+	// registry, the registry names the registrar. plat follows those
+	// referrals only on port 43, whatever Dial is. Its own dialer also
+	// refuses a referral that resolves to a loopback, private or
+	// link-local address, since no real WHOIS server is on one; the
+	// WHOISIANAServer the caller configures is not checked. A caller's
+	// Dial replaces that address check with its own policy, so set one to
+	// route WHOIS through a proxy, or to enforce rules for a program that
+	// runs plat inside a network it must not expose.
+	Dial func(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
 // Client performs lookups. It holds the IANA bootstrap resolver, a
@@ -81,6 +106,10 @@ type Options struct {
 type Client struct {
 	opts     Options
 	resolver *bootstrap.Resolver
+	// bootstrapped is true when resolver came from IANA's bootstrap data
+	// rather than Options.Resolver: every RDAP server it names is public,
+	// so every default-client RDAP connection is guarded.
+	bootstrapped bool
 	// limiter is the whois.Limiter interface, not *whois.HostLimiter, so
 	// that "no pacing" is a true nil interface. A nil *HostLimiter stored
 	// here would arrive at collect.Options.Limiter as a non-nil interface
@@ -141,10 +170,11 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 	}
 
 	return &Client{
-		opts:      opts,
-		resolver:  resolver,
-		limiter:   limiter,
-		ianaCache: whois.NewIANACache(),
+		opts:         opts,
+		resolver:     resolver,
+		bootstrapped: opts.Resolver == nil,
+		limiter:      limiter,
+		ianaCache:    whois.NewIANACache(),
 	}, nil
 }
 
@@ -225,6 +255,8 @@ func (c *Client) Lookup(ctx context.Context, input string) (Result, error) {
 			Limiter:    c.limiter,
 			IANACache:  c.ianaCache,
 			HTTPClient: c.opts.HTTPClient,
+			Dial:       c.opts.Dial,
+			GuardRDAP:  c.bootstrapped,
 		})
 		rec := merge.Merge(records)
 		res.Kind, res.Domain, sources = KindDomain, &rec, rec.Sources
@@ -236,6 +268,8 @@ func (c *Client) Lookup(ctx context.Context, input string) (Result, error) {
 			Sources:    c.opts.Sources,
 			Limiter:    c.limiter,
 			HTTPClient: c.opts.HTTPClient,
+			Dial:       c.opts.Dial,
+			GuardRDAP:  c.bootstrapped,
 		})
 		rec := merge.MergeIP(records)
 		res.Kind, res.IP, sources = KindIP, &rec, rec.Sources
@@ -247,6 +281,8 @@ func (c *Client) Lookup(ctx context.Context, input string) (Result, error) {
 			Sources:    c.opts.Sources,
 			Limiter:    c.limiter,
 			HTTPClient: c.opts.HTTPClient,
+			Dial:       c.opts.Dial,
+			GuardRDAP:  c.bootstrapped,
 		})
 		rec := merge.MergeASN(records)
 		res.Kind, res.ASN, sources = KindASN, &rec, rec.Sources

@@ -75,6 +75,13 @@ type Client struct {
 	Timeout   time.Duration
 	MaxBody   int64
 	UserAgent string
+	// GuardAll treats every request as a referral, not only a registrar
+	// link: with the default client, no connection -- a redirect included
+	// -- may reach a non-public address. Set when base URLs come from
+	// IANA's bootstrap data, which lists only public servers, so a
+	// registry server cannot redirect plat onto the caller's network.
+	// Left false for a caller's Resolver, which may name a private mirror.
+	GuardAll bool
 }
 
 // defaultHTTP is the client used when Client.HTTP is nil. A variable so
@@ -130,17 +137,18 @@ func (c *Client) do(ctx context.Context, reqURL string) (*rawResponse, error) {
 	// the defaults; a host that then succeeds is remembered, so later
 	// requests go straight to the fallback. Only plat's own default client
 	// does this: a caller's http.Client keeps its TLS policy, and a server
-	// that can do better never sees the weaker suites (#129).
-	hc := c.httpClient()
-	viaFallback := c.HTTP == nil && tlsFallback.needs(req.URL.Host)
+	// that can do better never sees the weaker suites (#129). A referral
+	// request uses the guarded client and its own fallback (see clientFor).
+	hc, fallback := c.clientFor(req)
+	viaFallback := c.HTTP == nil && fallback.needs(req.URL.Host)
 	if viaFallback {
-		hc = tlsFallback.clientFor(hc)
+		hc = fallback.clientFor(hc)
 	}
 	resp, err := hc.Do(req)
 	if err != nil && c.HTTP == nil && !viaFallback && isTLSHandshakeFailure(err) {
-		resp, err = tlsFallback.clientFor(hc).Do(req.Clone(ctx))
+		resp, err = fallback.clientFor(hc).Do(req.Clone(ctx))
 		if err == nil {
-			tlsFallback.remember(req.URL.Host)
+			fallback.remember(req.URL.Host)
 		}
 	}
 	if err != nil {
@@ -241,7 +249,8 @@ func (c *Client) DomainURL(ctx context.Context, rawURL string) (*Result, error) 
 	ctx, cancel := context.WithTimeout(ctx, c.timeout())
 	defer cancel()
 
-	return c.domainAt(ctx, rawURL)
+	// The URL came from a registry's answer, not the caller: a referral.
+	return c.domainAt(withReferral(ctx), rawURL)
 }
 
 // fetchAt is the shared fetch-and-parse core behind Domain, IP, and ASN:

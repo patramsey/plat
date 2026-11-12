@@ -49,7 +49,7 @@ func CollectIP(ctx context.Context, addr netip.Addr, baseURL, whoisIANAServer st
 }
 
 func collectIPRDAP(ctx context.Context, addr netip.Addr, baseURL string, opts Options) []source.IPSourceRecord {
-	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient}
+	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient, GuardAll: opts.GuardRDAP}
 	start := time.Now()
 	result, err := rdapClient.IP(ctx, baseURL, addr)
 
@@ -81,7 +81,7 @@ func collectIPWHOIS(ctx context.Context, addr netip.Addr, whoisIANAServer string
 	// ChainTimeout rather than a context.WithTimeout wrap here: a pacing
 	// wait must not be charged against the same budget as the actual
 	// network hops.
-	whoisClient := &whois.Client{Timeout: timeout, ChainTimeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter}
+	whoisClient := &whois.Client{Timeout: timeout, ChainTimeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter, Dial: opts.Dial}
 	result, _ := whoisClient.LookupIP(ctx, addr)
 	return fromIPWHOIS(result)
 }

@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/patramsey/plat/internal/testnet"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/model"
 )
@@ -24,10 +25,16 @@ import (
 // server (example.com's registry really does name whois.iana.org). So
 // one host, IANA's, is queried twice -- the only shape that can tell
 // paced from un-paced apart, since a limiter never delays the first
-// query to a given server. It returns the IANA host's address.
+// query to a given server. It returns the IANA host's name: its answers
+// refer by name, since plat refuses a referral by port or to loopback,
+// and the caller passes fakeWHOIS.Dial to reach them.
 //
 // The registry and IANA are separate listeners because a registry that
 // names itself as the registrar server is not followed at all.
+// fakeWHOIS maps the names selfReferringWHOIS hands out onto its
+// listeners; see internal/testnet.
+var fakeWHOIS testnet.Registry
+
 func selfReferringWHOIS(t *testing.T) string {
 	t.Helper()
 	listen := func() net.Listener {
@@ -55,6 +62,7 @@ func selfReferringWHOIS(t *testing.T) string {
 		}()
 	}
 	iana, registry := listen(), listen()
+	ianaName, registryName := fakeWHOIS.Add(iana.Addr().String()), fakeWHOIS.Add(registry.Addr().String())
 
 	var mu sync.Mutex
 	var ianaQueries int
@@ -63,16 +71,16 @@ func selfReferringWHOIS(t *testing.T) string {
 		defer mu.Unlock()
 		ianaQueries++
 		if ianaQueries == 1 { // IANA hop: the TLD's registry is the other host
-			return "refer: " + registry.Addr().String() + "\n"
+			return "refer: " + registryName + "\n"
 		}
 		// registrar hop, back on the IANA host: terminal
 		return "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
 	})
 	serve(registry, func() string {
 		return "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n" +
-			"Registrar WHOIS Server: " + iana.Addr().String() + "\n"
+			"Registrar WHOIS Server: " + ianaName + "\n"
 	})
-	return iana.Addr().String()
+	return ianaName
 }
 
 func TestNew_DefaultsAreApplied(t *testing.T) {
@@ -153,6 +161,7 @@ func selfReferringWHOISTwoHops(t *testing.T) string {
 		t.Fatalf("listen: %v", err)
 	}
 	t.Cleanup(func() { _ = ln.Close() })
+	name := fakeWHOIS.Add(ln.Addr().String())
 
 	var mu sync.Mutex
 	var hop int
@@ -173,7 +182,7 @@ func selfReferringWHOISTwoHops(t *testing.T) string {
 				mu.Unlock()
 				var reply string
 				if n == 1 { // IANA hop: the TLD's registry server is this host
-					reply = "refer: " + ln.Addr().String() + "\n"
+					reply = "refer: " + name + "\n"
 				} else { // registry hop: terminal, no registrar referral
 					reply = "Domain Name: EXAMPLE.COM\nRegistrar: Example Registrar, Inc.\n"
 				}
@@ -181,7 +190,7 @@ func selfReferringWHOISTwoHops(t *testing.T) string {
 			}()
 		}
 	}()
-	return ln.Addr().String()
+	return name
 }
 
 // TestNew_DefaultWHOISIntervalPacesQueries proves a default-constructed
@@ -200,6 +209,7 @@ func TestNew_DefaultWHOISIntervalPacesQueries(t *testing.T) {
 		Timeout:         5 * time.Second,
 		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{}}), // no RDAP: WHOIS-only
 		WHOISIANAServer: addr,
+		Dial:            fakeWHOIS.Dial,
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -367,6 +377,7 @@ func TestLookup_PacingDelaysRepeatQueriesToOneServer(t *testing.T) {
 		WHOISInterval:   interval,
 		Resolver:        NewResolver(ResolverConfig{Domains: map[string]string{}}), // no RDAP: WHOIS-only
 		WHOISIANAServer: addr,
+		Dial:            fakeWHOIS.Dial,
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -407,6 +418,7 @@ func TestLookup_DisableWHOISPacingSkipsTheWait(t *testing.T) {
 		WHOISInterval:      interval,
 		Resolver:           NewResolver(ResolverConfig{Domains: map[string]string{}}),
 		WHOISIANAServer:    addr,
+		Dial:               fakeWHOIS.Dial,
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)

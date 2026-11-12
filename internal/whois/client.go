@@ -6,6 +6,8 @@ import (
 	"io"
 	"net"
 	"time"
+
+	"github.com/patramsey/plat/internal/netguard"
 )
 
 // Client performs port-43 WHOIS lookups with IANA -> registry -> registrar
@@ -36,8 +38,12 @@ type Client struct {
 	// bounded only by Timeout. That is the correct standalone behavior
 	// for a Client used directly; internal/collect sets both fields.
 	ChainTimeout time.Duration
-	// Dialer is used to open each TCP connection. Defaults to &net.Dialer{}.
-	Dialer *net.Dialer
+	// Dial opens each TCP connection. nil means plat's own dialer, which
+	// refuses a referral -- a server named by an answer rather than by the
+	// caller -- that resolves to a loopback, private or link-local address
+	// (see internal/netguard). A caller's Dial replaces that check with its
+	// own policy. Either way, a referral is followed only on port 43.
+	Dial func(ctx context.Context, network, addr string) (net.Conn, error)
 	// Limiter paces outbound queries per server. nil means no pacing,
 	// which is correct for a single lookup: one query to one server
 	// needs no throttle. Bulk runs set it so every worker shares one.
@@ -63,11 +69,17 @@ func (c *Client) timeout() time.Duration {
 	return 5 * time.Second
 }
 
-func (c *Client) dialer() *net.Dialer {
-	if c.Dialer != nil {
-		return c.Dialer
+// dial opens a connection to addr. Without a caller's Dial, a referral
+// connection goes through netguard, which refuses non-public addresses
+// after name resolution; a server the caller configured does not.
+func (c *Client) dial(ctx context.Context, addr string) (net.Conn, error) {
+	if c.Dial != nil {
+		return c.Dial(ctx, "tcp", addr)
 	}
-	return &net.Dialer{}
+	if isReferral(ctx) {
+		return netguard.Dialer().DialContext(ctx, "tcp", addr)
+	}
+	return (&net.Dialer{}).DialContext(ctx, "tcp", addr)
 }
 
 // hopDeadline returns the instant a hop starting now must be finished
@@ -112,7 +124,7 @@ func (c *Client) query(ctx context.Context, server, line string) (string, error)
 	ctx, cancel := context.WithDeadline(ctx, c.hopDeadline(ctx))
 	defer cancel()
 
-	conn, err := c.dialer().DialContext(ctx, "tcp", addr)
+	conn, err := c.dial(ctx, addr)
 	if err != nil {
 		return "", fmt.Errorf("whois: dialing %s: %w", addr, err)
 	}

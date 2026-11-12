@@ -81,8 +81,13 @@ func (c *Client) ianaHop(ctx context.Context, tld string) Hop {
 // so it's parsed with the default/kv template ("" below), not name.TLD —
 // see Lookup's registrar-hop comment for why a registrar server's reply
 // format doesn't depend on the queried domain's TLD dialect.
+//
+// server comes from an RDAP answer, so it is a referral: followed only on
+// port 43, and through netguard unless the caller supplied Dial.
 func (c *Client) QueryServer(ctx context.Context, server string, name domain.Name) Hop {
-	return c.hop(ctx, server, name.Punycode, "")
+	return c.followReferral(ctx, server, func(ctx context.Context, server string) Hop {
+		return c.hop(ctx, server, name.Punycode, "")
+	})
 }
 
 // Lookup performs IANA -> registry -> registrar referral chasing for
@@ -103,12 +108,23 @@ func (c *Client) Lookup(ctx context.Context, name domain.Name) (*Result, error) 
 	result.Hops = append(result.Hops, ianaHop)
 
 	registry := ianaHop.Fields.Refer
+	fromFallback := false
 	if ianaHop.Err == nil && registry == "" {
-		registry = registryFallback[name.TLD]
+		registry, fromFallback = registryFallback[name.TLD], true
 	}
 
 	if ianaHop.Err == nil && registry != "" {
-		registryHop := c.hop(ctx, registry, name.Punycode, name.TLD)
+		// registryFallback is plat's own table; a refer: line is a
+		// referral, checked like any other server an answer names.
+		queryRegistry := func(ctx context.Context, server string) Hop {
+			return c.hop(ctx, server, name.Punycode, name.TLD)
+		}
+		var registryHop Hop
+		if fromFallback {
+			registryHop = queryRegistry(ctx, registry)
+		} else {
+			registryHop = c.followReferral(ctx, registry, queryRegistry)
+		}
 		result.Hops = append(result.Hops, registryHop)
 
 		// A registry that names itself as the registrar server (.au's
@@ -124,7 +140,9 @@ func (c *Client) Lookup(ctx context.Context, name domain.Name) (*Result, error) 
 			// regardless of the queried domain's TLD dialect (e.g.
 			// brackets for .jp, indent for .uk), so it's parsed with the
 			// default/kv template ("") rather than name.TLD.
-			registrarHop := c.hop(ctx, registryHop.Fields.RegistrarWHOISServer, name.Punycode, "")
+			registrarHop := c.followReferral(ctx, registryHop.Fields.RegistrarWHOISServer, func(ctx context.Context, server string) Hop {
+				return c.hop(ctx, server, name.Punycode, "")
+			})
 			result.Hops = append(result.Hops, registrarHop)
 		}
 	}
@@ -150,7 +168,9 @@ func (c *Client) LookupIP(ctx context.Context, addr netip.Addr) (*Result, error)
 	result.Hops = append(result.Hops, ianaHop)
 
 	if ianaHop.Err == nil && ianaHop.Fields.Refer != "" {
-		result.Hops = append(result.Hops, c.ipHop(ctx, ianaHop.Fields.Refer, q))
+		result.Hops = append(result.Hops, c.followReferral(ctx, ianaHop.Fields.Refer, func(ctx context.Context, server string) Hop {
+			return c.ipHop(ctx, server, q)
+		}))
 	}
 
 	for _, h := range result.Hops {
@@ -198,7 +218,9 @@ func (c *Client) LookupASN(ctx context.Context, asn uint32) (*Result, error) {
 	result.Hops = append(result.Hops, ianaHop)
 
 	if ianaHop.Err == nil && ianaHop.Fields.Refer != "" {
-		result.Hops = append(result.Hops, c.asnHop(ctx, ianaHop.Fields.Refer, q))
+		result.Hops = append(result.Hops, c.followReferral(ctx, ianaHop.Fields.Refer, func(ctx context.Context, server string) Hop {
+			return c.asnHop(ctx, server, q)
+		}))
 	}
 
 	for _, h := range result.Hops {

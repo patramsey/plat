@@ -39,7 +39,7 @@ func TestCollectASN_RegistryRDAPPlusWHOIS(t *testing.T) {
 		return "refer:        " + rirWHOISAddr + "\n"
 	})
 
-	records := CollectASN(context.Background(), 15169, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	records := CollectASN(context.Background(), 15169, rdapSrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, Timeout: 2 * time.Second})
 
 	if len(records) != 2 {
 		t.Fatalf("len(records) = %d, want 2, got: %+v", len(records), records)
@@ -72,7 +72,7 @@ func TestCollectASN_EmptyBaseURLDegradesToWHOISOnly(t *testing.T) {
 		return "refer:        " + rirWHOISAddr + "\n"
 	})
 
-	records := CollectASN(context.Background(), 15169, "", ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	records := CollectASN(context.Background(), 15169, "", ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, Timeout: 2 * time.Second})
 
 	if len(records) != 1 {
 		t.Fatalf("len(records) = %d, want 1 (WHOIS-only), got: %+v", len(records), records)

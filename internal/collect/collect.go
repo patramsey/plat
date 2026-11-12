@@ -2,6 +2,7 @@ package collect
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -63,6 +64,13 @@ type Options struct {
 	// own transport -- for a proxy, custom timeouts, or instrumentation
 	// -- without plat owning a second HTTP stack.
 	HTTPClient *http.Client
+	// Dial opens every WHOIS connection. nil means plat's own dialer,
+	// which refuses a referral to a non-public address; see whois.Client.
+	Dial func(ctx context.Context, network, addr string) (net.Conn, error)
+	// GuardRDAP refuses every default-client RDAP connection to a
+	// non-public address, not only the registrar link; see
+	// rdap.Client.GuardAll.
+	GuardRDAP bool
 }
 
 func (o Options) allows(id model.SourceID) bool {
@@ -129,7 +137,7 @@ func Collect(ctx context.Context, name domain.Name, registryBaseURL string, whoi
 		// chain, so opts.Timeout as the per-hop bound is the whole story.
 		// Any pacing wait ahead of it happens before that per-hop
 		// deadline is taken, so it costs this query nothing either.
-		whoisClient := &whois.Client{Timeout: opts.Timeout, Limiter: opts.Limiter}
+		whoisClient := &whois.Client{Timeout: opts.Timeout, Limiter: opts.Limiter, Dial: opts.Dial}
 		hop := whoisClient.QueryServer(ctx, registrarPort43, name)
 		whoisOut = append(whoisOut, fromHop(model.SourceRegistrarWHOIS, hop))
 	}
@@ -157,7 +165,7 @@ func collectRDAP(ctx context.Context, name domain.Name, registryBaseURL string, 
 	var out []source.SourceRecord
 	var registrarPort43 string
 
-	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient}
+	rdapClient := &rdap.Client{Timeout: opts.Timeout, HTTP: opts.HTTPClient, GuardAll: opts.GuardRDAP}
 	start := time.Now()
 	result, err := rdapClient.Domain(ctx, registryBaseURL, name.Punycode)
 	if opts.allows(model.SourceRegistryRDAP) {
@@ -198,7 +206,7 @@ func collectWHOIS(ctx context.Context, name domain.Name, whoisIANAServer string,
 	// left to credit is a wait on another name's in-flight IANACache
 	// fetch -- and with neither (a lone lookup through the library's
 	// defaults) this behaves exactly like the outer deadline it replaces.
-	whoisClient := &whois.Client{Timeout: timeout, ChainTimeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter, IANACache: opts.IANACache}
+	whoisClient := &whois.Client{Timeout: timeout, ChainTimeout: timeout, IANAServer: whoisIANAServer, Limiter: opts.Limiter, IANACache: opts.IANACache, Dial: opts.Dial}
 	wResult, _ := whoisClient.Lookup(ctx, name)
 	for _, sr := range FromWHOIS(wResult) {
 		if opts.allows(sr.Meta.Source) {

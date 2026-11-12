@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/patramsey/plat/internal/domain"
+	"github.com/patramsey/plat/internal/testnet"
 )
 
 func TestClient_EchoesExactQuery(t *testing.T) {
@@ -103,7 +104,7 @@ func TestClient_ReferralChasing(t *testing.T) {
 	})
 
 	registryAddr := startListener(t, func(query string) string {
-		return fmt.Sprintf("Domain Name: EXAMPLE.COM\nRegistrar WHOIS Server: %s\nRegistrar: Example Registrar, Inc.\n", registrarAddr)
+		return fmt.Sprintf("Domain Name: EXAMPLE.COM\nRegistrar WHOIS Server: %s\nRegistrar: Example Registrar, Inc.\n", "registrar.test")
 	})
 
 	ianaAddr := startListener(t, func(query string) string {
@@ -113,10 +114,10 @@ func TestClient_ReferralChasing(t *testing.T) {
 		// once matched reality: the registry/registrar hops below were
 		// silently unreachable for every live domain until parse.go
 		// learned "whois" as a synonym for the same Refer field.
-		return fmt.Sprintf("whois:        %s\ndomain:       COM\n", registryAddr)
+		return fmt.Sprintf("whois:        %s\ndomain:       COM\n", "registry.test")
 	})
 
-	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
+	c := &Client{IANAServer: ianaAddr, Dial: testnet.Net{"registry.test": registryAddr, "registrar.test": registrarAddr}.Dial, Timeout: 2 * time.Second}
 	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
@@ -132,11 +133,11 @@ func TestClient_ReferralChasing(t *testing.T) {
 	if result.Hops[0].Server != ianaAddr {
 		t.Errorf("hop 0 server = %q, want %q", result.Hops[0].Server, ianaAddr)
 	}
-	if result.Hops[1].Server != registryAddr {
-		t.Errorf("hop 1 server = %q, want %q", result.Hops[1].Server, registryAddr)
+	if result.Hops[1].Server != "registry.test" {
+		t.Errorf("hop 1 server = %q, want %q", result.Hops[1].Server, "registry.test")
 	}
-	if result.Hops[2].Server != registrarAddr {
-		t.Errorf("hop 2 server = %q, want %q", result.Hops[2].Server, registrarAddr)
+	if result.Hops[2].Server != "registrar.test" {
+		t.Errorf("hop 2 server = %q, want %q", result.Hops[2].Server, "registrar.test")
 	}
 	if result.Hops[2].Fields.Registrar != "Example Registrar, Inc." {
 		t.Errorf("registrar = %q, want %q", result.Hops[2].Fields.Registrar, "Example Registrar, Inc.")
@@ -197,11 +198,11 @@ func TestClient_ReferralChasing_BracketsDialectTLD(t *testing.T) {
 	ianaAddr := startListener(t, func(query string) string {
 		// See TestClient_ReferralChasing's comment: real whois.iana.org
 		// responses use "whois:", not "refer:".
-		return fmt.Sprintf("whois:        %s\ndomain:       JP\n", registryAddr)
+		return fmt.Sprintf("whois:        %s\ndomain:       JP\n", "registry.test")
 	})
 	_ = registrarAddr // the registry response above has no "Registrar WHOIS Server" field, so the chain stops at 2 hops — that's fine, this test's purpose is proving the IANA hop's whois: line parses correctly for a brackets-dialect TLD, not exercising a full 3-hop chain
 
-	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
+	c := &Client{IANAServer: ianaAddr, Dial: testnet.Net{"registry.test": registryAddr}.Dial, Timeout: 2 * time.Second}
 	q, err := domain.Normalize("example.jp")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
@@ -214,11 +215,11 @@ func TestClient_ReferralChasing_BracketsDialectTLD(t *testing.T) {
 	if len(result.Hops) != 2 {
 		t.Fatalf("Hops = %d, want 2 (IANA + registry; the IANA hop's whois: line must parse correctly even though .jp's own template is brackets-dialect)", len(result.Hops))
 	}
-	if result.Hops[0].Fields.Refer != registryAddr {
-		t.Errorf("IANA hop Refer = %q, want %q (this is the regression this test guards: the IANA hop must be parsed with the default kv dialect, not .jp's brackets dialect, since IANA's own response format is always plain kv text regardless of the queried TLD)", result.Hops[0].Fields.Refer, registryAddr)
+	if result.Hops[0].Fields.Refer != "registry.test" {
+		t.Errorf("IANA hop Refer = %q, want %q (this is the regression this test guards: the IANA hop must be parsed with the default kv dialect, not .jp's brackets dialect, since IANA's own response format is always plain kv text regardless of the queried TLD)", result.Hops[0].Fields.Refer, "registry.test")
 	}
-	if result.Hops[1].Server != registryAddr {
-		t.Errorf("hop 1 server = %q, want %q", result.Hops[1].Server, registryAddr)
+	if result.Hops[1].Server != "registry.test" {
+		t.Errorf("hop 1 server = %q, want %q", result.Hops[1].Server, "registry.test")
 	}
 	wantNS := []string{"a.dns.jp"}
 	if len(result.Hops[1].Fields.Nameservers) != len(wantNS) || result.Hops[1].Fields.Nameservers[0] != wantNS[0] {
@@ -304,8 +305,8 @@ func TestClient_QueryServerSkipsReferralChasing(t *testing.T) {
 	}
 	name := q.Name
 
-	c := &Client{Timeout: 2 * time.Second}
-	hop := c.QueryServer(context.Background(), ln.Addr().String(), name)
+	c := &Client{Timeout: 2 * time.Second, Dial: testnet.Net{"whois.registrar.test": ln.Addr().String()}.Dial}
+	hop := c.QueryServer(context.Background(), "whois.registrar.test", name)
 	<-done
 
 	if hop.Err != nil {
@@ -331,14 +332,14 @@ func TestClient_ReferralChasing_RegistrarHopUsesGenericTemplateNotDomainTLD(t *t
 	})
 
 	registryAddr := startListener(t, func(query string) string {
-		return fmt.Sprintf("[Domain Name]                  EXAMPLE.JP\n[Registrar WHOIS Server]       %s\n", registrarAddr)
+		return fmt.Sprintf("[Domain Name]                  EXAMPLE.JP\n[Registrar WHOIS Server]       %s\n", "registrar.test")
 	})
 
 	ianaAddr := startListener(t, func(query string) string {
-		return fmt.Sprintf("whois:        %s\ndomain:       JP\n", registryAddr)
+		return fmt.Sprintf("whois:        %s\ndomain:       JP\n", "registry.test")
 	})
 
-	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second}
+	c := &Client{IANAServer: ianaAddr, Dial: testnet.Net{"registry.test": registryAddr, "registrar.test": registrarAddr}.Dial, Timeout: 2 * time.Second}
 	q, err := domain.Normalize("example.jp")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
@@ -361,10 +362,10 @@ func TestLookupIP_FollowsIANAReferral(t *testing.T) {
 		return "NetRange:       8.8.8.0 - 8.8.8.255\nNetName:        GOGL\nOrgName:        Google LLC\n"
 	})
 	ianaAddr := startListener(t, func(q string) string {
-		return "refer:          " + rirAddr + "\n"
+		return "refer:          rir.test\n"
 	})
 
-	c := &Client{IANAServer: ianaAddr, Timeout: 5 * time.Second}
+	c := &Client{IANAServer: ianaAddr, Dial: testnet.Net{"rir.test": rirAddr}.Dial, Timeout: 5 * time.Second}
 	res, err := c.LookupIP(context.Background(), netip.MustParseAddr("8.8.8.8"))
 	if err != nil {
 		t.Fatalf("LookupIP: %v", err)
@@ -440,15 +441,15 @@ func TestClient_LookupAcquiresLimiterForEveryHop(t *testing.T) {
 	})
 
 	registryAddr := startListener(t, func(query string) string {
-		return fmt.Sprintf("Domain Name: EXAMPLE.COM\nRegistrar WHOIS Server: %s\nRegistrar: Example Registrar, Inc.\n", registrarAddr)
+		return fmt.Sprintf("Domain Name: EXAMPLE.COM\nRegistrar WHOIS Server: %s\nRegistrar: Example Registrar, Inc.\n", "registrar.test")
 	})
 
 	ianaAddr := startListener(t, func(query string) string {
-		return fmt.Sprintf("whois:        %s\ndomain:       COM\n", registryAddr)
+		return fmt.Sprintf("whois:        %s\ndomain:       COM\n", "registry.test")
 	})
 
 	f := &fakeLimiter{}
-	c := &Client{IANAServer: ianaAddr, Timeout: 2 * time.Second, Limiter: f}
+	c := &Client{IANAServer: ianaAddr, Dial: testnet.Net{"registry.test": registryAddr, "registrar.test": registrarAddr}.Dial, Timeout: 2 * time.Second, Limiter: f}
 	q, err := domain.Normalize("example.com")
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
@@ -461,7 +462,7 @@ func TestClient_LookupAcquiresLimiterForEveryHop(t *testing.T) {
 		t.Fatalf("Hops = %d, want 3", len(result.Hops))
 	}
 
-	want := []string{ianaAddr, registryAddr, registrarAddr}
+	want := []string{ianaAddr, "registry.test", "registrar.test"}
 	if len(f.servers) != len(want) {
 		t.Fatalf("limiter acquired %d times, want %d (one per hop): got %v", len(f.servers), len(want), f.servers)
 	}
@@ -481,10 +482,10 @@ func TestLookupASN_FollowsIANAReferral(t *testing.T) {
 	var ianaReceived string
 	ianaAddr := startListener(t, func(q string) string {
 		ianaReceived = q
-		return "whois:          " + rirAddr + "\n"
+		return "whois:          rir.test\n"
 	})
 
-	c := &Client{IANAServer: ianaAddr, Timeout: 5 * time.Second}
+	c := &Client{IANAServer: ianaAddr, Dial: testnet.Net{"rir.test": rirAddr}.Dial, Timeout: 5 * time.Second}
 	res, err := c.LookupASN(context.Background(), 15169)
 	if err != nil {
 		t.Fatalf("LookupASN: %v", err)

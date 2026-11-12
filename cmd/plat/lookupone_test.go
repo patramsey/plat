@@ -17,7 +17,13 @@ import (
 	"github.com/patramsey/plat"
 	"github.com/patramsey/plat/internal/bootstrap"
 	"github.com/patramsey/plat/internal/render"
+
+	"github.com/patramsey/plat/internal/testnet"
 )
+
+// fakeWHOIS maps the names startFakeWHOISListener returns onto its
+// listeners; see internal/testnet.
+var fakeWHOIS testnet.Registry
 
 func startFakeWHOISListener(t *testing.T, respond func(query string) string) string {
 	t.Helper()
@@ -41,7 +47,7 @@ func startFakeWHOISListener(t *testing.T, respond func(query string) string) str
 			}()
 		}
 	}()
-	return ln.Addr().String()
+	return fakeWHOIS.Add(ln.Addr().String())
 }
 
 // newTestClient builds the single *plat.Client lookupOne now takes,
@@ -59,6 +65,7 @@ func newTestClient(t *testing.T, resolver *plat.Resolver, opts lookupOptions, so
 		Sources:         sources,
 		NoFollow:        opts.NoFollow,
 		WHOISIANAServer: opts.whoisIANAServer,
+		Dial:            opts.whoisDial,
 	})
 	if err != nil {
 		t.Fatalf("plat.New: %v", err)
@@ -88,7 +95,7 @@ func TestLookupOne_HappyPath_RDAPAndWHOIS(t *testing.T) {
 	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr, NoFollow: true}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "example.com",
@@ -121,7 +128,7 @@ func TestLookupOne_WHOISOnlyDegradedMode(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr, NoFollow: true}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "example.com",
@@ -161,7 +168,7 @@ func TestLookupOne_NotFound_ExitCode1(t *testing.T) {
 	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr, NoFollow: true}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "example.com",
@@ -184,7 +191,7 @@ func TestLookupOne_FailurePath_ExitCode3(t *testing.T) {
 	resolver := bootstrap.NewResolver(map[string]string{"com": "http://127.0.0.1:1/unreachable"})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: "127.0.0.1:1", NoFollow: true, Timeout: time.Second}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: "127.0.0.1:1", NoFollow: true, Timeout: time.Second}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "example.com",
@@ -229,7 +236,7 @@ func TestLookupOne_Diff(t *testing.T) {
 	})
 
 	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
-	baseOpts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	baseOpts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr, NoFollow: true}
 
 	// Produce a baseline -o json snapshot from a fresh lookup -- this is
 	// exactly what a user would have saved via `plat example.com -o json
@@ -325,7 +332,7 @@ func TestLookupOne_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	})
 
 	resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
-	baseOpts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	baseOpts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr, NoFollow: true}
 
 	var baseline, baselineErr bytes.Buffer
 	client := newTestClient(t, resolver, baseOpts, nil)
@@ -383,7 +390,7 @@ func TestLookupOne_SpinnerBranch_HumanFormat(t *testing.T) {
 	// checks to route work() through spinner.Run instead of calling it
 	// directly -- this is the one branch none of the other tests in this
 	// file exercise.
-	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr, NoFollow: true}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "example.com",
@@ -439,7 +446,7 @@ func TestLookupOne_IP_HappyPath_RDAPAndWHOIS(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
@@ -473,7 +480,7 @@ func TestLookupOne_IP_WHOISOnlyDegradedMode(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
@@ -515,7 +522,7 @@ func TestLookupOne_IP_NotFound_ExitCode1(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
@@ -540,7 +547,7 @@ func TestLookupOne_IP_FailurePath_ExitCode3(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: "127.0.0.1:1", Timeout: time.Second}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: "127.0.0.1:1", Timeout: time.Second}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
@@ -576,7 +583,7 @@ func TestLookupOne_IP_JSONOutput_ObjectTypeIsIP(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
@@ -620,7 +627,7 @@ func TestLookupOne_IP_Diff(t *testing.T) {
 	resolver := bootstrap.NewIPResolver(map[netip.Prefix]string{
 		netip.MustParsePrefix("8.8.8.0/24"): rdapSrv.URL,
 	})
-	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
+	baseOpts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 
 	// Produce a baseline -o json snapshot from a fresh lookup, exactly
 	// what a user would have saved via `plat 8.8.8.8 -o json > before.json`.
@@ -720,7 +727,7 @@ func TestLookupOne_IP_Diff_NoCIDRSnapshot(t *testing.T) {
 	})
 
 	resolver := bootstrap.NewIPResolver(nil)
-	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
+	baseOpts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 
 	// Produce a baseline -o json snapshot from a fresh lookup, exactly
 	// what a user would have saved via `plat 193.0.6.139 -o json > before.json`.
@@ -784,7 +791,7 @@ func TestLookupOne_IP_SpinnerBranch_HumanFormat(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "8.8.8.8",
@@ -824,7 +831,7 @@ func TestLookupOne_IP_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	resolver := bootstrap.NewIPResolver(map[netip.Prefix]string{
 		netip.MustParsePrefix("8.8.8.0/24"): rdapSrv.URL,
 	})
-	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
+	baseOpts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 
 	var baseline, baselineErr bytes.Buffer
 	client := newTestClient(t, resolver, baseOpts, nil)
@@ -890,7 +897,7 @@ func TestLookupOne_ASN_HappyPath_RDAPAndWHOIS(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
@@ -924,7 +931,7 @@ func TestLookupOne_ASN_WHOISOnlyDegradedMode(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
@@ -966,7 +973,7 @@ func TestLookupOne_ASN_NotFound_ExitCode1(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
@@ -991,7 +998,7 @@ func TestLookupOne_ASN_FailurePath_ExitCode3(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: "127.0.0.1:1", Timeout: time.Second}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: "127.0.0.1:1", Timeout: time.Second}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
@@ -1027,7 +1034,7 @@ func TestLookupOne_ASN_JSONOutput_ObjectTypeIsASN(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
@@ -1068,7 +1075,7 @@ func TestLookupOne_ASN_Diff(t *testing.T) {
 	resolver := bootstrap.NewASNResolver(map[[2]uint32]string{
 		{15169, 15169}: rdapSrv.URL,
 	})
-	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
+	baseOpts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 
 	// Produce a baseline -o json snapshot from a fresh lookup, exactly
 	// what a user would have saved via `plat AS15169 -o json > before.json`.
@@ -1155,7 +1162,7 @@ func TestLookupOne_ASN_Diff_RenderErrorPath_ExitCode3(t *testing.T) {
 	resolver := bootstrap.NewASNResolver(map[[2]uint32]string{
 		{15169, 15169}: rdapSrv.URL,
 	})
-	baseOpts := lookupOptions{whoisIANAServer: ianaAddr}
+	baseOpts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 
 	var baseline, baselineErr bytes.Buffer
 	client := newTestClient(t, resolver, baseOpts, nil)
@@ -1212,7 +1219,7 @@ func TestLookupOne_ASN_SpinnerBranch_HumanFormat(t *testing.T) {
 	})
 
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), &stdout, &stderr, client, "AS15169",
@@ -1269,7 +1276,7 @@ func TestLookupOne_ASN_RenderErrorPath_ExitCode3(t *testing.T) {
 	})
 
 	var stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr, Quiet: true}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr, Quiet: true}
 	client := newTestClient(t, resolver, opts, nil)
 	code := lookupOne(
 		context.Background(), errWriter{}, &stderr, client, "AS15169",
@@ -1315,7 +1322,7 @@ func TestLookupOne_SubdomainLooksUpRegisteredDomain(t *testing.T) {
 			resolver := bootstrap.NewResolver(map[string]string{"com": rdapSrv.URL})
 
 			var stdout, stderr bytes.Buffer
-			opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+			opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr, NoFollow: true}
 			client := newTestClient(t, resolver, opts, nil)
 			code := lookupOne(context.Background(), &stdout, &stderr, client, "https://www.example.com/x", opts, tc.format, uiConfig{})
 
@@ -1342,7 +1349,7 @@ func TestLookupOne_UnknownTLD(t *testing.T) {
 	})
 	resolver := bootstrap.NewResolver(map[string]string{})
 	var stdout, stderr bytes.Buffer
-	opts := lookupOptions{whoisIANAServer: ianaAddr, NoFollow: true}
+	opts := lookupOptions{whoisDial: fakeWHOIS.Dial, whoisIANAServer: ianaAddr, NoFollow: true}
 	client := newTestClient(t, resolver, opts, nil)
 
 	code := lookupOne(context.Background(), &stdout, &stderr, client, "exmaple.comm", opts, render.FormatPlain, uiConfig{})

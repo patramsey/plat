@@ -52,7 +52,7 @@ func TestCollectIP_RegistryRDAPPlusWHOIS(t *testing.T) {
 
 	addr := netip.MustParseAddr("8.8.8.8")
 
-	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, Timeout: 2 * time.Second})
 
 	if len(records) != 2 {
 		t.Fatalf("len(records) = %d, want 2, got: %+v", len(records), records)
@@ -87,7 +87,7 @@ func TestCollectIP_EmptyBaseURLDegradesToWHOISOnly(t *testing.T) {
 
 	addr := netip.MustParseAddr("8.8.8.8")
 
-	records := CollectIP(context.Background(), addr, "", ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	records := CollectIP(context.Background(), addr, "", ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, Timeout: 2 * time.Second})
 
 	if len(records) != 1 {
 		t.Fatalf("len(records) = %d, want 1 (WHOIS-only), got: %+v", len(records), records)
@@ -115,7 +115,7 @@ func TestCollectIP_NotFoundBothSources(t *testing.T) {
 
 	addr := netip.MustParseAddr("8.8.8.8")
 
-	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, Timeout: 2 * time.Second})
 
 	if len(records) != 2 {
 		t.Fatalf("len(records) = %d, want 2, got: %+v", len(records), records)
@@ -160,7 +160,7 @@ func TestCollectIP_RateLimitedWHOISNotReportedOK(t *testing.T) {
 
 	addr := netip.MustParseAddr("8.8.8.8")
 
-	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, Timeout: 2 * time.Second})
 
 	if len(records) != 2 {
 		t.Fatalf("len(records) = %d, want 2, got: %+v", len(records), records)
@@ -213,7 +213,7 @@ func TestCollectIP_SourceFilter(t *testing.T) {
 
 	addr := netip.MustParseAddr("8.8.8.8")
 
-	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial,
 		Timeout: 2 * time.Second,
 		Sources: []model.SourceID{model.SourceRegistryWHOIS},
 	})
@@ -253,7 +253,7 @@ func TestCollectIP_RegistryAndWHOIS_NoFalseRangeOrParentConflict(t *testing.T) {
 
 	addr := netip.MustParseAddr("8.8.8.8")
 
-	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, Timeout: 2 * time.Second})
 	rec := merge.MergeIP(records)
 
 	for _, c := range rec.Conflicts {
@@ -329,7 +329,7 @@ func TestCollectIP_RIPEStyle_NoFalseOrgNameConflict(t *testing.T) {
 
 	addr := netip.MustParseAddr("193.0.6.139")
 
-	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	records := CollectIP(context.Background(), addr, rdapSrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, Timeout: 2 * time.Second})
 	rec := merge.MergeIP(records)
 
 	for _, c := range rec.Conflicts {

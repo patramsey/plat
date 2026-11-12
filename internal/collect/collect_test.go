@@ -17,7 +17,13 @@ import (
 	"github.com/patramsey/plat/internal/source"
 	"github.com/patramsey/plat/internal/whois"
 	"github.com/patramsey/plat/model"
+
+	"github.com/patramsey/plat/internal/testnet"
 )
+
+// fakeWHOIS maps the names the listener helpers return onto their
+// listeners; see internal/testnet.
+var fakeWHOIS testnet.Registry
 
 func startWHOISListener(t *testing.T, respond func(query string) string) string {
 	t.Helper()
@@ -37,7 +43,7 @@ func startWHOISListener(t *testing.T, respond func(query string) string) string 
 		query := strings.TrimRight(string(buf[:n]), "\r\n")
 		_, _ = conn.Write([]byte(respond(query)))
 	}()
-	return ln.Addr().String()
+	return fakeWHOIS.Add(ln.Addr().String())
 }
 
 func TestCollect_RegistryAndRegistrarRDAPPlusWHOIS(t *testing.T) {
@@ -90,7 +96,9 @@ func TestCollect_RegistryAndRegistrarRDAPPlusWHOIS(t *testing.T) {
 	}
 	name := q.Name
 
-	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	// A caller's own client: plat's default refuses a registrar link to
+	// loopback, which is where httptest listens.
+	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, HTTPClient: &http.Client{}, Timeout: 2 * time.Second})
 
 	var gotRegistryRDAP, gotRegistrarRDAP bool
 	for _, s := range sources {
@@ -158,7 +166,7 @@ func TestCollect_NoFollowSkipsRegistrarHop(t *testing.T) {
 	}
 	name := q.Name
 
-	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{NoFollow: true, Timeout: 2 * time.Second})
+	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, NoFollow: true, Timeout: 2 * time.Second})
 
 	for _, s := range sources {
 		if s.Meta.Source == "registrar-rdap" {
@@ -184,7 +192,7 @@ func TestCollect_EmptyBaseURLSkipsRDAPEntirely(t *testing.T) {
 	}
 	name := q.Name
 
-	sources := Collect(context.Background(), name, "", ianaAddr, Options{Timeout: 2 * time.Second})
+	sources := Collect(context.Background(), name, "", ianaAddr, Options{Dial: fakeWHOIS.Dial, Timeout: 2 * time.Second})
 
 	for _, s := range sources {
 		if s.Meta.Source == "registry-rdap" || s.Meta.Source == "registrar-rdap" {
@@ -210,7 +218,7 @@ func TestCollect_WHOISOnlySources(t *testing.T) {
 	}
 	name := q.Name
 
-	sources := Collect(context.Background(), name, "", ianaAddr, Options{Timeout: 2 * time.Second})
+	sources := Collect(context.Background(), name, "", ianaAddr, Options{Dial: fakeWHOIS.Dial, Timeout: 2 * time.Second})
 
 	var gotRegistryWHOIS, gotRegistrarWHOIS bool
 	for _, s := range sources {
@@ -266,7 +274,7 @@ func TestCollect_SourceFilterRDAPOnly(t *testing.T) {
 	}
 	name := q.Name
 
-	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{
+	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial,
 		Timeout: 2 * time.Second,
 		Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistrarRDAP},
 	})
@@ -313,7 +321,7 @@ func TestCollect_SourceFilterWHOISOnly(t *testing.T) {
 	}
 	name := q.Name
 
-	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{
+	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial,
 		Timeout: 2 * time.Second,
 		Sources: []model.SourceID{model.SourceRegistryWHOIS, model.SourceRegistrarWHOIS},
 	})
@@ -379,7 +387,7 @@ func TestCollect_SourceFilterRegistryOnly(t *testing.T) {
 	}
 	name := q.Name
 
-	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{
+	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial,
 		Timeout: 2 * time.Second,
 		Sources: []model.SourceID{model.SourceRegistryRDAP, model.SourceRegistryWHOIS},
 	})
@@ -448,7 +456,7 @@ func TestCollect_SourceFilterRegistrarOnly(t *testing.T) {
 	}
 	name := q.Name
 
-	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{
+	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial,
 		Timeout: 2 * time.Second,
 		Sources: []model.SourceID{model.SourceRegistrarRDAP, model.SourceRegistrarWHOIS},
 	})
@@ -513,7 +521,7 @@ func TestCollect_RDAPAndWHOISRunConcurrently(t *testing.T) {
 	name := q.Name
 
 	start := time.Now()
-	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{
+	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial,
 		NoFollow: true,
 		Timeout:  2 * time.Second,
 	})
@@ -599,7 +607,9 @@ func TestCollect_Port43FallbackWhenRegistryWHOISGivesNoReferral(t *testing.T) {
 	}
 	name := q.Name
 
-	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	// A caller's own client: plat's default refuses a registrar link to
+	// loopback, which is where httptest listens.
+	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, HTTPClient: &http.Client{}, Timeout: 2 * time.Second})
 
 	var registrarWHOIS *source.SourceRecord
 	for i, s := range sources {
@@ -679,7 +689,7 @@ func TestCollect_Port43FallbackSkippedWhenReferralAlreadyFound(t *testing.T) {
 	}
 	name := q.Name
 
-	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Timeout: 2 * time.Second})
+	sources := Collect(context.Background(), name, registrySrv.URL, ianaWHOISAddr, Options{Dial: fakeWHOIS.Dial, Timeout: 2 * time.Second})
 
 	if fallbackQueried {
 		t.Error("port43 fallback server was queried even though the normal referral chain already found a registrar-whois server")
@@ -716,7 +726,7 @@ func TestCollect_WHOISTimeoutBoundsWholeChainNotEachHop(t *testing.T) {
 	name := q.Name
 
 	start := time.Now()
-	sources := Collect(context.Background(), name, "", ianaAddr, Options{Timeout: timeout})
+	sources := Collect(context.Background(), name, "", ianaAddr, Options{Dial: fakeWHOIS.Dial, Timeout: timeout})
 	elapsed := time.Since(start)
 
 	// Each hop's own delay (200ms) fits comfortably under Timeout (300ms)
@@ -773,7 +783,7 @@ func startLoopingWHOISListener(t *testing.T, hits *int32, respond func(query str
 			}()
 		}
 	}()
-	return ln.Addr().String()
+	return fakeWHOIS.Add(ln.Addr().String())
 }
 
 // TestCollect_BulkSharedLimiterAndIANACacheAllRetainRegistryWHOIS is C1's
@@ -815,7 +825,7 @@ func TestCollect_BulkSharedLimiterAndIANACacheAllRetainRegistryWHOIS(t *testing.
 	})
 
 	names := []string{"one.com", "two.com", "three.org", "four.org"}
-	opts := Options{
+	opts := Options{Dial: fakeWHOIS.Dial,
 		Timeout:   timeout,
 		Limiter:   whois.NewHostLimiter(interval),
 		IANACache: whois.NewIANACache(),
@@ -910,7 +920,7 @@ func TestCollect_BulkPacingIsNotChargedAgainstTheChainDeadline(t *testing.T) {
 		return "refer: " + addr + "\n"
 	})
 
-	opts := Options{
+	opts := Options{Dial: fakeWHOIS.Dial,
 		Timeout:   timeout,
 		Limiter:   whois.NewHostLimiter(interval),
 		IANACache: whois.NewIANACache(),
@@ -976,7 +986,7 @@ func TestCollect_UsesSuppliedHTTPClient(t *testing.T) {
 	tr := &countingTransport{}
 	name := domain.Name{Punycode: "example.com", Unicode: "example.com", TLD: "com"}
 
-	Collect(context.Background(), name, srv.URL, "127.0.0.1:1", Options{
+	Collect(context.Background(), name, srv.URL, "127.0.0.1:1", Options{Dial: fakeWHOIS.Dial,
 		Timeout:    2 * time.Second,
 		NoFollow:   true,
 		Sources:    []model.SourceID{model.SourceRegistryRDAP},
