@@ -6,6 +6,21 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-11-11
+
+Rebuilds the release binaries with Go 1.27.4. No change to plat's
+behaviour.
+
+### Security
+- v0.13.1's binaries were built with go1.27.3, which vulnerability
+  scanners flag for GO-2026-6859, a `net/http` server crash fixed in
+  go1.27.4. plat runs no HTTP server, so it was not exposed, but a scan
+  of the installed binary reported it. Scans of v0.13.1's binary also
+  reported two `golang.org/x/net/html` advisories, fixed in x/net
+  0.62.0, for a package plat does not use; the bump clears them.
+- Each release is now scanned with govulncheck before it is published,
+  and stops if the binary carries a known vulnerability.
+
 ## [0.13.1] - 2026-10-22
 
 Rebuilds the release binaries with Go 1.27.3: v0.13.0's were built with
@@ -755,7 +770,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.13.2...HEAD
+[0.13.2]: https://github.com/patramsey/plat/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/patramsey/plat/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/patramsey/plat/compare/v0.12.2...v0.13.0
 [0.12.2]: https://github.com/patramsey/plat/compare/v0.12.1...v0.12.2
