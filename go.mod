@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/charmbracelet/colorprofile v0.4.3
-	github.com/charmbracelet/x/ansi v0.11.9
+	github.com/charmbracelet/x/ansi v0.11.10
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/net v0.62.0
 	golang.org/x/sync v0.24.0
