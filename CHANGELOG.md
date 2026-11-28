@@ -6,6 +6,24 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-11-27
+
+Dependency updates and documentation. No change to plat's behaviour or
+output.
+
+### Changed
+- Updated lipgloss to 2.1.1, x/ansi to 0.11.10, and golang.org/x/net,
+  x/sync, x/term, x/sys and x/text to their latest releases. Terminal
+  output is byte-identical to v0.14.0's.
+
+### Documentation
+- `Options.HTTPClient` now says that a caller's own client does not get
+  the fallback for the twelve RDAP servers that offer only RSA key
+  exchange (`rdap.nic.cat` and others), and shows the `CipherSuites`
+  setting that restores it.
+- The README's library example checks `errors.Is(err, plat.ErrNotFound)`
+  rather than exiting on every error.
+
 ## [0.14.0] - 2026-11-12
 
 Fixes a server-side request forgery in referral chasing
@@ -809,7 +827,8 @@ Initial public release.
   Homebrew tap.
 - Man pages and shell completions generated at build time.
 
-[Unreleased]: https://github.com/patramsey/plat/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/patramsey/plat/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/patramsey/plat/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/patramsey/plat/compare/v0.13.2...v0.14.0
 [0.13.2]: https://github.com/patramsey/plat/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/patramsey/plat/compare/v0.13.0...v0.13.1
